@@ -1,0 +1,85 @@
+{
+  "protocol_version": 1,
+  "generation_id": "64caf716bcd449bfb0736d21e892064e",
+  "source": {
+    "format": {
+      "local_database": {
+        "kind": "missing"
+      },
+      "shared_store": {
+        "kind": "visible_v3",
+        "refs": [
+          "refs/heads/crosslink/agents/sooH",
+          "refs/heads/crosslink/checkpoint",
+          "refs/heads/crosslink/meta"
+        ]
+      }
+    },
+    "refs": {
+      "refs/heads/crosslink/agents/sooH": {
+        "authority_oid": "7d7a927e05fe73b467105fbfa61c77e589eb97e4",
+        "oid": "7d7a927e05fe73b467105fbfa61c77e589eb97e4",
+        "tree_oid": "7b80b56bb718243b40292c63588cec40bb318290",
+        "remote_oid": null,
+        "remote_tree_oid": null
+      },
+      "refs/heads/crosslink/checkpoint": {
+        "authority_oid": "a3f0b494525559a3adb29e604e4100ab7d6802d5",
+        "oid": "a3f0b494525559a3adb29e604e4100ab7d6802d5",
+        "tree_oid": "48e9b263dd30590ffd54a795224c94d961c2295b",
+        "remote_oid": null,
+        "remote_tree_oid": null
+      },
+      "refs/heads/crosslink/meta": {
+        "authority_oid": "a7329ad179c2a7f58fe89672bc14735d707c3635",
+        "oid": "a7329ad179c2a7f58fe89672bc14735d707c3635",
+        "tree_oid": "7cbfbba349bdd2a10932082e8effebadfd8afa43",
+        "remote_oid": null,
+        "remote_tree_oid": null
+      }
+    },
+    "local_fingerprint": null,
+    "fingerprint": "3f6f11be176c10ed4ee82cdb1f465eca7e9f55f102535ff0688bb0d3df2621f3"
+  },
+  "semantic_digest": "a479eef0c83333b832b39da3b29a38c8b604c1f942058bf47bc8ac11e284936e",
+  "targets": {
+    "refs/heads/crosslink/agents/sooH": {
+      "oid": "7d7a927e05fe73b467105fbfa61c77e589eb97e4",
+      "immutable_ref": "refs/heads/crosslink/reconciliation/generations/64caf716bcd449bfb0736d21e892064e/targets/5f76ec1fe1d5dc4e7299eb5eb19b56e1"
+    },
+    "refs/heads/crosslink/checkpoint": {
+      "oid": "a3f0b494525559a3adb29e604e4100ab7d6802d5",
+      "immutable_ref": "refs/heads/crosslink/reconciliation/generations/64caf716bcd449bfb0736d21e892064e/targets/1c1dbcde8b3f98fafb05e6ae9aefb746"
+    },
+    "refs/heads/crosslink/meta": {
+      "oid": "a7329ad179c2a7f58fe89672bc14735d707c3635",
+      "immutable_ref": "refs/heads/crosslink/reconciliation/generations/64caf716bcd449bfb0736d21e892064e/targets/c033bdc25838852d0bf50a3bd166e1a2"
+    }
+  },
+  "archives": {
+    "authority:refs/heads/crosslink/agents/sooH": {
+      "oid": "7d7a927e05fe73b467105fbfa61c77e589eb97e4",
+      "immutable_ref": "refs/heads/crosslink/reconciliation/archives/64caf716bcd449bfb0736d21e892064e/c4e2919e9cc62b016e6142a23705d637"
+    },
+    "authority:refs/heads/crosslink/checkpoint": {
+      "oid": "a3f0b494525559a3adb29e604e4100ab7d6802d5",
+      "immutable_ref": "refs/heads/crosslink/reconciliation/archives/64caf716bcd449bfb0736d21e892064e/bd68acb412473f39db32df27fa7e7d16"
+    },
+    "authority:refs/heads/crosslink/meta": {
+      "oid": "a7329ad179c2a7f58fe89672bc14735d707c3635",
+      "immutable_ref": "refs/heads/crosslink/reconciliation/archives/64caf716bcd449bfb0736d21e892064e/d74e8202d74f39d22a7296dcc910996e"
+    },
+    "refs/heads/crosslink/agents/sooH": {
+      "oid": "7d7a927e05fe73b467105fbfa61c77e589eb97e4",
+      "immutable_ref": "refs/heads/crosslink/reconciliation/archives/64caf716bcd449bfb0736d21e892064e/5f76ec1fe1d5dc4e7299eb5eb19b56e1"
+    },
+    "refs/heads/crosslink/checkpoint": {
+      "oid": "a3f0b494525559a3adb29e604e4100ab7d6802d5",
+      "immutable_ref": "refs/heads/crosslink/reconciliation/archives/64caf716bcd449bfb0736d21e892064e/1c1dbcde8b3f98fafb05e6ae9aefb746"
+    },
+    "refs/heads/crosslink/meta": {
+      "oid": "a7329ad179c2a7f58fe89672bc14735d707c3635",
+      "immutable_ref": "refs/heads/crosslink/reconciliation/archives/64caf716bcd449bfb0736d21e892064e/c033bdc25838852d0bf50a3bd166e1a2"
+    }
+  }
+}

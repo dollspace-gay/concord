@@ -2,15 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
+import { channelKey } from '../../api/types';
 import { UserProfilePopup } from '../members/UserProfilePopup';
 import type { HistoryMessage } from '../../api/types';
 
 const EMPTY_MESSAGES: HistoryMessage[] = [];
 
 export function MessageList() {
+  const activeServer = useUiStore((s) => s.activeServer);
   const activeChannel = useUiStore((s) => s.activeChannel);
-  const messages = useChatStore((s) => (activeChannel ? s.messages[activeChannel] ?? EMPTY_MESSAGES : EMPTY_MESSAGES));
-  const hasMore = useChatStore((s) => (activeChannel ? s.hasMore[activeChannel] ?? true : false));
+  const key = activeServer && activeChannel ? channelKey(activeServer, activeChannel) : null;
+  const messages = useChatStore((s) => (key ? s.messages[key] ?? EMPTY_MESSAGES : EMPTY_MESSAGES));
+  const hasMore = useChatStore((s) => (key ? s.hasMore[key] ?? true : false));
   const fetchHistory = useChatStore((s) => s.fetchHistory);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const prevLengthRef = useRef(0);
@@ -28,10 +31,10 @@ export function MessageList() {
   }, [messages.length]);
 
   const handleLoadMore = () => {
-    if (!activeChannel || !hasMore || messages.length === 0) return;
+    if (!activeServer || !activeChannel || !hasMore || messages.length === 0) return;
     const oldest = messages[0];
     if (oldest) {
-      fetchHistory(activeChannel, oldest.id);
+      fetchHistory(activeServer, activeChannel, oldest.id);
     }
   };
 

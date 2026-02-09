@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
+import { channelKey } from '../../api/types';
 import { UserProfilePopup } from './UserProfilePopup';
 import type { MemberInfo } from '../../api/types';
 
 const EMPTY_MEMBERS: MemberInfo[] = [];
 
 export function MemberList() {
+  const activeServer = useUiStore((s) => s.activeServer);
   const activeChannel = useUiStore((s) => s.activeChannel);
-  const members = useChatStore((s) => (activeChannel ? s.members[activeChannel] ?? EMPTY_MEMBERS : EMPTY_MEMBERS));
+  const key = activeServer && activeChannel ? channelKey(activeServer, activeChannel) : null;
+  const members = useChatStore((s) => (key ? s.members[key] ?? EMPTY_MEMBERS : EMPTY_MEMBERS));
   const avatars = useChatStore((s) => s.avatars);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [popupAnchor, setPopupAnchor] = useState<{ top: number; left: number } | null>(null);

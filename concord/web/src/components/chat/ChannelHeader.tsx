@@ -1,9 +1,13 @@
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
+import type { ChannelInfo } from '../../api/types';
+
+const EMPTY_CHANNELS: ChannelInfo[] = [];
 
 export function ChannelHeader() {
+  const activeServer = useUiStore((s) => s.activeServer);
   const activeChannel = useUiStore((s) => s.activeChannel);
-  const channels = useChatStore((s) => s.channels);
+  const channels = useChatStore((s) => (activeServer ? s.channels[activeServer] ?? EMPTY_CHANNELS : EMPTY_CHANNELS));
   const toggleMemberList = useUiStore((s) => s.toggleMemberList);
   const showMemberList = useUiStore((s) => s.showMemberList);
 

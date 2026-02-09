@@ -7,6 +7,8 @@ use super::events::SessionId;
 /// In-memory state for a single channel.
 #[derive(Debug)]
 pub struct ChannelState {
+    pub id: String,
+    pub server_id: String,
     pub name: String,
     pub topic: String,
     pub topic_set_by: Option<String>,
@@ -17,8 +19,10 @@ pub struct ChannelState {
 }
 
 impl ChannelState {
-    pub fn new(name: String) -> Self {
+    pub fn new(id: String, server_id: String, name: String) -> Self {
         Self {
+            id,
+            server_id,
             name,
             topic: String::new(),
             topic_set_by: None,

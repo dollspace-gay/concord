@@ -1,4 +1,5 @@
 import { useUiStore } from '../../stores/uiStore';
+import { ServerList } from '../servers/ServerList';
 import { ChannelList } from '../channels/ChannelList';
 import { ChannelHeader } from '../chat/ChannelHeader';
 import { MessageInput } from '../chat/MessageInput';
@@ -13,6 +14,9 @@ export function AppLayout() {
 
   return (
     <div className="flex h-full">
+      {/* Server icon strip */}
+      <ServerList />
+
       {/* Channel sidebar */}
       <div className="w-60 shrink-0">
         <ChannelList />

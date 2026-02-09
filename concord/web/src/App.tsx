@@ -1,41 +1,45 @@
 import { useEffect } from 'react';
 import { useAuthStore } from './stores/authStore';
 import { useChatStore } from './stores/chatStore';
+import { useUiStore } from './stores/uiStore';
 import { LoginPage } from './components/auth/LoginPage';
 import { AppLayout } from './components/layout/AppLayout';
 
-let renderCount = 0;
-
 function App() {
-  renderCount++;
   const user = useAuthStore((s) => s.user);
   const loading = useAuthStore((s) => s.loading);
   const checkAuth = useAuthStore((s) => s.checkAuth);
   const connect = useChatStore((s) => s.connect);
   const disconnect = useChatStore((s) => s.disconnect);
-
-  console.log(`[App] render #${renderCount} loading=${loading} user=${user?.username ?? 'null'}`);
+  const servers = useChatStore((s) => s.servers);
+  const listChannels = useChatStore((s) => s.listChannels);
+  const activeServer = useUiStore((s) => s.activeServer);
+  const setActiveServer = useUiStore((s) => s.setActiveServer);
 
   // Check auth on mount
   useEffect(() => {
-    console.log('[App] checkAuth effect firing');
     checkAuth();
   }, [checkAuth]);
 
   // Connect WebSocket when authenticated
   useEffect(() => {
     if (user) {
-      console.log('[App] connect effect firing for user:', user.username);
       connect(user.username);
       return () => {
-        console.log('[App] disconnect cleanup');
         disconnect();
       };
     }
   }, [user, connect, disconnect]);
 
+  // Auto-select first server when server list arrives and no server is active
+  useEffect(() => {
+    if (servers.length > 0 && !activeServer) {
+      setActiveServer(servers[0].id);
+      listChannels(servers[0].id);
+    }
+  }, [servers, activeServer, setActiveServer, listChannels]);
+
   if (loading) {
-    console.log('[App] rendering: loading spinner');
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-text-muted">Loading...</div>
@@ -44,11 +48,9 @@ function App() {
   }
 
   if (!user) {
-    console.log('[App] rendering: LoginPage');
     return <LoginPage />;
   }
 
-  console.log('[App] rendering: AppLayout');
   return <AppLayout />;
 }
 

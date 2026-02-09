@@ -21,7 +21,6 @@ use atproto_oauth::workflow::{
 use crate::auth::config::AuthConfig;
 use crate::auth::token::create_session_token;
 use crate::db::queries::users;
-
 use super::app_state::AppState;
 
 /// State for pending AT Protocol OAuth flows.

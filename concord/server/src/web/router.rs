@@ -17,11 +17,47 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     Router::new()
         // WebSocket
         .route("/ws", axum::routing::get(ws_handler::ws_upgrade))
-        // Public channel endpoints
+        // Public channel endpoints (default server, backward compat)
         .route("/api/channels", axum::routing::get(rest_api::get_channels))
         .route(
             "/api/channels/{name}/messages",
             axum::routing::get(rest_api::get_channel_history),
+        )
+        // Server endpoints (authenticated)
+        .route(
+            "/api/servers",
+            axum::routing::get(rest_api::list_servers)
+                .post(rest_api::create_server),
+        )
+        .route(
+            "/api/servers/{id}",
+            axum::routing::get(rest_api::get_server)
+                .delete(rest_api::delete_server),
+        )
+        .route(
+            "/api/servers/{id}/channels",
+            axum::routing::get(rest_api::list_server_channels),
+        )
+        .route(
+            "/api/servers/{id}/channels/{name}/messages",
+            axum::routing::get(rest_api::get_server_channel_history),
+        )
+        .route(
+            "/api/servers/{id}/members",
+            axum::routing::get(rest_api::list_server_members),
+        )
+        // Admin endpoints (system admin only)
+        .route(
+            "/api/admin/servers",
+            axum::routing::get(rest_api::admin_list_servers),
+        )
+        .route(
+            "/api/admin/servers/{id}",
+            axum::routing::delete(rest_api::admin_delete_server),
+        )
+        .route(
+            "/api/admin/users/{id}/admin",
+            axum::routing::put(rest_api::admin_set_admin),
         )
         // Auth status
         .route(

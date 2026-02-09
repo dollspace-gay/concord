@@ -6,16 +6,19 @@ use crate::db::models::MessageRow;
 pub async fn insert_message(
     pool: &SqlitePool,
     id: &str,
-    channel_name: &str,
+    server_id: &str,
+    channel_id: &str,
     sender_id: &str,
     sender_nick: &str,
     content: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO messages (id, channel_name, sender_id, sender_nick, content) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO messages (id, server_id, channel_id, sender_id, sender_nick, content) \
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(id)
-    .bind(channel_name)
+    .bind(server_id)
+    .bind(channel_id)
     .bind(sender_id)
     .bind(sender_nick)
     .bind(content)
@@ -34,7 +37,8 @@ pub async fn insert_dm(
     content: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO messages (id, sender_id, sender_nick, target_user_id, content) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO messages (id, sender_id, sender_nick, target_user_id, content) \
+         VALUES (?, ?, ?, ?, ?)",
     )
     .bind(id)
     .bind(sender_id)
@@ -50,38 +54,37 @@ pub async fn insert_dm(
 /// Returns messages before `before_time`, ordered newest first.
 pub async fn fetch_channel_history(
     pool: &SqlitePool,
-    channel_name: &str,
+    channel_id: &str,
     before_time: Option<&str>,
     limit: i64,
 ) -> Result<Vec<MessageRow>, sqlx::Error> {
-    let rows = match before_time {
+    match before_time {
         Some(before) => {
             sqlx::query_as::<_, MessageRow>(
-                "SELECT id, channel_name, sender_id, sender_nick, content, created_at, target_user_id \
+                "SELECT id, server_id, channel_id, sender_id, sender_nick, content, created_at, target_user_id \
                  FROM messages \
-                 WHERE channel_name = ? AND created_at < ? \
+                 WHERE channel_id = ? AND created_at < ? \
                  ORDER BY created_at DESC \
                  LIMIT ?",
             )
-            .bind(channel_name)
+            .bind(channel_id)
             .bind(before)
             .bind(limit)
             .fetch_all(pool)
-            .await?
+            .await
         }
         None => {
             sqlx::query_as::<_, MessageRow>(
-                "SELECT id, channel_name, sender_id, sender_nick, content, created_at, target_user_id \
+                "SELECT id, server_id, channel_id, sender_id, sender_nick, content, created_at, target_user_id \
                  FROM messages \
-                 WHERE channel_name = ? \
+                 WHERE channel_id = ? \
                  ORDER BY created_at DESC \
                  LIMIT ?",
             )
-            .bind(channel_name)
+            .bind(channel_id)
             .bind(limit)
             .fetch_all(pool)
-            .await?
+            .await
         }
-    };
-    Ok(rows)
+    }
 }

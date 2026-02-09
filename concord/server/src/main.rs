@@ -36,7 +36,12 @@ async fn main() {
     // Create the shared chat engine with database
     let engine = Arc::new(ChatEngine::new(Some(pool.clone())));
 
-    // Load persisted channels into memory
+    // Load persisted servers and channels into memory
+    engine
+        .load_servers_from_db()
+        .await
+        .expect("failed to load servers from database");
+
     engine
         .load_channels_from_db()
         .await

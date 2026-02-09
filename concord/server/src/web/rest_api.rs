@@ -9,16 +9,17 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::auth::token::{generate_irc_token, hash_irc_token};
-use crate::db::queries::users;
+use crate::db::queries::{servers, users};
 use crate::engine::events::HistoryMessage;
 
 use super::app_state::AppState;
 use super::auth_middleware::AuthUser;
 
-// ── Channel endpoints (public) ──────────────────────────
+// ── Channel endpoints (public, require server_id query param) ──
 
 #[derive(Deserialize)]
 pub struct HistoryParams {
+    pub server_id: Option<String>,
     pub before: Option<String>,
     pub limit: Option<i64>,
 }
@@ -30,11 +31,20 @@ pub struct HistoryResponse {
     pub has_more: bool,
 }
 
+#[derive(Deserialize)]
+pub struct ChannelListParams {
+    pub server_id: Option<String>,
+}
+
 pub async fn get_channel_history(
     State(state): State<Arc<AppState>>,
     Path(channel_name): Path<String>,
     Query(params): Query<HistoryParams>,
 ) -> impl IntoResponse {
+    let Some(server_id) = params.server_id else {
+        return (StatusCode::BAD_REQUEST, "server_id query parameter is required").into_response();
+    };
+
     let channel = if channel_name.starts_with('#') {
         channel_name
     } else {
@@ -45,7 +55,7 @@ pub async fn get_channel_history(
 
     match state
         .engine
-        .fetch_history(&channel, params.before.as_deref(), limit)
+        .fetch_history(&server_id, &channel, params.before.as_deref(), limit)
         .await
     {
         Ok((messages, has_more)) => Json(HistoryResponse {
@@ -58,8 +68,204 @@ pub async fn get_channel_history(
     }
 }
 
-pub async fn get_channels(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    Json(state.engine.list_channels())
+pub async fn get_channels(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<ChannelListParams>,
+) -> impl IntoResponse {
+    let Some(server_id) = params.server_id else {
+        return (StatusCode::BAD_REQUEST, "server_id query parameter is required").into_response();
+    };
+    Json(state.engine.list_channels(&server_id)).into_response()
+}
+
+// ── Server endpoints (authenticated) ────────────────────
+
+/// GET /api/servers — list the current user's servers.
+pub async fn list_servers(
+    State(state): State<Arc<AppState>>,
+    auth: AuthUser,
+) -> impl IntoResponse {
+    Json(state.engine.list_servers_for_user(&auth.user_id))
+}
+
+#[derive(Deserialize)]
+pub struct CreateServerRequest {
+    pub name: String,
+    pub icon_url: Option<String>,
+}
+
+/// POST /api/servers — create a new server.
+pub async fn create_server(
+    State(state): State<Arc<AppState>>,
+    auth: AuthUser,
+    Json(body): Json<CreateServerRequest>,
+) -> impl IntoResponse {
+    match state
+        .engine
+        .create_server(body.name, auth.user_id, body.icon_url)
+        .await
+    {
+        Ok(server_id) => {
+            let server = state.engine.list_all_servers().into_iter().find(|s| s.id == server_id);
+            (StatusCode::CREATED, Json(server)).into_response()
+        }
+        Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
+    }
+}
+
+/// GET /api/servers/:id — get server info.
+pub async fn get_server(
+    State(state): State<Arc<AppState>>,
+    Path(server_id): Path<String>,
+) -> impl IntoResponse {
+    match state.engine.list_all_servers().into_iter().find(|s| s.id == server_id) {
+        Some(server) => Json(server).into_response(),
+        None => (StatusCode::NOT_FOUND, "Server not found").into_response(),
+    }
+}
+
+/// DELETE /api/servers/:id — delete a server (owner only).
+pub async fn delete_server(
+    State(state): State<Arc<AppState>>,
+    Path(server_id): Path<String>,
+    auth: AuthUser,
+) -> impl IntoResponse {
+    if !state.engine.is_server_owner(&server_id, &auth.user_id) {
+        return (StatusCode::FORBIDDEN, "Only the server owner can delete it").into_response();
+    }
+    match state.engine.delete_server(&server_id).await {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
+    }
+}
+
+/// GET /api/servers/:id/channels — list channels in a server.
+pub async fn list_server_channels(
+    State(state): State<Arc<AppState>>,
+    Path(server_id): Path<String>,
+) -> impl IntoResponse {
+    Json(state.engine.list_channels(&server_id))
+}
+
+/// GET /api/servers/:id/channels/:name/messages — channel history within a server.
+pub async fn get_server_channel_history(
+    State(state): State<Arc<AppState>>,
+    Path((server_id, channel_name)): Path<(String, String)>,
+    Query(params): Query<HistoryParams>,
+) -> impl IntoResponse {
+    let channel = if channel_name.starts_with('#') {
+        channel_name
+    } else {
+        format!("#{}", channel_name)
+    };
+
+    let limit = params.limit.unwrap_or(50).min(200);
+
+    match state
+        .engine
+        .fetch_history(&server_id, &channel, params.before.as_deref(), limit)
+        .await
+    {
+        Ok((messages, has_more)) => Json(HistoryResponse {
+            channel,
+            messages,
+            has_more,
+        })
+        .into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+    }
+}
+
+/// GET /api/servers/:id/members — list server members.
+pub async fn list_server_members(
+    State(state): State<Arc<AppState>>,
+    Path(server_id): Path<String>,
+) -> impl IntoResponse {
+    match servers::get_server_members(&state.db, &server_id).await {
+        Ok(rows) => {
+            let members: Vec<serde_json::Value> = rows
+                .into_iter()
+                .map(|m| {
+                    serde_json::json!({
+                        "user_id": m.user_id,
+                        "role": m.role,
+                        "joined_at": m.joined_at,
+                    })
+                })
+                .collect();
+            Json(members).into_response()
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to list server members");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
+    }
+}
+
+// ── Admin endpoints (system admin only) ─────────────────
+
+/// GET /api/admin/servers — list all servers (system admin).
+pub async fn admin_list_servers(
+    State(state): State<Arc<AppState>>,
+    auth: AuthUser,
+) -> impl IntoResponse {
+    match servers::is_system_admin(&state.db, &auth.user_id).await {
+        Ok(true) => Json(state.engine.list_all_servers()).into_response(),
+        Ok(false) => (StatusCode::FORBIDDEN, "Not a system admin").into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to check admin status");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
+    }
+}
+
+/// DELETE /api/admin/servers/:id — delete any server (system admin).
+pub async fn admin_delete_server(
+    State(state): State<Arc<AppState>>,
+    Path(server_id): Path<String>,
+    auth: AuthUser,
+) -> impl IntoResponse {
+    match servers::is_system_admin(&state.db, &auth.user_id).await {
+        Ok(true) => match state.engine.delete_server(&server_id).await {
+            Ok(()) => StatusCode::NO_CONTENT.into_response(),
+            Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
+        },
+        Ok(false) => (StatusCode::FORBIDDEN, "Not a system admin").into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to check admin status");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct SetAdminRequest {
+    pub is_admin: bool,
+}
+
+/// PUT /api/admin/users/:id/admin — toggle system admin flag.
+pub async fn admin_set_admin(
+    State(state): State<Arc<AppState>>,
+    Path(target_user_id): Path<String>,
+    auth: AuthUser,
+    Json(body): Json<SetAdminRequest>,
+) -> impl IntoResponse {
+    match servers::is_system_admin(&state.db, &auth.user_id).await {
+        Ok(true) => {
+            match servers::set_system_admin(&state.db, &target_user_id, body.is_admin).await {
+                Ok(()) => StatusCode::NO_CONTENT.into_response(),
+                Err(e) => {
+                    error!(error = %e, "Failed to set admin flag");
+                    (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+                }
+            }
+        }
+        Ok(false) => (StatusCode::FORBIDDEN, "Not a system admin").into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to check admin status");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
+    }
 }
 
 // ── Auth status (public) ────────────────────────────────

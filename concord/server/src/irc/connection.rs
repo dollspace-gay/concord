@@ -8,11 +8,11 @@ use tracing::{info, warn};
 
 use crate::auth::token::verify_irc_token;
 use crate::db::queries::users;
-use crate::engine::chat_engine::ChatEngine;
+use crate::engine::chat_engine::{ChatEngine, DEFAULT_SERVER_ID};
 use crate::engine::events::{ChatEvent, SessionId};
 use crate::engine::user_session::Protocol;
 
-use super::commands;
+use super::commands::{self, to_irc_channel};
 use super::formatter;
 use super::parser::IrcMessage;
 
@@ -109,7 +109,7 @@ pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>, d
                 event = rx.recv() => {
                     let Some(event) = event else { break };
                     if let RegState::Registered { ref nick, .. } = state {
-                        let lines = event_to_irc_lines(nick, &event);
+                        let lines = event_to_irc_lines(&engine, nick, &event);
                         for line in lines {
                             send_line(&out_tx, &line);
                         }
@@ -191,12 +191,10 @@ pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>, d
             {
                 if let (Some(nick_val), true) = (nick.as_ref(), user_received) {
                     // If a PASS was provided, validate it as an IRC token
-                    if let Some(pass_token) = pass {
+                    let user_id = if let Some(pass_token) = pass {
                         match validate_irc_pass(&db, pass_token, nick_val).await {
-                            Ok(true) => {
-                                // Token valid — proceed with registration
-                            }
-                            Ok(false) => {
+                            Ok(Some(uid)) => Some(uid),
+                            Ok(None) => {
                                 send_line(&out_tx, &format!(
                                     ":{} 464 {} :Password incorrect",
                                     formatter::server_name(),
@@ -214,10 +212,12 @@ pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>, d
                                 break;
                             }
                         }
-                    }
+                    } else {
+                        None
+                    };
 
                     // Try to register with the engine
-                    match engine.connect(nick_val.clone(), Protocol::Irc, None) {
+                    match engine.connect(user_id, nick_val.clone(), Protocol::Irc, None) {
                         Ok((sid, rx)) => {
                             let nick_owned = nick_val.clone();
 
@@ -259,54 +259,65 @@ pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>, d
 }
 
 /// Validate an IRC PASS token against stored hashes.
-/// Returns Ok(true) if the token matches a stored hash for the given nickname.
+/// Returns Ok(Some(user_id)) if the token matches, Ok(None) if not.
 async fn validate_irc_pass(
     db: &SqlitePool,
     token: &str,
     nickname: &str,
-) -> Result<bool, String> {
+) -> Result<Option<String>, String> {
     let hashes = users::get_all_irc_token_hashes(db)
         .await
         .map_err(|e| format!("DB error: {}", e))?;
 
-    for (_user_id, stored_nick, token_hash) in &hashes {
+    for (user_id, stored_nick, token_hash) in &hashes {
         if stored_nick == nickname && verify_irc_token(token, token_hash) {
             // Update last_used timestamp (fire-and-forget)
             let pool = db.clone();
-            let uid = _user_id.clone();
+            let uid = user_id.clone();
             let hash = token_hash.clone();
             tokio::spawn(async move {
                 let _ = users::touch_irc_token(&pool, &uid, &hash).await;
             });
-            return Ok(true);
+            return Ok(Some(user_id.clone()));
         }
     }
 
-    Ok(false)
+    Ok(None)
 }
 
 /// Convert a ChatEvent to IRC protocol lines for a specific recipient.
-fn event_to_irc_lines(my_nick: &str, event: &ChatEvent) -> Vec<String> {
+/// Uses the engine to translate (server_id, channel_name) to IRC format.
+fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> Vec<String> {
     match event {
         ChatEvent::Message {
+            server_id,
             from,
             target,
             content,
             ..
         } => {
-            vec![formatter::privmsg(from, target, content)]
+            let irc_target = if target.starts_with('#') {
+                let sid = server_id.as_deref().unwrap_or(DEFAULT_SERVER_ID);
+                to_irc_channel(engine, sid, target)
+            } else {
+                target.clone()
+            };
+            vec![formatter::privmsg(from, &irc_target, content)]
         }
-        ChatEvent::Join { nickname, channel, .. } => {
-            vec![formatter::join(nickname, channel)]
+        ChatEvent::Join { nickname, server_id, channel, .. } => {
+            let irc_channel = to_irc_channel(engine, server_id, channel);
+            vec![formatter::join(nickname, &irc_channel)]
         }
         ChatEvent::Part {
             nickname,
+            server_id,
             channel,
             reason,
         } => {
+            let irc_channel = to_irc_channel(engine, server_id, channel);
             vec![formatter::part(
                 nickname,
-                channel,
+                &irc_channel,
                 reason.as_deref(),
             )]
         }
@@ -314,27 +325,31 @@ fn event_to_irc_lines(my_nick: &str, event: &ChatEvent) -> Vec<String> {
             vec![formatter::quit(nickname, reason.as_deref())]
         }
         ChatEvent::TopicChange {
+            server_id,
             channel,
             set_by,
             topic,
         } => {
-            vec![formatter::topic_change(set_by, channel, topic)]
+            let irc_channel = to_irc_channel(engine, server_id, channel);
+            vec![formatter::topic_change(set_by, &irc_channel, topic)]
         }
         ChatEvent::NickChange { old_nick, new_nick } => {
             vec![formatter::nick_change(old_nick, new_nick)]
         }
-        ChatEvent::Names { channel, members } => {
+        ChatEvent::Names { server_id, channel, members } => {
+            let irc_channel = to_irc_channel(engine, server_id, channel);
             let nicks: Vec<String> = members.iter().map(|m| m.nickname.clone()).collect();
             vec![
-                formatter::rpl_namreply(my_nick, channel, &nicks),
-                formatter::rpl_endofnames(my_nick, channel),
+                formatter::rpl_namreply(my_nick, &irc_channel, &nicks),
+                formatter::rpl_endofnames(my_nick, &irc_channel),
             ]
         }
-        ChatEvent::Topic { channel, topic } => {
+        ChatEvent::Topic { server_id, channel, topic } => {
+            let irc_channel = to_irc_channel(engine, server_id, channel);
             if topic.is_empty() {
-                vec![formatter::rpl_notopic(my_nick, channel)]
+                vec![formatter::rpl_notopic(my_nick, &irc_channel)]
             } else {
-                vec![formatter::rpl_topic(my_nick, channel, topic)]
+                vec![formatter::rpl_topic(my_nick, &irc_channel, topic)]
             }
         }
         ChatEvent::ServerNotice { message } => {
@@ -355,7 +370,9 @@ fn event_to_irc_lines(my_nick: &str, event: &ChatEvent) -> Vec<String> {
             )]
         }
         // These events are WebSocket-specific and don't map to IRC
-        ChatEvent::ChannelList { .. } | ChatEvent::History { .. } => vec![],
+        ChatEvent::ChannelList { .. }
+        | ChatEvent::History { .. }
+        | ChatEvent::ServerList { .. } => vec![],
     }
 }
 

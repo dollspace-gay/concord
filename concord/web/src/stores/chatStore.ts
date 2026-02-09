@@ -1,14 +1,26 @@
 import { create } from 'zustand';
-import type { ChannelInfo, HistoryMessage, MemberInfo, ServerEvent } from '../api/types';
+import type { ChannelInfo, HistoryMessage, MemberInfo, ServerEvent, ServerInfo } from '../api/types';
+import { channelKey } from '../api/types';
 import { WebSocketManager } from '../api/websocket';
+
+// Stable empty references to prevent zustand selector re-render loops.
+// Inline [] / {} in selectors create new references on every evaluation,
+// failing Object.is comparison and causing infinite re-renders with React 19.
+const EMPTY_SERVERS: ServerInfo[] = [];
+const EMPTY_CHANNELS_MAP: Record<string, ChannelInfo[]> = {};
+const EMPTY_MESSAGES_MAP: Record<string, HistoryMessage[]> = {};
+const EMPTY_MEMBERS_MAP: Record<string, MemberInfo[]> = {};
+const EMPTY_HAS_MORE: Record<string, boolean> = {};
+const EMPTY_AVATARS: Record<string, string> = {};
 
 interface ChatState {
   connected: boolean;
   nickname: string | null;
-  channels: ChannelInfo[];
-  messages: Record<string, HistoryMessage[]>;
-  members: Record<string, MemberInfo[]>;
-  hasMore: Record<string, boolean>;
+  servers: ServerInfo[];
+  channels: Record<string, ChannelInfo[]>;   // server_id -> channels
+  messages: Record<string, HistoryMessage[]>; // channelKey -> messages
+  members: Record<string, MemberInfo[]>;      // channelKey -> members
+  hasMore: Record<string, boolean>;           // channelKey -> has_more
   /** nickname -> avatar_url cache (populated from Names/Join/Message events) */
   avatars: Record<string, string>;
   ws: WebSocketManager | null;
@@ -16,13 +28,20 @@ interface ChatState {
   connect: (nickname: string) => void;
   disconnect: () => void;
   handleEvent: (event: ServerEvent) => void;
-  sendMessage: (channel: string, content: string) => void;
-  joinChannel: (channel: string) => void;
-  partChannel: (channel: string) => void;
-  setTopic: (channel: string, topic: string) => void;
-  fetchHistory: (channel: string, before?: string) => void;
-  listChannels: () => void;
-  getMembers: (channel: string) => void;
+  sendMessage: (serverId: string, channel: string, content: string) => void;
+  joinChannel: (serverId: string, channel: string) => void;
+  partChannel: (serverId: string, channel: string) => void;
+  setTopic: (serverId: string, channel: string, topic: string) => void;
+  fetchHistory: (serverId: string, channel: string, before?: string) => void;
+  listChannels: (serverId: string) => void;
+  getMembers: (serverId: string, channel: string) => void;
+  listServers: () => void;
+  createServer: (name: string, iconUrl?: string) => void;
+  joinServer: (serverId: string) => void;
+  leaveServer: (serverId: string) => void;
+  createChannel: (serverId: string, name: string) => void;
+  deleteChannel: (serverId: string, channel: string) => void;
+  deleteServer: (serverId: string) => void;
 }
 
 /** Cache an avatar_url for a nickname if present. */
@@ -36,11 +55,12 @@ function cacheAvatar(avatars: Record<string, string>, nickname: string, avatar_u
 export const useChatStore = create<ChatState>((set, get) => ({
   connected: false,
   nickname: null,
-  channels: [],
-  messages: {},
-  members: {},
-  hasMore: {},
-  avatars: {},
+  servers: EMPTY_SERVERS,
+  channels: EMPTY_CHANNELS_MAP,
+  messages: EMPTY_MESSAGES_MAP,
+  members: EMPTY_MEMBERS_MAP,
+  hasMore: EMPTY_HAS_MORE,
+  avatars: EMPTY_AVATARS,
   ws: null,
 
   connect: (nickname: string) => {
@@ -59,7 +79,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       (connected) => {
         set({ connected });
         if (connected) {
-          ws.send({ type: 'list_channels' });
+          ws.send({ type: 'list_servers' });
         }
       },
     );
@@ -70,12 +90,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   disconnect: () => {
     get().ws?.disconnect();
-    set({ ws: null, connected: false });
+    set({
+      ws: null,
+      connected: false,
+      servers: EMPTY_SERVERS,
+      channels: EMPTY_CHANNELS_MAP,
+      messages: EMPTY_MESSAGES_MAP,
+      members: EMPTY_MEMBERS_MAP,
+      hasMore: EMPTY_HAS_MORE,
+      avatars: EMPTY_AVATARS,
+    });
   },
 
   handleEvent: (event: ServerEvent) => {
     switch (event.type) {
       case 'message': {
+        const sid = event.server_id || 'default';
+        const key = channelKey(sid, event.target);
         const msg: HistoryMessage = {
           id: event.id,
           from: event.from,
@@ -85,7 +116,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set((s) => ({
           messages: {
             ...s.messages,
-            [event.target]: [...(s.messages[event.target] || []), msg],
+            [key]: [...(s.messages[key] || []), msg],
           },
           avatars: cacheAvatar(s.avatars, event.from, event.avatar_url),
         }));
@@ -93,14 +124,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       case 'join': {
+        const key = channelKey(event.server_id, event.channel);
         const memberInfo: MemberInfo = { nickname: event.nickname, avatar_url: event.avatar_url };
         set((s) => {
-          const current = s.members[event.channel] || [];
+          const current = s.members[key] || [];
           if (current.some((m) => m.nickname === event.nickname)) return s;
           return {
             members: {
               ...s.members,
-              [event.channel]: [...current, memberInfo],
+              [key]: [...current, memberInfo],
             },
             avatars: cacheAvatar(s.avatars, event.nickname, event.avatar_url),
           };
@@ -109,10 +141,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       case 'part': {
+        const key = channelKey(event.server_id, event.channel);
         set((s) => ({
           members: {
             ...s.members,
-            [event.channel]: (s.members[event.channel] || []).filter(
+            [key]: (s.members[key] || []).filter(
               (m) => m.nickname !== event.nickname,
             ),
           },
@@ -132,6 +165,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       case 'names': {
+        const key = channelKey(event.server_id, event.channel);
         set((s) => {
           let newAvatars = { ...s.avatars };
           for (const m of event.members) {
@@ -140,7 +174,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             }
           }
           return {
-            members: { ...s.members, [event.channel]: event.members },
+            members: { ...s.members, [key]: event.members },
             avatars: newAvatars,
           };
         });
@@ -148,30 +182,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       case 'topic_change': {
-        set((s) => ({
-          channels: s.channels.map((ch) =>
-            ch.name === event.channel ? { ...ch, topic: event.topic } : ch,
-          ),
-        }));
+        set((s) => {
+          const serverChannels = s.channels[event.server_id];
+          if (!serverChannels) return s;
+          return {
+            channels: {
+              ...s.channels,
+              [event.server_id]: serverChannels.map((ch) =>
+                ch.name === event.channel ? { ...ch, topic: event.topic } : ch,
+              ),
+            },
+          };
+        });
         break;
       }
 
       case 'channel_list': {
-        set({ channels: event.channels });
+        set((s) => ({
+          channels: { ...s.channels, [event.server_id]: event.channels },
+        }));
         break;
       }
 
       case 'history': {
+        const key = channelKey(event.server_id, event.channel);
         set((s) => ({
           messages: {
             ...s.messages,
-            [event.channel]: [
+            [key]: [
               ...event.messages.reverse(),
-              ...(s.messages[event.channel] || []),
+              ...(s.messages[key] || []),
             ],
           },
-          hasMore: { ...s.hasMore, [event.channel]: event.has_more },
+          hasMore: { ...s.hasMore, [key]: event.has_more },
         }));
+        break;
+      }
+
+      case 'server_list': {
+        set({ servers: event.servers });
         break;
       }
 
@@ -182,9 +231,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: (channel, content) => {
+  sendMessage: (serverId, channel, content) => {
     const { ws, nickname } = get();
     if (!ws || !nickname) return;
+
+    const key = channelKey(serverId, channel);
 
     // Add message locally (server excludes sender from broadcast)
     const msg: HistoryMessage = {
@@ -196,34 +247,62 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((s) => ({
       messages: {
         ...s.messages,
-        [channel]: [...(s.messages[channel] || []), msg],
+        [key]: [...(s.messages[key] || []), msg],
       },
     }));
 
-    ws.send({ type: 'send_message', channel, content });
+    ws.send({ type: 'send_message', server_id: serverId, channel, content });
   },
 
-  joinChannel: (channel) => {
-    get().ws?.send({ type: 'join_channel', channel });
+  joinChannel: (serverId, channel) => {
+    get().ws?.send({ type: 'join_channel', server_id: serverId, channel });
   },
 
-  partChannel: (channel) => {
-    get().ws?.send({ type: 'part_channel', channel });
+  partChannel: (serverId, channel) => {
+    get().ws?.send({ type: 'part_channel', server_id: serverId, channel });
   },
 
-  setTopic: (channel, topic) => {
-    get().ws?.send({ type: 'set_topic', channel, topic });
+  setTopic: (serverId, channel, topic) => {
+    get().ws?.send({ type: 'set_topic', server_id: serverId, channel, topic });
   },
 
-  fetchHistory: (channel, before) => {
-    get().ws?.send({ type: 'fetch_history', channel, before, limit: 50 });
+  fetchHistory: (serverId, channel, before) => {
+    get().ws?.send({ type: 'fetch_history', server_id: serverId, channel, before, limit: 50 });
   },
 
-  listChannels: () => {
-    get().ws?.send({ type: 'list_channels' });
+  listChannels: (serverId) => {
+    get().ws?.send({ type: 'list_channels', server_id: serverId });
   },
 
-  getMembers: (channel) => {
-    get().ws?.send({ type: 'get_members', channel });
+  getMembers: (serverId, channel) => {
+    get().ws?.send({ type: 'get_members', server_id: serverId, channel });
+  },
+
+  listServers: () => {
+    get().ws?.send({ type: 'list_servers' });
+  },
+
+  createServer: (name, iconUrl) => {
+    get().ws?.send({ type: 'create_server', name, icon_url: iconUrl });
+  },
+
+  joinServer: (serverId) => {
+    get().ws?.send({ type: 'join_server', server_id: serverId });
+  },
+
+  leaveServer: (serverId) => {
+    get().ws?.send({ type: 'leave_server', server_id: serverId });
+  },
+
+  createChannel: (serverId, name) => {
+    get().ws?.send({ type: 'create_channel', server_id: serverId, name });
+  },
+
+  deleteChannel: (serverId, channel) => {
+    get().ws?.send({ type: 'delete_channel', server_id: serverId, channel });
+  },
+
+  deleteServer: (serverId) => {
+    get().ws?.send({ type: 'delete_server', server_id: serverId });
   },
 }));

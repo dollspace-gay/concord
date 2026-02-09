@@ -4,13 +4,14 @@ import { useUiStore } from '../../stores/uiStore';
 
 export function MessageInput() {
   const [text, setText] = useState('');
+  const activeServer = useUiStore((s) => s.activeServer);
   const activeChannel = useUiStore((s) => s.activeChannel);
   const sendMessage = useChatStore((s) => s.sendMessage);
 
   const handleSend = () => {
     const trimmed = text.trim();
-    if (!trimmed || !activeChannel) return;
-    sendMessage(activeChannel, trimmed);
+    if (!trimmed || !activeChannel || !activeServer) return;
+    sendMessage(activeServer, activeChannel, trimmed);
     setText('');
   };
 

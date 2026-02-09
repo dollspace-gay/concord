@@ -17,6 +17,8 @@ pub enum Protocol {
 #[derive(Debug)]
 pub struct UserSession {
     pub id: SessionId,
+    /// Database user ID (None for unauthenticated/guest sessions).
+    pub user_id: Option<String>,
     pub nickname: String,
     pub protocol: Protocol,
     /// Send outbound events to this session's write loop.
@@ -31,6 +33,7 @@ pub struct UserSession {
 impl UserSession {
     pub fn new(
         id: SessionId,
+        user_id: Option<String>,
         nickname: String,
         protocol: Protocol,
         outbound: mpsc::UnboundedSender<ChatEvent>,
@@ -38,6 +41,7 @@ impl UserSession {
     ) -> Self {
         Self {
             id,
+            user_id,
             nickname,
             protocol,
             outbound,

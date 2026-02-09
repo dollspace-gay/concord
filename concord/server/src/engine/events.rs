@@ -16,6 +16,8 @@ pub enum ChatEvent {
     /// A message sent to a channel or as a DM.
     Message {
         id: MessageId,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        server_id: Option<String>,
         from: String,
         target: String,
         content: String,
@@ -27,6 +29,7 @@ pub enum ChatEvent {
     /// User joined a channel.
     Join {
         nickname: String,
+        server_id: String,
         channel: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         avatar_url: Option<String>,
@@ -35,6 +38,7 @@ pub enum ChatEvent {
     /// User left a channel.
     Part {
         nickname: String,
+        server_id: String,
         channel: String,
         reason: Option<String>,
     },
@@ -47,6 +51,7 @@ pub enum ChatEvent {
 
     /// Channel topic changed.
     TopicChange {
+        server_id: String,
         channel: String,
         set_by: String,
         topic: String,
@@ -63,26 +68,35 @@ pub enum ChatEvent {
 
     /// Channel member list (sent on join).
     Names {
+        server_id: String,
         channel: String,
         members: Vec<MemberInfo>,
     },
 
     /// Current topic of a channel (sent on join).
     Topic {
+        server_id: String,
         channel: String,
         topic: String,
     },
 
     /// Response to a channel list request.
     ChannelList {
+        server_id: String,
         channels: Vec<ChannelInfo>,
     },
 
     /// Message history response.
     History {
+        server_id: String,
         channel: String,
         messages: Vec<HistoryMessage>,
         has_more: bool,
+    },
+
+    /// List of servers the user belongs to.
+    ServerList {
+        servers: Vec<ServerInfo>,
     },
 
     /// Error from the server.
@@ -90,7 +104,20 @@ pub enum ChatEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerInfo {
+    pub id: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_url: Option<String>,
+    pub member_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelInfo {
+    pub id: String,
+    pub server_id: String,
     pub name: String,
     pub topic: String,
     pub member_count: usize,

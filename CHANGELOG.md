@@ -17,6 +17,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 ### Changed
+- Frontend UI components for multi-server (#44)
+- Frontend stores + types for multi-server support (#43)
+- IRC protocol adaptation for multi-server channels (#42)
+- WebSocket + REST protocol update for multi-server (#41)
+- ChatEngine refactoring for server-aware architecture (#40)
+- Database schema migration for multi-server support (#39)
 - Wire frontend build output into Rust server static serving (#36)
 - Initialize Vite + React + TypeScript + Tailwind project (#35)
 - Build and test OAuth authentication (#34)

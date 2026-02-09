@@ -7,8 +7,26 @@ pub const MAX_CHANNEL_NAME_LENGTH: usize = 50;
 /// Maximum topic length.
 pub const MAX_TOPIC_LENGTH: usize = 500;
 
+/// Maximum server name length.
+pub const MAX_SERVER_NAME_LENGTH: usize = 100;
+
 /// Maximum nickname length.
 pub const MAX_NICKNAME_LENGTH: usize = 32;
+
+/// Validate a server name. Must be 1-100 chars, non-empty after trimming.
+pub fn validate_server_name(name: &str) -> Result<(), String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("Server name cannot be empty".into());
+    }
+    if trimmed.len() > MAX_SERVER_NAME_LENGTH {
+        return Err(format!(
+            "Server name too long (max {} characters)",
+            MAX_SERVER_NAME_LENGTH
+        ));
+    }
+    Ok(())
+}
 
 /// Validate a nickname. Must be 1-32 chars, alphanumeric + underscore/hyphen.
 pub fn validate_nickname(nick: &str) -> Result<(), String> {

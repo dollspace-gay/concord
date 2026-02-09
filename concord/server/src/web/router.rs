@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::services::ServeDir;
+use tower_http::services::{ServeDir, ServeFile};
 
 use super::app_state::AppState;
 use super::{oauth, rest_api, ws_handler};
@@ -57,8 +57,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/api/tokens/{id}",
             axum::routing::delete(rest_api::delete_irc_token),
         )
-        // Static files fallback
-        .fallback_service(ServeDir::new("static"))
+        // Static files with SPA fallback — unmatched routes serve index.html
+        .fallback_service(ServeDir::new("static").fallback(ServeFile::new("static/index.html")))
         .layer(cors)
         .with_state(state)
 }

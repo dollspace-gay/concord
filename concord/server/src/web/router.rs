@@ -4,26 +4,61 @@ use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
-use crate::engine::chat_engine::ChatEngine;
-
-use super::rest_api;
-use super::ws_handler::ws_upgrade;
+use super::app_state::AppState;
+use super::{oauth, rest_api, ws_handler};
 
 /// Build the axum router with all HTTP and WebSocket routes.
-pub fn build_router(engine: Arc<ChatEngine>) -> Router {
+pub fn build_router(state: Arc<AppState>) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
     Router::new()
-        .route("/ws", axum::routing::get(ws_upgrade))
+        // WebSocket
+        .route("/ws", axum::routing::get(ws_handler::ws_upgrade))
+        // Public channel endpoints
         .route("/api/channels", axum::routing::get(rest_api::get_channels))
         .route(
             "/api/channels/{name}/messages",
             axum::routing::get(rest_api::get_channel_history),
         )
+        // Auth status
+        .route(
+            "/api/auth/status",
+            axum::routing::get(rest_api::auth_status),
+        )
+        // OAuth flows
+        .route(
+            "/api/auth/github",
+            axum::routing::get(oauth::github_login),
+        )
+        .route(
+            "/api/auth/github/callback",
+            axum::routing::get(oauth::github_callback),
+        )
+        .route(
+            "/api/auth/google",
+            axum::routing::get(oauth::google_login),
+        )
+        .route(
+            "/api/auth/google/callback",
+            axum::routing::get(oauth::google_callback),
+        )
+        .route("/api/auth/logout", axum::routing::post(oauth::logout))
+        // Authenticated user endpoints
+        .route("/api/me", axum::routing::get(rest_api::get_me))
+        .route(
+            "/api/tokens",
+            axum::routing::get(rest_api::list_irc_tokens)
+                .post(rest_api::create_irc_token),
+        )
+        .route(
+            "/api/tokens/{id}",
+            axum::routing::delete(rest_api::delete_irc_token),
+        )
+        // Static files fallback
         .fallback_service(ServeDir::new("static"))
         .layer(cors)
-        .with_state(engine)
+        .with_state(state)
 }

@@ -3,19 +3,25 @@ use std::sync::Arc;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{Query, State, WebSocketUpgrade};
 use axum::response::IntoResponse;
+use axum_extra::extract::CookieJar;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use tracing::{error, info, warn};
 
+use crate::auth::token::validate_session_token;
+use crate::db::queries::users;
 use crate::engine::chat_engine::ChatEngine;
 use crate::engine::events::ChatEvent;
 use crate::engine::user_session::Protocol;
 
-/// Query parameters for WebSocket upgrade — nickname is required for now.
-/// Once OAuth is implemented, this will be replaced with token-based auth.
-#[derive(Deserialize)]
+use super::app_state::AppState;
+
+/// Query parameters for WebSocket upgrade.
+/// If authenticated via cookie, nickname is looked up from the user's profile.
+/// Falls back to ?nickname= for unauthenticated dev/test usage.
+#[derive(Deserialize, Default)]
 pub struct WsParams {
-    pub nickname: String,
+    pub nickname: Option<String>,
 }
 
 /// Client-to-server WebSocket message types.
@@ -49,16 +55,50 @@ enum ClientMessage {
 }
 
 pub async fn ws_upgrade(
-    State(engine): State<Arc<ChatEngine>>,
+    State(state): State<Arc<AppState>>,
+    jar: CookieJar,
     Query(params): Query<WsParams>,
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
-    let nickname = params.nickname;
+    // Try cookie-based auth first
+    let nickname = if let Some(cookie) = jar.get("concord_session") {
+        if let Ok(claims) =
+            validate_session_token(cookie.value(), &state.auth_config.jwt_secret)
+        {
+            match users::get_user(&state.db, &claims.sub).await {
+                Ok(Some((_id, username, _email, _avatar))) => username,
+                _ => {
+                    return (
+                        axum::http::StatusCode::UNAUTHORIZED,
+                        "User not found",
+                    )
+                        .into_response();
+                }
+            }
+        } else {
+            return (
+                axum::http::StatusCode::UNAUTHORIZED,
+                "Invalid session token",
+            )
+                .into_response();
+        }
+    } else if let Some(nick) = params.nickname {
+        // Fallback: allow ?nickname= for dev/test (no auth required)
+        nick
+    } else {
+        return (
+            axum::http::StatusCode::UNAUTHORIZED,
+            "Not authenticated. Provide a session cookie or ?nickname= param.",
+        )
+            .into_response();
+    };
+
+    let engine = state.engine.clone();
     ws.on_upgrade(move |socket| handle_ws_connection(socket, engine, nickname))
+        .into_response()
 }
 
 async fn handle_ws_connection(socket: WebSocket, engine: Arc<ChatEngine>, nickname: String) {
-    // Register this session with the engine
     let (session_id, mut event_rx) = match engine.connect(nickname.clone(), Protocol::WebSocket) {
         Ok(pair) => pair,
         Err(e) => {
@@ -69,7 +109,6 @@ async fn handle_ws_connection(socket: WebSocket, engine: Arc<ChatEngine>, nickna
 
     let (mut ws_sender, mut ws_receiver) = socket.split();
 
-    // Spawn write loop: engine events -> WebSocket frames
     let write_handle = tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
             match serde_json::to_string(&event) {
@@ -85,7 +124,6 @@ async fn handle_ws_connection(socket: WebSocket, engine: Arc<ChatEngine>, nickna
         }
     });
 
-    // Read loop: WebSocket frames -> engine commands
     let engine_ref = engine.clone();
     while let Some(msg_result) = ws_receiver.next().await {
         let msg = match msg_result {
@@ -101,11 +139,10 @@ async fn handle_ws_connection(socket: WebSocket, engine: Arc<ChatEngine>, nickna
                 handle_client_message(&engine_ref, session_id, &text).await;
             }
             Message::Close(_) => break,
-            _ => {} // Ignore binary, ping, pong (axum handles ping/pong)
+            _ => {}
         }
     }
 
-    // Clean up
     engine.disconnect(session_id);
     write_handle.abort();
     info!(%session_id, %nickname, "WebSocket connection closed");

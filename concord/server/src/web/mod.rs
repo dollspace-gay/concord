@@ -1,3 +1,6 @@
+pub mod app_state;
+pub mod auth_middleware;
+pub mod oauth;
 pub mod rest_api;
 pub mod router;
 pub mod ws_handler;

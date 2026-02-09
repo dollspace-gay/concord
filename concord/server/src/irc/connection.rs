@@ -1,10 +1,13 @@
 use std::sync::Arc;
 
+use sqlx::SqlitePool;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
+use crate::auth::token::verify_irc_token;
+use crate::db::queries::users;
 use crate::engine::chat_engine::ChatEngine;
 use crate::engine::events::{ChatEvent, SessionId};
 use crate::engine::user_session::Protocol;
@@ -30,7 +33,7 @@ enum RegState {
 }
 
 /// Handle a single IRC client connection from accept to close.
-pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>) {
+pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>, db: SqlitePool) {
     let peer = stream
         .peer_addr()
         .map(|a| a.to_string())
@@ -181,12 +184,38 @@ pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>) {
 
             // Check if registration is complete
             if let RegState::Unregistered {
+                ref pass,
                 ref nick,
                 user_received,
-                ..
             } = state
             {
                 if let (Some(nick_val), true) = (nick.as_ref(), user_received) {
+                    // If a PASS was provided, validate it as an IRC token
+                    if let Some(pass_token) = pass {
+                        match validate_irc_pass(&db, pass_token, nick_val).await {
+                            Ok(true) => {
+                                // Token valid — proceed with registration
+                            }
+                            Ok(false) => {
+                                send_line(&out_tx, &format!(
+                                    ":{} 464 {} :Password incorrect",
+                                    formatter::server_name(),
+                                    nick_val,
+                                ));
+                                break;
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "IRC token validation error");
+                                send_line(&out_tx, &format!(
+                                    ":{} 464 {} :Authentication error",
+                                    formatter::server_name(),
+                                    nick_val,
+                                ));
+                                break;
+                            }
+                        }
+                    }
+
                     // Try to register with the engine
                     match engine.connect(nick_val.clone(), Protocol::Irc) {
                         Ok((sid, rx)) => {
@@ -227,6 +256,33 @@ pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>) {
     }
 
     write_handle.abort();
+}
+
+/// Validate an IRC PASS token against stored hashes.
+/// Returns Ok(true) if the token matches a stored hash for the given nickname.
+async fn validate_irc_pass(
+    db: &SqlitePool,
+    token: &str,
+    nickname: &str,
+) -> Result<bool, String> {
+    let hashes = users::get_all_irc_token_hashes(db)
+        .await
+        .map_err(|e| format!("DB error: {}", e))?;
+
+    for (_user_id, stored_nick, token_hash) in &hashes {
+        if stored_nick == nickname && verify_irc_token(token, token_hash) {
+            // Update last_used timestamp (fire-and-forget)
+            let pool = db.clone();
+            let uid = _user_id.clone();
+            let hash = token_hash.clone();
+            tokio::spawn(async move {
+                let _ = users::touch_irc_token(&pool, &uid, &hash).await;
+            });
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 /// Convert a ChatEvent to IRC protocol lines for a specific recipient.

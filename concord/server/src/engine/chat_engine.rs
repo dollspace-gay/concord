@@ -9,7 +9,9 @@ use uuid::Uuid;
 
 use super::channel::ChannelState;
 use super::events::{ChannelInfo, ChatEvent, HistoryMessage, SessionId};
+use super::rate_limiter::RateLimiter;
 use super::user_session::{Protocol, UserSession};
+use super::validation;
 
 /// The central hub that manages all chat state. Protocol-agnostic —
 /// both IRC and WebSocket adapters call into this.
@@ -22,6 +24,8 @@ pub struct ChatEngine {
     nick_to_session: DashMap<String, SessionId>,
     /// Optional database pool. When present, messages and channels are persisted.
     db: Option<SqlitePool>,
+    /// Per-user message rate limiter (burst of 10, refill 1 per second).
+    message_limiter: RateLimiter,
 }
 
 impl ChatEngine {
@@ -31,6 +35,7 @@ impl ChatEngine {
             channels: DashMap::new(),
             nick_to_session: DashMap::new(),
             db,
+            message_limiter: RateLimiter::new(10, 1.0),
         }
     }
 
@@ -66,9 +71,13 @@ impl ChatEngine {
         nickname: String,
         protocol: Protocol,
     ) -> Result<(SessionId, mpsc::UnboundedReceiver<ChatEvent>), String> {
-        // Check nickname availability
-        if self.nick_to_session.contains_key(&nickname) {
-            return Err(format!("Nickname '{}' is already in use", nickname));
+        validation::validate_nickname(&nickname)?;
+
+        // If nickname is already in use, disconnect the stale session.
+        // This handles page refreshes and reconnects gracefully.
+        if let Some(old_session_id) = self.nick_to_session.get(&nickname).map(|r| *r) {
+            info!(%nickname, "replacing stale session for reconnecting user");
+            self.disconnect(old_session_id);
         }
 
         let session_id = Uuid::new_v4();
@@ -128,6 +137,7 @@ impl ChatEngine {
     /// Join a channel. Creates the channel if it doesn't exist.
     pub fn join_channel(&self, session_id: SessionId, channel_name: &str) -> Result<(), String> {
         let channel_name = normalize_channel_name(channel_name);
+        validation::validate_channel_name(&channel_name)?;
 
         let session = self
             .sessions
@@ -239,11 +249,17 @@ impl ChatEngine {
         target: &str,
         content: &str,
     ) -> Result<(), String> {
+        validation::validate_message(content)?;
+
         let session = self
             .sessions
             .get(&session_id)
             .ok_or("Session not found")?
             .clone();
+
+        if !self.message_limiter.check(&session.nickname) {
+            return Err("Rate limit exceeded. Please slow down.".into());
+        }
 
         let msg_id = Uuid::new_v4();
         let event = ChatEvent::Message {
@@ -328,6 +344,7 @@ impl ChatEngine {
         channel_name: &str,
         topic: String,
     ) -> Result<(), String> {
+        validation::validate_topic(&topic)?;
         let channel_name = normalize_channel_name(channel_name);
 
         let session = self
@@ -506,12 +523,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_duplicate_nick_rejected() {
+    async fn test_duplicate_nick_replaces_old_session() {
         let engine = ChatEngine::new(None);
 
-        let (_sid, _rx) = engine.connect("alice".into(), Protocol::WebSocket).unwrap();
-        let result = engine.connect("alice".into(), Protocol::WebSocket);
-        assert!(result.is_err());
+        let (sid1, _rx1) = engine.connect("alice".into(), Protocol::WebSocket).unwrap();
+        let (sid2, _rx2) = engine.connect("alice".into(), Protocol::WebSocket).unwrap();
+
+        // Old session should be gone, new one active
+        assert!(engine.get_session(sid1).is_none());
+        assert!(engine.get_session(sid2).is_some());
     }
 
     #[tokio::test]

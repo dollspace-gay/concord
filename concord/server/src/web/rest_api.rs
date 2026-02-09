@@ -72,7 +72,7 @@ pub struct AuthStatusResponse {
 
 /// GET /api/auth/status — returns available providers and auth state.
 pub async fn auth_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let mut providers = Vec::new();
+    let mut providers = vec!["atproto".to_string()];
     if state.auth_config.github.is_some() {
         providers.push("github".to_string());
     }

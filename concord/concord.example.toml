@@ -1,0 +1,24 @@
+# Concord Server Configuration
+# Copy this file to concord.toml and adjust as needed.
+# Environment variables override values in this file.
+
+[server]
+web_address = "0.0.0.0:8080"
+irc_address = "0.0.0.0:6667"
+
+[database]
+url = "sqlite:concord.db?mode=rwc"
+
+[auth]
+# IMPORTANT: Change this in production!
+jwt_secret = "change-me-to-a-random-secret"
+session_expiry_hours = 720  # 30 days
+public_url = "http://localhost:8080"
+
+[oauth.github]
+client_id = ""
+client_secret = ""
+
+[oauth.google]
+client_id = ""
+client_secret = ""

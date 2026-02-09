@@ -19,19 +19,23 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
 
   checkAuth: async () => {
+    console.log('[authStore] checkAuth starting');
     set({ loading: true, error: null });
     try {
       const status = await api.getAuthStatus();
+      console.log('[authStore] got auth status:', status);
       set({ providers: status.providers });
 
       try {
         const user = await api.getMe();
+        console.log('[authStore] got user:', user);
         set({ user, loading: false });
-      } catch {
-        // Not authenticated — that's fine
+      } catch (e) {
+        console.log('[authStore] getMe failed (not authenticated):', e);
         set({ user: null, loading: false });
       }
     } catch (e) {
+      console.error('[authStore] checkAuth error:', e);
       set({ error: String(e), loading: false });
     }
   },

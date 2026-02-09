@@ -1,0 +1,23 @@
+services:
+  concord:
+    build: .
+    ports:
+      - "8080:8080"   # Web UI + API
+      - "6667:6667"   # IRC
+    volumes:
+      - concord-data:/app/data
+      - ./concord.toml:/app/concord.toml:ro
+    environment:
+      - DATABASE_URL=sqlite:/app/data/concord.db?mode=rwc
+      - RUST_LOG=info
+      # Uncomment and fill in for OAuth:
+      # - JWT_SECRET=your-secret-here
+      # - PUBLIC_URL=https://your-domain.com
+      # - GITHUB_CLIENT_ID=
+      # - GITHUB_CLIENT_SECRET=
+      # - GOOGLE_CLIENT_ID=
+      # - GOOGLE_CLIENT_SECRET=
+    restart: unless-stopped
+
+volumes:
+  concord-data:

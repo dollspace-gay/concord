@@ -1,9 +1,11 @@
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
 
+const EMPTY_MEMBERS: string[] = [];
+
 export function MemberList() {
   const activeChannel = useUiStore((s) => s.activeChannel);
-  const members = useChatStore((s) => (activeChannel ? s.members[activeChannel] || [] : []));
+  const members = useChatStore((s) => (activeChannel ? s.members[activeChannel] ?? EMPTY_MEMBERS : EMPTY_MEMBERS));
 
   return (
     <div className="flex h-full w-60 flex-col bg-bg-secondary">

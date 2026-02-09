@@ -4,9 +4,11 @@ import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
 import type { HistoryMessage } from '../../api/types';
 
+const EMPTY_MESSAGES: HistoryMessage[] = [];
+
 export function MessageList() {
   const activeChannel = useUiStore((s) => s.activeChannel);
-  const messages = useChatStore((s) => (activeChannel ? s.messages[activeChannel] || [] : []));
+  const messages = useChatStore((s) => (activeChannel ? s.messages[activeChannel] ?? EMPTY_MESSAGES : EMPTY_MESSAGES));
   const hasMore = useChatStore((s) => (activeChannel ? s.hasMore[activeChannel] ?? true : false));
   const fetchHistory = useChatStore((s) => s.fetchHistory);
   const virtuosoRef = useRef<VirtuosoHandle>(null);

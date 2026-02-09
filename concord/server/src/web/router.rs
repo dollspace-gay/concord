@@ -5,7 +5,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
 use super::app_state::AppState;
-use super::{oauth, rest_api, ws_handler};
+use super::{atproto, oauth, rest_api, ws_handler};
 
 /// Build the axum router with all HTTP and WebSocket routes.
 pub fn build_router(state: Arc<AppState>) -> Router {
@@ -44,6 +44,19 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/api/auth/google/callback",
             axum::routing::get(oauth::google_callback),
+        )
+        // Bluesky / AT Protocol OAuth
+        .route(
+            "/api/auth/atproto/client-metadata.json",
+            axum::routing::get(atproto::client_metadata),
+        )
+        .route(
+            "/api/auth/atproto/login",
+            axum::routing::get(atproto::atproto_login),
+        )
+        .route(
+            "/api/auth/atproto/callback",
+            axum::routing::get(atproto::atproto_callback),
         )
         .route("/api/auth/logout", axum::routing::post(oauth::logout))
         // Authenticated user endpoints

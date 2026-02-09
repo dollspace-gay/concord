@@ -4,6 +4,7 @@ import { WebSocketManager } from '../api/websocket';
 
 interface ChatState {
   connected: boolean;
+  nickname: string | null;
   channels: ChannelInfo[];
   messages: Record<string, HistoryMessage[]>;
   members: Record<string, string[]>;
@@ -24,6 +25,7 @@ interface ChatState {
 
 export const useChatStore = create<ChatState>((set, get) => ({
   connected: false,
+  nickname: null,
   channels: [],
   messages: {},
   members: {},
@@ -31,29 +33,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
   ws: null,
 
   connect: (nickname: string) => {
-    const existing = get().ws;
-    if (existing) existing.disconnect();
+    if (get().ws) {
+      console.log('[chatStore] connect called but ws already exists, skipping');
+      return;
+    }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const url = `${protocol}//${window.location.host}/ws?nickname=${encodeURIComponent(nickname)}`;
+    console.log('[chatStore] connecting WebSocket to:', url);
 
     const ws = new WebSocketManager(
       url,
-      (event) => get().handleEvent(event),
+      (event) => {
+        console.log('[chatStore] ws event:', event.type, event);
+        get().handleEvent(event);
+      },
       (connected) => {
+        console.log('[chatStore] ws status changed:', connected);
         set({ connected });
         if (connected) {
-          // Request channel list on connect
           ws.send({ type: 'list_channels' });
         }
       },
     );
 
-    set({ ws });
+    set({ ws, nickname });
     ws.connect();
   },
 
   disconnect: () => {
+    console.log('[chatStore] disconnect called');
     get().ws?.disconnect();
     set({ ws: null, connected: false });
   },
@@ -156,7 +165,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   sendMessage: (channel, content) => {
-    get().ws?.send({ type: 'send_message', channel, content });
+    const { ws, nickname } = get();
+    if (!ws || !nickname) return;
+
+    // Add message locally (server excludes sender from broadcast)
+    const msg: HistoryMessage = {
+      id: crypto.randomUUID(),
+      from: nickname,
+      content,
+      timestamp: new Date().toISOString(),
+    };
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [channel]: [...(s.messages[channel] || []), msg],
+      },
+    }));
+
+    ws.send({ type: 'send_message', channel, content });
   },
 
   joinChannel: (channel) => {

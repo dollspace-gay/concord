@@ -1,4 +1,5 @@
 pub mod app_state;
+pub mod atproto;
 pub mod auth_middleware;
 pub mod oauth;
 pub mod rest_api;

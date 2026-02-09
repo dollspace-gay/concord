@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Concord - Test Client</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; }
+        #login { display: flex; align-items: center; justify-content: center; height: 100vh; }
+        #login form { background: #16213e; padding: 2rem; border-radius: 8px; display: flex; flex-direction: column; gap: 1rem; min-width: 300px; }
+        #login h1 { text-align: center; color: #7c83ff; }
+        #login input, #login button { padding: 0.75rem; border-radius: 4px; border: 1px solid #333; font-size: 1rem; }
+        #login input { background: #0f3460; color: #e0e0e0; }
+        #login button { background: #7c83ff; color: white; border: none; cursor: pointer; }
+        #login button:hover { background: #6a70e0; }
+        #chat { display: none; flex-direction: column; height: 100vh; }
+        #header { background: #16213e; padding: 0.75rem 1rem; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        #header h2 { color: #7c83ff; font-size: 1rem; }
+        #channel-bar { background: #0f3460; padding: 0.5rem 1rem; display: flex; gap: 0.5rem; align-items: center; border-bottom: 1px solid #333; }
+        #channel-bar input { flex: 1; padding: 0.4rem; background: #16213e; color: #e0e0e0; border: 1px solid #333; border-radius: 4px; }
+        #channel-bar button { padding: 0.4rem 0.8rem; background: #7c83ff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        #messages { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
+        .msg { padding: 0.25rem 0; line-height: 1.4; }
+        .msg .nick { font-weight: bold; color: #7c83ff; }
+        .msg .time { color: #666; font-size: 0.8rem; margin-right: 0.5rem; }
+        .msg.system { color: #888; font-style: italic; }
+        .msg.error { color: #ff6b6b; }
+        #input-bar { display: flex; padding: 0.75rem 1rem; background: #16213e; border-top: 1px solid #333; gap: 0.5rem; }
+        #input-bar input { flex: 1; padding: 0.75rem; background: #0f3460; color: #e0e0e0; border: 1px solid #333; border-radius: 4px; font-size: 1rem; }
+        #input-bar button { padding: 0.75rem 1.5rem; background: #7c83ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+    </style>
+</head>
+<body>
+    <div id="login">
+        <form id="login-form">
+            <h1>Concord</h1>
+            <input type="text" id="nickname-input" placeholder="Pick a nickname" autocomplete="off" required>
+            <button type="submit">Connect</button>
+        </form>
+    </div>
+    <div id="chat">
+        <div id="header">
+            <h2 id="channel-name">#general</h2>
+            <span id="user-info"></span>
+        </div>
+        <div id="channel-bar">
+            <input type="text" id="join-input" placeholder="Channel name (e.g. #rust)">
+            <button id="join-btn">Join</button>
+        </div>
+        <div id="messages"></div>
+        <div id="input-bar">
+            <input type="text" id="msg-input" placeholder="Type a message..." autocomplete="off">
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentChannel = '#general';
+        let nickname = '';
+
+        const loginDiv = document.getElementById('login');
+        const chatDiv = document.getElementById('chat');
+        const messagesDiv = document.getElementById('messages');
+        const msgInput = document.getElementById('msg-input');
+        const channelNameEl = document.getElementById('channel-name');
+
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            nickname = document.getElementById('nickname-input').value.trim();
+            if (!nickname) return;
+            connect(nickname);
+        });
+
+        document.getElementById('send-btn').addEventListener('click', sendMessage);
+        msgInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        document.getElementById('join-btn').addEventListener('click', () => {
+            const ch = document.getElementById('join-input').value.trim();
+            if (!ch) return;
+            const channel = ch.startsWith('#') ? ch : '#' + ch;
+            ws.send(JSON.stringify({ type: 'join_channel', channel }));
+            currentChannel = channel;
+            channelNameEl.textContent = channel;
+            document.getElementById('join-input').value = '';
+            appendSystem('Joining ' + channel + '...');
+        });
+
+        function connect(nick) {
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const url = `${proto}//${location.host}/ws?nickname=${encodeURIComponent(nick)}`;
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                loginDiv.style.display = 'none';
+                chatDiv.style.display = 'flex';
+                document.getElementById('user-info').textContent = nick;
+                appendSystem('Connected as ' + nick);
+                // Auto-join #general
+                ws.send(JSON.stringify({ type: 'join_channel', channel: '#general' }));
+            };
+
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                handleEvent(data);
+            };
+
+            ws.onclose = () => {
+                appendSystem('Disconnected from server.');
+            };
+
+            ws.onerror = () => {
+                appendSystem('Connection error.');
+            };
+        }
+
+        function handleEvent(data) {
+            switch (data.type) {
+                case 'message':
+                    appendMessage(data.from, data.content, data.timestamp);
+                    break;
+                case 'join':
+                    appendSystem(data.nickname + ' joined ' + data.channel);
+                    break;
+                case 'part':
+                    appendSystem(data.nickname + ' left ' + data.channel + (data.reason ? ' (' + data.reason + ')' : ''));
+                    break;
+                case 'quit':
+                    appendSystem(data.nickname + ' disconnected' + (data.reason ? ' (' + data.reason + ')' : ''));
+                    break;
+                case 'topic_change':
+                    appendSystem(data.set_by + ' set topic for ' + data.channel + ': ' + data.topic);
+                    break;
+                case 'topic':
+                    appendSystem('Topic for ' + data.channel + ': ' + data.topic);
+                    break;
+                case 'names':
+                    appendSystem('Users in ' + data.channel + ': ' + data.members.join(', '));
+                    break;
+                case 'channel_list':
+                    appendSystem('Channels: ' + data.channels.map(c => c.name + ' (' + c.member_count + ')').join(', '));
+                    break;
+                case 'error':
+                    appendError(data.message);
+                    break;
+                default:
+                    console.log('Unknown event:', data);
+            }
+        }
+
+        function sendMessage() {
+            const text = msgInput.value.trim();
+            if (!text || !ws) return;
+            ws.send(JSON.stringify({ type: 'send_message', channel: currentChannel, content: text }));
+            // Show own message locally (server doesn't echo back to sender)
+            appendMessage(nickname, text, new Date().toISOString());
+            msgInput.value = '';
+        }
+
+        function appendMessage(from, content, timestamp) {
+            const div = document.createElement('div');
+            div.className = 'msg';
+            const time = new Date(timestamp).toLocaleTimeString();
+            div.innerHTML = `<span class="time">${time}</span><span class="nick">${escapeHtml(from)}</span>: ${escapeHtml(content)}`;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function appendSystem(text) {
+            const div = document.createElement('div');
+            div.className = 'msg system';
+            div.textContent = text;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function appendError(text) {
+            const div = document.createElement('div');
+            div.className = 'msg error';
+            div.textContent = 'Error: ' + text;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

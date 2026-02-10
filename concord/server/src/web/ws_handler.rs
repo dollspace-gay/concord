@@ -108,16 +108,11 @@ pub async fn ws_upgrade(
 ) -> impl IntoResponse {
     // Try cookie-based auth first
     let (nickname, user_id) = if let Some(cookie) = jar.get("concord_session") {
-        if let Ok(claims) =
-            validate_session_token(cookie.value(), &state.auth_config.jwt_secret)
-        {
+        if let Ok(claims) = validate_session_token(cookie.value(), &state.auth_config.jwt_secret) {
             match users::get_user(&state.db, &claims.sub).await {
                 Ok(Some((id, username, _email, _avatar))) => (username, Some(id)),
                 _ => {
-                    return (
-                        axum::http::StatusCode::UNAUTHORIZED,
-                        "User not found",
-                    )
+                    return (axum::http::StatusCode::UNAUTHORIZED, "User not found")
                         .into_response();
                 }
             }
@@ -141,9 +136,10 @@ pub async fn ws_upgrade(
 
     // Look up avatar_url from DB if authenticated via cookie
     let avatar_url = if jar.get("concord_session").is_some() {
-        if let Ok(claims) =
-            validate_session_token(jar.get("concord_session").unwrap().value(), &state.auth_config.jwt_secret)
-        {
+        if let Ok(claims) = validate_session_token(
+            jar.get("concord_session").unwrap().value(),
+            &state.auth_config.jwt_secret,
+        ) {
             match users::get_user(&state.db, &claims.sub).await {
                 Ok(Some((_id, _username, _email, avatar))) => avatar,
                 _ => None,
@@ -167,13 +163,14 @@ async fn handle_ws_connection(
     nickname: String,
     avatar_url: Option<String>,
 ) {
-    let (session_id, mut event_rx) = match engine.connect(user_id, nickname.clone(), Protocol::WebSocket, avatar_url) {
-        Ok(pair) => pair,
-        Err(e) => {
-            warn!(%nickname, error = %e, "WebSocket connection rejected");
-            return;
-        }
-    };
+    let (session_id, mut event_rx) =
+        match engine.connect(user_id, nickname.clone(), Protocol::WebSocket, avatar_url) {
+            Ok(pair) => pair,
+            Err(e) => {
+                warn!(%nickname, error = %e, "WebSocket connection rejected");
+                return;
+            }
+        };
 
     let (mut ws_sender, mut ws_receiver) = socket.split();
 
@@ -230,18 +227,24 @@ async fn handle_client_message(
     };
 
     let result = match msg {
-        ClientMessage::SendMessage { server_id, channel, content } => {
-            engine.send_message(session_id, &server_id, &channel, &content)
-        }
+        ClientMessage::SendMessage {
+            server_id,
+            channel,
+            content,
+        } => engine.send_message(session_id, &server_id, &channel, &content),
         ClientMessage::JoinChannel { server_id, channel } => {
             engine.join_channel(session_id, &server_id, &channel)
         }
-        ClientMessage::PartChannel { server_id, channel, reason } => {
-            engine.part_channel(session_id, &server_id, &channel, reason)
-        }
-        ClientMessage::SetTopic { server_id, channel, topic } => {
-            engine.set_topic(session_id, &server_id, &channel, topic)
-        }
+        ClientMessage::PartChannel {
+            server_id,
+            channel,
+            reason,
+        } => engine.part_channel(session_id, &server_id, &channel, reason),
+        ClientMessage::SetTopic {
+            server_id,
+            channel,
+            topic,
+        } => engine.set_topic(session_id, &server_id, &channel, topic),
         ClientMessage::FetchHistory {
             server_id,
             channel,
@@ -270,7 +273,10 @@ async fn handle_client_message(
         ClientMessage::ListChannels { server_id } => {
             let channels = engine.list_channels(&server_id);
             if let Some(session) = engine.get_session(session_id) {
-                let _ = session.send(ChatEvent::ChannelList { server_id, channels });
+                let _ = session.send(ChatEvent::ChannelList {
+                    server_id,
+                    channels,
+                });
             }
             Ok(())
         }
@@ -278,7 +284,11 @@ async fn handle_client_message(
             match engine.get_members(&server_id, &channel) {
                 Ok(member_infos) => {
                     if let Some(session) = engine.get_session(session_id) {
-                        let _ = session.send(ChatEvent::Names { server_id, channel, members: member_infos });
+                        let _ = session.send(ChatEvent::Names {
+                            server_id,
+                            channel,
+                            members: member_infos,
+                        });
                     }
                     Ok(())
                 }
@@ -300,15 +310,20 @@ async fn handle_client_message(
             let session = engine.get_session(session_id);
             let user_id = session.as_ref().and_then(|s| s.user_id.clone());
             let Some(uid) = user_id else {
-                return send_error(engine, session_id, "AUTH_REQUIRED", "Must be authenticated to create a server");
+                return send_error(
+                    engine,
+                    session_id,
+                    "AUTH_REQUIRED",
+                    "Must be authenticated to create a server",
+                );
             };
             match engine.create_server(name, uid, icon_url).await {
                 Ok(_server_id) => {
-                    if let Some(session) = engine.get_session(session_id) {
-                        if let Some(ref uid) = session.user_id {
-                            let servers = engine.list_servers_for_user(uid);
-                            let _ = session.send(ChatEvent::ServerList { servers });
-                        }
+                    if let Some(session) = engine.get_session(session_id)
+                        && let Some(ref uid) = session.user_id
+                    {
+                        let servers = engine.list_servers_for_user(uid);
+                        let _ = session.send(ChatEvent::ServerList { servers });
                     }
                     Ok(())
                 }
@@ -319,15 +334,20 @@ async fn handle_client_message(
             let session = engine.get_session(session_id);
             let user_id = session.as_ref().and_then(|s| s.user_id.clone());
             let Some(uid) = user_id else {
-                return send_error(engine, session_id, "AUTH_REQUIRED", "Must be authenticated to join a server");
+                return send_error(
+                    engine,
+                    session_id,
+                    "AUTH_REQUIRED",
+                    "Must be authenticated to join a server",
+                );
             };
             match engine.join_server(&uid, &server_id).await {
                 Ok(()) => {
-                    if let Some(session) = engine.get_session(session_id) {
-                        if let Some(ref uid) = session.user_id {
-                            let servers = engine.list_servers_for_user(uid);
-                            let _ = session.send(ChatEvent::ServerList { servers });
-                        }
+                    if let Some(session) = engine.get_session(session_id)
+                        && let Some(ref uid) = session.user_id
+                    {
+                        let servers = engine.list_servers_for_user(uid);
+                        let _ = session.send(ChatEvent::ServerList { servers });
                     }
                     Ok(())
                 }
@@ -338,15 +358,20 @@ async fn handle_client_message(
             let session = engine.get_session(session_id);
             let user_id = session.as_ref().and_then(|s| s.user_id.clone());
             let Some(uid) = user_id else {
-                return send_error(engine, session_id, "AUTH_REQUIRED", "Must be authenticated to leave a server");
+                return send_error(
+                    engine,
+                    session_id,
+                    "AUTH_REQUIRED",
+                    "Must be authenticated to leave a server",
+                );
             };
             match engine.leave_server(&uid, &server_id).await {
                 Ok(()) => {
-                    if let Some(session) = engine.get_session(session_id) {
-                        if let Some(ref uid) = session.user_id {
-                            let servers = engine.list_servers_for_user(uid);
-                            let _ = session.send(ChatEvent::ServerList { servers });
-                        }
+                    if let Some(session) = engine.get_session(session_id)
+                        && let Some(ref uid) = session.user_id
+                    {
+                        let servers = engine.list_servers_for_user(uid);
+                        let _ = session.send(ChatEvent::ServerList { servers });
                     }
                     Ok(())
                 }
@@ -358,7 +383,10 @@ async fn handle_client_message(
                 Ok(_) => {
                     let channels = engine.list_channels(&server_id);
                     if let Some(session) = engine.get_session(session_id) {
-                        let _ = session.send(ChatEvent::ChannelList { server_id, channels });
+                        let _ = session.send(ChatEvent::ChannelList {
+                            server_id,
+                            channels,
+                        });
                     }
                     Ok(())
                 }
@@ -370,7 +398,10 @@ async fn handle_client_message(
                 Ok(()) => {
                     let channels = engine.list_channels(&server_id);
                     if let Some(session) = engine.get_session(session_id) {
-                        let _ = session.send(ChatEvent::ChannelList { server_id, channels });
+                        let _ = session.send(ChatEvent::ChannelList {
+                            server_id,
+                            channels,
+                        });
                     }
                     Ok(())
                 }
@@ -381,25 +412,39 @@ async fn handle_client_message(
             let session = engine.get_session(session_id);
             let user_id = session.as_ref().and_then(|s| s.user_id.clone());
             let Some(uid) = user_id else {
-                return send_error(engine, session_id, "AUTH_REQUIRED", "Must be authenticated to delete a server");
+                return send_error(
+                    engine,
+                    session_id,
+                    "AUTH_REQUIRED",
+                    "Must be authenticated to delete a server",
+                );
             };
             if !engine.is_server_owner(&server_id, &uid) {
-                return send_error(engine, session_id, "FORBIDDEN", "Only the server owner can delete it");
+                return send_error(
+                    engine,
+                    session_id,
+                    "FORBIDDEN",
+                    "Only the server owner can delete it",
+                );
             }
             match engine.delete_server(&server_id).await {
                 Ok(()) => {
-                    if let Some(session) = engine.get_session(session_id) {
-                        if let Some(ref uid) = session.user_id {
-                            let servers = engine.list_servers_for_user(uid);
-                            let _ = session.send(ChatEvent::ServerList { servers });
-                        }
+                    if let Some(session) = engine.get_session(session_id)
+                        && let Some(ref uid) = session.user_id
+                    {
+                        let servers = engine.list_servers_for_user(uid);
+                        let _ = session.send(ChatEvent::ServerList { servers });
                     }
                     Ok(())
                 }
                 Err(e) => Err(e),
             }
         }
-        ClientMessage::UpdateMemberRole { server_id, user_id, role } => {
+        ClientMessage::UpdateMemberRole {
+            server_id,
+            user_id,
+            role,
+        } => {
             if let Some(pool) = engine.db() {
                 crate::db::queries::servers::update_member_role(pool, &server_id, &user_id, &role)
                     .await
@@ -415,7 +460,12 @@ async fn handle_client_message(
     }
 }
 
-fn send_error(engine: &ChatEngine, session_id: crate::engine::events::SessionId, code: &str, message: &str) {
+fn send_error(
+    engine: &ChatEngine,
+    session_id: crate::engine::events::SessionId,
+    code: &str,
+    message: &str,
+) {
     if let Some(session) = engine.get_session(session_id) {
         let _ = session.send(ChatEvent::Error {
             code: code.into(),

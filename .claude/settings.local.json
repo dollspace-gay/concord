@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo:*)",
+      "Bash(chainlink list:*)",
+      "Bash(chainlink session end:*)",
+      "Bash(mkdir:*)",
+      "Bash(cmd.exe /c \"wsl -d FedoraLinux-42 -- chmod +x /mnt/c/Users/texas/chainlink/chainlink/vscode-extension/bin/chainlink-linux\")",
+      "Bash(wsl:*)",
+      "Bash(npm run compile:*)",
+      "Bash(cargo audit:*)",
+      "Bash(chainlink create:*)",
+      "Bash(npm run build:binaries:*)",
+      "Bash(cargo clean:*)",
+      "Bash(cargo build:*)",
+      "Bash(cp:*)",
+      "Bash(ls:*)",
+      "Bash(where:*)",
+      "Bash(./target/release/chainlink.exe session start:*)"
+    ]
+  }
+}

@@ -26,10 +26,7 @@ enum RegState {
         user_received: bool,
     },
     /// Fully registered with the chat engine.
-    Registered {
-        session_id: SessionId,
-        nick: String,
-    },
+    Registered { session_id: SessionId, nick: String },
 }
 
 /// Handle a single IRC client connection from accept to close.
@@ -138,7 +135,10 @@ pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>, d
             // Handle CAP during registration
             if msg.command == "CAP" {
                 if msg.params.first().map(|s| s.as_str()) == Some("LS") {
-                    send_line(&out_tx, &format!(":{} CAP * LS :", formatter::server_name()));
+                    send_line(
+                        &out_tx,
+                        &format!(":{} CAP * LS :", formatter::server_name()),
+                    );
                 }
                 // CAP END just falls through
                 continue;
@@ -188,59 +188,61 @@ pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>, d
                 ref nick,
                 user_received,
             } = state
+                && let (Some(nick_val), true) = (nick.as_ref(), user_received)
             {
-                if let (Some(nick_val), true) = (nick.as_ref(), user_received) {
-                    // If a PASS was provided, validate it as an IRC token
-                    let user_id = if let Some(pass_token) = pass {
-                        match validate_irc_pass(&db, pass_token, nick_val).await {
-                            Ok(Some(uid)) => Some(uid),
-                            Ok(None) => {
-                                send_line(&out_tx, &format!(
+                // If a PASS was provided, validate it as an IRC token
+                let user_id = if let Some(pass_token) = pass {
+                    match validate_irc_pass(&db, pass_token, nick_val).await {
+                        Ok(Some(uid)) => Some(uid),
+                        Ok(None) => {
+                            send_line(
+                                &out_tx,
+                                &format!(
                                     ":{} 464 {} :Password incorrect",
                                     formatter::server_name(),
                                     nick_val,
-                                ));
-                                break;
-                            }
-                            Err(e) => {
-                                warn!(error = %e, "IRC token validation error");
-                                send_line(&out_tx, &format!(
+                                ),
+                            );
+                            break;
+                        }
+                        Err(e) => {
+                            warn!(error = %e, "IRC token validation error");
+                            send_line(
+                                &out_tx,
+                                &format!(
                                     ":{} 464 {} :Authentication error",
                                     formatter::server_name(),
                                     nick_val,
-                                ));
-                                break;
-                            }
-                        }
-                    } else {
-                        None
-                    };
-
-                    // Try to register with the engine
-                    match engine.connect(user_id, nick_val.clone(), Protocol::Irc, None) {
-                        Ok((sid, rx)) => {
-                            let nick_owned = nick_val.clone();
-
-                            // Send welcome burst
-                            send_line(&out_tx, &formatter::rpl_welcome(&nick_owned));
-                            send_line(&out_tx, &formatter::rpl_yourhost(&nick_owned));
-                            send_line(&out_tx, &formatter::rpl_created(&nick_owned));
-                            send_line(&out_tx, &formatter::rpl_myinfo(&nick_owned));
-                            send_line(&out_tx, &formatter::err_nomotd(&nick_owned));
-
-                            state = RegState::Registered {
-                                session_id: sid,
-                                nick: nick_owned,
-                            };
-                            event_rx = Some(rx);
-                        }
-                        Err(e) => {
-                            warn!(error = %e, "IRC registration failed");
-                            send_line(
-                                &out_tx,
-                                &formatter::err_nicknameinuse("*", nick_val),
+                                ),
                             );
+                            break;
                         }
+                    }
+                } else {
+                    None
+                };
+
+                // Try to register with the engine
+                match engine.connect(user_id, nick_val.clone(), Protocol::Irc, None) {
+                    Ok((sid, rx)) => {
+                        let nick_owned = nick_val.clone();
+
+                        // Send welcome burst
+                        send_line(&out_tx, &formatter::rpl_welcome(&nick_owned));
+                        send_line(&out_tx, &formatter::rpl_yourhost(&nick_owned));
+                        send_line(&out_tx, &formatter::rpl_created(&nick_owned));
+                        send_line(&out_tx, &formatter::rpl_myinfo(&nick_owned));
+                        send_line(&out_tx, &formatter::err_nomotd(&nick_owned));
+
+                        state = RegState::Registered {
+                            session_id: sid,
+                            nick: nick_owned,
+                        };
+                        event_rx = Some(rx);
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "IRC registration failed");
+                        send_line(&out_tx, &formatter::err_nicknameinuse("*", nick_val));
                     }
                 }
             }
@@ -304,7 +306,12 @@ fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> 
             };
             vec![formatter::privmsg(from, &irc_target, content)]
         }
-        ChatEvent::Join { nickname, server_id, channel, .. } => {
+        ChatEvent::Join {
+            nickname,
+            server_id,
+            channel,
+            ..
+        } => {
             let irc_channel = to_irc_channel(engine, server_id, channel);
             vec![formatter::join(nickname, &irc_channel)]
         }
@@ -315,11 +322,7 @@ fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> 
             reason,
         } => {
             let irc_channel = to_irc_channel(engine, server_id, channel);
-            vec![formatter::part(
-                nickname,
-                &irc_channel,
-                reason.as_deref(),
-            )]
+            vec![formatter::part(nickname, &irc_channel, reason.as_deref())]
         }
         ChatEvent::Quit { nickname, reason } => {
             vec![formatter::quit(nickname, reason.as_deref())]
@@ -336,7 +339,11 @@ fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> 
         ChatEvent::NickChange { old_nick, new_nick } => {
             vec![formatter::nick_change(old_nick, new_nick)]
         }
-        ChatEvent::Names { server_id, channel, members } => {
+        ChatEvent::Names {
+            server_id,
+            channel,
+            members,
+        } => {
             let irc_channel = to_irc_channel(engine, server_id, channel);
             let nicks: Vec<String> = members.iter().map(|m| m.nickname.clone()).collect();
             vec![
@@ -344,7 +351,11 @@ fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> 
                 formatter::rpl_endofnames(my_nick, &irc_channel),
             ]
         }
-        ChatEvent::Topic { server_id, channel, topic } => {
+        ChatEvent::Topic {
+            server_id,
+            channel,
+            topic,
+        } => {
             let irc_channel = to_irc_channel(engine, server_id, channel);
             if topic.is_empty() {
                 vec![formatter::rpl_notopic(my_nick, &irc_channel)]

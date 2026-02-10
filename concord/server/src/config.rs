@@ -119,7 +119,8 @@ impl ServerConfig {
         if let (Ok(id), Ok(secret)) = (
             std::env::var("GITHUB_CLIENT_ID"),
             std::env::var("GITHUB_CLIENT_SECRET"),
-        ) && !id.is_empty() && !secret.is_empty()
+        ) && !id.is_empty()
+            && !secret.is_empty()
         {
             self.oauth.github = Some(OAuthProviderSection {
                 client_id: id,
@@ -129,7 +130,8 @@ impl ServerConfig {
         if let (Ok(id), Ok(secret)) = (
             std::env::var("GOOGLE_CLIENT_ID"),
             std::env::var("GOOGLE_CLIENT_SECRET"),
-        ) && !id.is_empty() && !secret.is_empty()
+        ) && !id.is_empty()
+            && !secret.is_empty()
         {
             self.oauth.google = Some(OAuthProviderSection {
                 client_id: id,

@@ -13,14 +13,12 @@ pub async fn ensure_channel(
     if let Some(row) = get_channel_by_name(pool, server_id, name).await? {
         return Ok(row.id);
     }
-    sqlx::query(
-        "INSERT OR IGNORE INTO channels (id, server_id, name) VALUES (?, ?, ?)",
-    )
-    .bind(channel_id)
-    .bind(server_id)
-    .bind(name)
-    .execute(pool)
-    .await?;
+    sqlx::query("INSERT OR IGNORE INTO channels (id, server_id, name) VALUES (?, ?, ?)")
+        .bind(channel_id)
+        .bind(server_id)
+        .bind(name)
+        .execute(pool)
+        .await?;
     Ok(channel_id.to_string())
 }
 
@@ -41,13 +39,11 @@ pub async fn get_channel_by_name(
     server_id: &str,
     name: &str,
 ) -> Result<Option<ChannelRow>, sqlx::Error> {
-    sqlx::query_as::<_, ChannelRow>(
-        "SELECT * FROM channels WHERE server_id = ? AND name = ?",
-    )
-    .bind(server_id)
-    .bind(name)
-    .fetch_optional(pool)
-    .await
+    sqlx::query_as::<_, ChannelRow>("SELECT * FROM channels WHERE server_id = ? AND name = ?")
+        .bind(server_id)
+        .bind(name)
+        .fetch_optional(pool)
+        .await
 }
 
 /// List all channels in a server.
@@ -55,12 +51,10 @@ pub async fn list_channels(
     pool: &SqlitePool,
     server_id: &str,
 ) -> Result<Vec<ChannelRow>, sqlx::Error> {
-    sqlx::query_as::<_, ChannelRow>(
-        "SELECT * FROM channels WHERE server_id = ? ORDER BY name",
-    )
-    .bind(server_id)
-    .fetch_all(pool)
-    .await
+    sqlx::query_as::<_, ChannelRow>("SELECT * FROM channels WHERE server_id = ? ORDER BY name")
+        .bind(server_id)
+        .fetch_all(pool)
+        .await
 }
 
 /// Get all default channels in a server.
@@ -123,13 +117,11 @@ pub async fn add_member(
     channel_id: &str,
     user_id: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)",
-    )
-    .bind(channel_id)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    sqlx::query("INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)")
+        .bind(channel_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 

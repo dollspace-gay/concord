@@ -58,10 +58,7 @@ pub enum ChatEvent {
     },
 
     /// User changed their nickname.
-    NickChange {
-        old_nick: String,
-        new_nick: String,
-    },
+    NickChange { old_nick: String, new_nick: String },
 
     /// Server notice directed at a specific session.
     ServerNotice { message: String },
@@ -95,9 +92,7 @@ pub enum ChatEvent {
     },
 
     /// List of servers the user belongs to.
-    ServerList {
-        servers: Vec<ServerInfo>,
-    },
+    ServerList { servers: Vec<ServerInfo> },
 
     /// Error from the server.
     Error { code: String, message: String },

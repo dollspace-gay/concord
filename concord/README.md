@@ -6,11 +6,15 @@ Any IRC client (HexChat, irssi, WeeChat) connects alongside web users — messag
 
 ## Features
 
-- **Dual protocol**: WebSocket (browser) + IRC (RFC 2812) on the same server
+- **Multi-server architecture**: Discord-style servers with isolated channels, members, and permissions
+- **Dual protocol**: WebSocket (browser) + IRC (RFC 2812) on the same instance
 - **Protocol-agnostic engine**: Core chat logic never imports protocol-specific code
-- **OAuth authentication**: GitHub and Google login for the web UI
-- **IRC access tokens**: Web users generate tokens to connect from any IRC client
-- **Persistent history**: SQLite (WAL mode) with message history and channel persistence
+- **OAuth authentication**: GitHub, Google, and Bluesky (AT Protocol) login
+- **Role-based permissions**: Owner, Admin, Moderator, and Member roles per server
+- **IRC access tokens**: Web users generate argon2-hashed tokens to connect from any IRC client
+- **Persistent history**: SQLite (WAL mode) with paginated message history
+- **Rate limiting**: Token-bucket rate limiter on messages (per-user)
+- **Direct messages**: Cross-protocol DMs between any connected users
 - **Modern web UI**: React + TypeScript with a Discord-like layout
 - **Self-hostable**: Single binary + static files, or use Docker
 
@@ -72,6 +76,8 @@ Concord loads configuration from `concord.toml` (see `concord.example.toml`). En
 | GitHub OAuth | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | — |
 | Google OAuth | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — |
 
+Bluesky login requires no configuration — it uses the AT Protocol OAuth flow with your instance's public URL.
+
 ## IRC Usage
 
 1. Log in via the web UI (OAuth)
@@ -87,32 +93,75 @@ Nickname: <your-username>
 
 In HexChat, set the server password to your token. Concord validates the token and maps you to your web account.
 
+### Multi-server channels over IRC
+
+IRC clients can join channels on non-default servers using the `#server-name/channel` syntax:
+
+```
+/join #general            → default server, #general
+/join #my-guild/general   → "my-guild" server, #general
+```
+
 ## Architecture
 
 ```
-IRC Clients ──TCP──▸ ┌─────────────────┐ ◂──WS── Web Browsers
-                     │   Rust Server    │
-                     │  ┌─────────────┐ │
-                     │  │ IRC Adapter  │ │
-                     │  ├─────────────┤ │
-                     │  │ Chat Engine  │ │  ← protocol-agnostic
-                     │  ├─────────────┤ │
-                     │  │  WS / HTTP   │ │
-                     │  ├─────────────┤ │
-                     │  │   SQLite     │ │
-                     │  └─────────────┘ │
-                     └─────────────────┘
+IRC Clients ──TCP──▸ ┌─────────────────────┐ ◂──WS── Web Browsers
+                     │     Rust Server      │
+                     │  ┌─────────────────┐ │
+                     │  │  IRC Adapter    │ │
+                     │  ├─────────────────┤ │
+                     │  │  Chat Engine    │ │  ← protocol-agnostic
+                     │  │  (multi-server, │ │
+                     │  │   permissions,  │ │
+                     │  │   rate limits)  │ │
+                     │  ├─────────────────┤ │
+                     │  │  WS / HTTP API  │ │
+                     │  ├─────────────────┤ │
+                     │  │    SQLite       │ │
+                     │  └─────────────────┘ │
+                     └─────────────────────┘
 ```
+
+Dependency direction: `irc` → `engine` ← `web`. The engine knows nothing about protocols.
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Backend | Rust (tokio, axum, sqlx) |
-| Frontend | React 19, TypeScript, Vite, Zustand, Tailwind CSS |
+| Frontend | React 19, TypeScript, Vite, Zustand, Tailwind CSS 4 |
 | Database | SQLite (WAL mode) |
-| IRC | Custom RFC 2812 implementation |
-| Auth | OAuth2 (GitHub, Google), JWT sessions |
+| IRC | Custom RFC 2812 parser and formatter |
+| Auth | OAuth2 (GitHub, Google, Bluesky/AT Protocol), JWT sessions, argon2 IRC tokens |
+| Concurrency | DashMap, tokio mpsc channels |
+
+## REST API
+
+All endpoints are under `/api`. Authenticated endpoints require a `concord_session` cookie (set by OAuth login).
+
+### Public
+- `GET /api/auth/status` — available OAuth providers
+- `GET /api/channels?server_id=` — list channels
+- `GET /api/channels/{name}/messages?server_id=` — message history
+- `GET /api/users/{nickname}` — public profile lookup
+
+### Authenticated
+- `GET /api/me` — current user profile
+- `GET /api/servers` — list your servers
+- `POST /api/servers` — create a server
+- `GET /api/servers/{id}` — server info
+- `DELETE /api/servers/{id}` — delete server (owner only)
+- `GET /api/servers/{id}/channels` — list channels in server
+- `GET /api/servers/{id}/channels/{name}/messages` — channel history
+- `GET /api/servers/{id}/members` — list server members
+- `GET /api/tokens` — list your IRC tokens
+- `POST /api/tokens` — generate an IRC token
+- `DELETE /api/tokens/{id}` — revoke an IRC token
+
+### Admin
+- `GET /api/admin/servers` — list all servers
+- `DELETE /api/admin/servers/{id}` — delete any server
+- `PUT /api/admin/users/{id}/admin` — toggle system admin flag
 
 ## Development
 
@@ -132,6 +181,8 @@ npm run dev
 cd server
 cargo test
 ```
+
+42 tests covering the chat engine, IRC parser/formatter, JWT auth, and token hashing.
 
 ## License
 

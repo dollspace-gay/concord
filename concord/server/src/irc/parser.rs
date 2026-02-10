@@ -16,7 +16,7 @@ pub struct IrcMessage {
 impl IrcMessage {
     /// Parse a single IRC line (without the trailing \r\n).
     pub fn parse(line: &str) -> Result<Self, ParseError> {
-        let line = line.trim_end_matches(|c| c == '\r' || c == '\n');
+        let line = line.trim_end_matches(['\r', '\n']);
 
         if line.is_empty() {
             return Err(ParseError::Empty);
@@ -57,9 +57,9 @@ impl IrcMessage {
         // Parse parameters
         let mut params = Vec::new();
         while !remaining.is_empty() {
-            if remaining.starts_with(':') {
+            if let Some(trailing) = remaining.strip_prefix(':') {
                 // Trailing parameter — everything after the colon
-                params.push(remaining[1..].to_string());
+                params.push(trailing.to_string());
                 break;
             }
 
@@ -201,7 +201,10 @@ mod tests {
 
     #[test]
     fn test_parse_prefix_only() {
-        assert_eq!(IrcMessage::parse(":prefix"), Err(ParseError::MissingCommand));
+        assert_eq!(
+            IrcMessage::parse(":prefix"),
+            Err(ParseError::MissingCommand)
+        );
     }
 
     #[test]

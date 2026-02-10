@@ -11,9 +11,7 @@ pub fn github_client(config: &OAuthProviderConfig, public_url: &str) -> BasicCli
         AuthUrl::new("https://github.com/login/oauth/authorize".into()).unwrap(),
         Some(TokenUrl::new("https://github.com/login/oauth/access_token".into()).unwrap()),
     )
-    .set_redirect_uri(
-        RedirectUrl::new(format!("{}/api/auth/github/callback", public_url)).unwrap(),
-    )
+    .set_redirect_uri(RedirectUrl::new(format!("{}/api/auth/github/callback", public_url)).unwrap())
 }
 
 /// Build an OAuth2 client for Google.
@@ -24,9 +22,7 @@ pub fn google_client(config: &OAuthProviderConfig, public_url: &str) -> BasicCli
         AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".into()).unwrap(),
         Some(TokenUrl::new("https://oauth2.googleapis.com/token".into()).unwrap()),
     )
-    .set_redirect_uri(
-        RedirectUrl::new(format!("{}/api/auth/google/callback", public_url)).unwrap(),
-    )
+    .set_redirect_uri(RedirectUrl::new(format!("{}/api/auth/google/callback", public_url)).unwrap())
 }
 
 /// GitHub user info from their API.

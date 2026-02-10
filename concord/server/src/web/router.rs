@@ -26,13 +26,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Server endpoints (authenticated)
         .route(
             "/api/servers",
-            axum::routing::get(rest_api::list_servers)
-                .post(rest_api::create_server),
+            axum::routing::get(rest_api::list_servers).post(rest_api::create_server),
         )
         .route(
             "/api/servers/{id}",
-            axum::routing::get(rest_api::get_server)
-                .delete(rest_api::delete_server),
+            axum::routing::get(rest_api::get_server).delete(rest_api::delete_server),
         )
         .route(
             "/api/servers/{id}/channels",
@@ -65,18 +63,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             axum::routing::get(rest_api::auth_status),
         )
         // OAuth flows
-        .route(
-            "/api/auth/github",
-            axum::routing::get(oauth::github_login),
-        )
+        .route("/api/auth/github", axum::routing::get(oauth::github_login))
         .route(
             "/api/auth/github/callback",
             axum::routing::get(oauth::github_callback),
         )
-        .route(
-            "/api/auth/google",
-            axum::routing::get(oauth::google_login),
-        )
+        .route("/api/auth/google", axum::routing::get(oauth::google_login))
         .route(
             "/api/auth/google/callback",
             axum::routing::get(oauth::google_callback),
@@ -104,8 +96,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/me", axum::routing::get(rest_api::get_me))
         .route(
             "/api/tokens",
-            axum::routing::get(rest_api::list_irc_tokens)
-                .post(rest_api::create_irc_token),
+            axum::routing::get(rest_api::list_irc_tokens).post(rest_api::create_irc_token),
         )
         .route(
             "/api/tokens/{id}",

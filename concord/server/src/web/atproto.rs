@@ -10,18 +10,18 @@ use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-use atproto_identity::key::{generate_key, to_public, KeyData, KeyType};
+use atproto_identity::key::{KeyData, KeyType, generate_key, to_public};
 use atproto_oauth::jwk;
 use atproto_oauth::pkce;
-use atproto_oauth::resources::{pds_resources, AuthorizationServer};
+use atproto_oauth::resources::{AuthorizationServer, pds_resources};
 use atproto_oauth::workflow::{
-    oauth_complete, oauth_init, OAuthClient, OAuthRequest, OAuthRequestState,
+    OAuthClient, OAuthRequest, OAuthRequestState, oauth_complete, oauth_init,
 };
 
+use super::app_state::AppState;
 use crate::auth::config::AuthConfig;
 use crate::auth::token::create_session_token;
 use crate::db::queries::users;
-use super::app_state::AppState;
 
 /// State for pending AT Protocol OAuth flows.
 pub struct AtprotoOAuth {
@@ -38,6 +38,12 @@ pub struct PendingAtprotoAuth {
     pub dpop_key: KeyData,
     pub handle: String,
     pub auth_server: AuthorizationServer,
+}
+
+impl Default for AtprotoOAuth {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AtprotoOAuth {
@@ -61,8 +67,8 @@ pub async fn client_metadata(State(state): State<Arc<AppState>>) -> impl IntoRes
     let public_url = &state.auth_config.public_url;
     let client_id = format!("{}/api/auth/atproto/client-metadata.json", public_url);
 
-    let public_jwk_value = serde_json::to_value(&state.atproto.public_jwk)
-        .expect("failed to serialize public JWK");
+    let public_jwk_value =
+        serde_json::to_value(&state.atproto.public_jwk).expect("failed to serialize public JWK");
 
     let metadata = serde_json::json!({
         "client_id": client_id,
@@ -110,7 +116,10 @@ pub async fn atproto_login(
         Ok(url) => url,
         Err(e) => {
             warn!(handle = %handle, error = %e, "Failed to resolve handle");
-            return (StatusCode::BAD_REQUEST, format!("Could not resolve handle: {}", e))
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("Could not resolve handle: {}", e),
+            )
                 .into_response();
         }
     };
@@ -120,7 +129,10 @@ pub async fn atproto_login(
         Ok(r) => r,
         Err(e) => {
             error!(error = %e, "Failed to fetch PDS resources");
-            return (StatusCode::BAD_GATEWAY, "Failed to discover authorization server")
+            return (
+                StatusCode::BAD_GATEWAY,
+                "Failed to discover authorization server",
+            )
                 .into_response();
         }
     };
@@ -158,7 +170,10 @@ pub async fn atproto_login(
         Ok(r) => r,
         Err(e) => {
             error!(error = %e, "PAR request failed");
-            return (StatusCode::BAD_GATEWAY, format!("Authorization request failed: {}", e))
+            return (
+                StatusCode::BAD_GATEWAY,
+                format!("Authorization request failed: {}", e),
+            )
                 .into_response();
         }
     };
@@ -167,13 +182,12 @@ pub async fn atproto_login(
     let dpop_jwk = jwk::generate(&dpop_key).unwrap_or_else(|_| {
         panic!("failed to generate DPoP JWK");
     });
-    let dpop_private_key =
-        serde_json::to_string(&dpop_jwk).expect("failed to serialize DPoP key");
+    let dpop_private_key = serde_json::to_string(&dpop_jwk).expect("failed to serialize DPoP key");
 
-    let signing_pub = to_public(&state.atproto.signing_key)
-        .expect("failed to derive signing public key");
-    let signing_pub_jwk = jwk::generate(&signing_pub)
-        .expect("failed to generate signing public JWK");
+    let signing_pub =
+        to_public(&state.atproto.signing_key).expect("failed to derive signing public key");
+    let signing_pub_jwk =
+        jwk::generate(&signing_pub).expect("failed to generate signing public JWK");
     let signing_public_key =
         serde_json::to_string(&signing_pub_jwk).expect("failed to serialize signing key");
 
@@ -235,14 +249,18 @@ pub async fn atproto_callback(
     };
 
     let Some(pending) = pending else {
-        return (StatusCode::BAD_REQUEST, "Invalid or expired state parameter").into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            "Invalid or expired state parameter",
+        )
+            .into_response();
     };
 
     // Verify issuer matches if provided
-    if let Some(ref iss) = params.iss {
-        if *iss != pending.oauth_request.issuer {
-            return (StatusCode::BAD_REQUEST, "Issuer mismatch").into_response();
-        }
+    if let Some(ref iss) = params.iss
+        && *iss != pending.oauth_request.issuer
+    {
+        return (StatusCode::BAD_REQUEST, "Issuer mismatch").into_response();
     }
 
     let http_client = reqwest::Client::new();
@@ -283,8 +301,14 @@ pub async fn atproto_callback(
 
     // Fetch public profile for display name and avatar
     let (display_name, avatar_url) = fetch_bsky_profile(&http_client, &did).await;
-    let username = display_name
-        .unwrap_or_else(|| pending.handle.split('.').next().unwrap_or("user").to_string());
+    let username = display_name.unwrap_or_else(|| {
+        pending
+            .handle
+            .split('.')
+            .next()
+            .unwrap_or("user")
+            .to_string()
+    });
 
     // Find or create user using DID as provider_id
     let user_id = match users::find_by_oauth(&state.db, "atproto", &did).await {
@@ -294,18 +318,21 @@ pub async fn atproto_callback(
             let oauth_id = Uuid::new_v4().to_string();
             if let Err(e) = users::create_with_oauth(
                 &state.db,
-                &uid,
-                &username,
-                None,
-                avatar_url.as_deref(),
-                &oauth_id,
-                "atproto",
-                &did,
+                &users::CreateOAuthUser {
+                    user_id: &uid,
+                    username: &username,
+                    email: None,
+                    avatar_url: avatar_url.as_deref(),
+                    oauth_id: &oauth_id,
+                    provider: "atproto",
+                    provider_id: &did,
+                },
             )
             .await
             {
                 error!(error = %e, "Failed to create user");
-                return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create user").into_response();
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create user")
+                    .into_response();
             }
             info!(user_id = %uid, username = %username, did = %did, "new user registered via Bluesky");
             uid
@@ -343,10 +370,7 @@ async fn resolve_handle_to_pds(
 /// Resolve a handle to a DID. Tries the .well-known method first, then falls
 /// back to the public Bluesky XRPC API (works for all handles including
 /// custom domains and did:web identities).
-async fn resolve_handle(
-    http_client: &reqwest::Client,
-    handle: &str,
-) -> Result<String, String> {
+async fn resolve_handle(http_client: &reqwest::Client, handle: &str) -> Result<String, String> {
     // Try .well-known/atproto-did first (works for self-hosted PDS)
     if let Ok(did) = atproto_identity::resolve::resolve_handle_http(http_client, handle).await {
         return Ok(did);

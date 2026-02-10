@@ -3,7 +3,6 @@ use super::parser::IrcMessage;
 
 /// Helper to build IRC reply lines. All functions return formatted strings
 /// ready to send (caller appends \r\n).
-
 const SERVER_NAME: &str = "concord";
 
 pub fn server_name() -> &'static str {
@@ -162,12 +161,7 @@ pub fn rpl_namreply(nick: &str, channel: &str, members: &[String]) -> String {
     IrcMessage::server_reply(
         SERVER_NAME,
         RPL_NAMREPLY,
-        vec![
-            nick.into(),
-            "=".into(),
-            channel.into(),
-            members.join(" "),
-        ],
+        vec![nick.into(), "=".into(), channel.into(), members.join(" ")],
     )
     .format()
 }
@@ -244,11 +238,7 @@ pub fn rpl_endofwhois(requestor: &str, nick: &str) -> String {
     IrcMessage::server_reply(
         SERVER_NAME,
         RPL_ENDOFWHOIS,
-        vec![
-            requestor.into(),
-            nick.into(),
-            "End of /WHOIS list".into(),
-        ],
+        vec![requestor.into(), nick.into(), "End of /WHOIS list".into()],
     )
     .format()
 }

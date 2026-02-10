@@ -3,8 +3,8 @@ use std::sync::Arc;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect, Response};
-use oauth2::{AuthorizationCode, CsrfToken, Scope, TokenResponse};
 use oauth2::reqwest::async_http_client;
+use oauth2::{AuthorizationCode, CsrfToken, Scope, TokenResponse};
 use serde::Deserialize;
 use tracing::{error, info};
 use uuid::Uuid;
@@ -13,7 +13,6 @@ use crate::auth::config::AuthConfig;
 use crate::auth::oauth;
 use crate::auth::token::create_session_token;
 use crate::db::queries::users;
-
 
 use super::app_state::AppState;
 
@@ -87,13 +86,15 @@ pub async fn github_callback(
             let oauth_id = Uuid::new_v4().to_string();
             if let Err(e) = users::create_with_oauth(
                 &state.db,
-                &uid,
-                &gh_user.login,
-                gh_user.email.as_deref(),
-                gh_user.avatar_url.as_deref(),
-                &oauth_id,
-                "github",
-                &provider_id,
+                &users::CreateOAuthUser {
+                    user_id: &uid,
+                    username: &gh_user.login,
+                    email: gh_user.email.as_deref(),
+                    avatar_url: gh_user.avatar_url.as_deref(),
+                    oauth_id: &oauth_id,
+                    provider: "github",
+                    provider_id: &provider_id,
+                },
             )
             .await
             {
@@ -186,13 +187,15 @@ pub async fn google_callback(
             let oauth_id = Uuid::new_v4().to_string();
             if let Err(e) = users::create_with_oauth(
                 &state.db,
-                &uid,
-                &username,
-                g_user.email.as_deref(),
-                g_user.picture.as_deref(),
-                &oauth_id,
-                "google",
-                &g_user.sub,
+                &users::CreateOAuthUser {
+                    user_id: &uid,
+                    username: &username,
+                    email: g_user.email.as_deref(),
+                    avatar_url: g_user.picture.as_deref(),
+                    oauth_id: &oauth_id,
+                    provider: "google",
+                    provider_id: &g_user.sub,
+                },
             )
             .await
             {

@@ -10,24 +10,20 @@ pub async fn create_server(
     owner_id: &str,
     icon_url: Option<&str>,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "INSERT INTO servers (id, name, owner_id, icon_url) VALUES (?, ?, ?, ?)",
-    )
-    .bind(id)
-    .bind(name)
-    .bind(owner_id)
-    .bind(icon_url)
-    .execute(pool)
-    .await?;
+    sqlx::query("INSERT INTO servers (id, name, owner_id, icon_url) VALUES (?, ?, ?, ?)")
+        .bind(id)
+        .bind(name)
+        .bind(owner_id)
+        .bind(icon_url)
+        .execute(pool)
+        .await?;
 
     // Owner is automatically a member with 'owner' role
-    sqlx::query(
-        "INSERT INTO server_members (server_id, user_id, role) VALUES (?, ?, 'owner')",
-    )
-    .bind(id)
-    .bind(owner_id)
-    .execute(pool)
-    .await?;
+    sqlx::query("INSERT INTO server_members (server_id, user_id, role) VALUES (?, ?, 'owner')")
+        .bind(id)
+        .bind(owner_id)
+        .execute(pool)
+        .await?;
 
     Ok(())
 }
@@ -100,14 +96,12 @@ pub async fn add_server_member(
     user_id: &str,
     role: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "INSERT OR IGNORE INTO server_members (server_id, user_id, role) VALUES (?, ?, ?)",
-    )
-    .bind(server_id)
-    .bind(user_id)
-    .bind(role)
-    .execute(pool)
-    .await?;
+    sqlx::query("INSERT OR IGNORE INTO server_members (server_id, user_id, role) VALUES (?, ?, ?)")
+        .bind(server_id)
+        .bind(user_id)
+        .bind(role)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -170,10 +164,7 @@ pub async fn update_member_role(
 }
 
 /// Get the member count for a server.
-pub async fn get_member_count(
-    pool: &SqlitePool,
-    server_id: &str,
-) -> Result<i64, sqlx::Error> {
+pub async fn get_member_count(pool: &SqlitePool, server_id: &str) -> Result<i64, sqlx::Error> {
     sqlx::query_scalar("SELECT COUNT(*) FROM server_members WHERE server_id = ?")
         .bind(server_id)
         .fetch_one(pool)

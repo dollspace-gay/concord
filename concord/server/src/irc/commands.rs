@@ -15,11 +15,7 @@ use super::parser::IrcMessage;
 /// If the server name doesn't match any known server, falls back to treating
 /// the whole thing as a default-server channel name.
 pub fn parse_irc_channel(engine: &ChatEngine, irc_name: &str) -> (String, String) {
-    let bare = if irc_name.starts_with('#') {
-        &irc_name[1..]
-    } else {
-        irc_name
-    };
+    let bare = irc_name.strip_prefix('#').unwrap_or(irc_name);
 
     if let Some(slash_pos) = bare.find('/') {
         let server_name = &bare[..slash_pos];
@@ -79,12 +75,7 @@ pub fn handle_command(
         // CAP, MODE — common client sends these, just ignore or give minimal response
         "CAP" => {
             if msg.params.first().map(|s| s.as_str()) == Some("LS") {
-                vec![format!(
-                    ":{} CAP * LS :",
-                    formatter::server_name()
-                )]
-            } else if msg.params.first().map(|s| s.as_str()) == Some("END") {
-                vec![]
+                vec![format!(":{} CAP * LS :", formatter::server_name())]
             } else {
                 vec![]
             }
@@ -102,11 +93,7 @@ pub fn handle_command(
                         irc_channel
                     )]
                 } else {
-                    vec![format!(
-                        ":{} 221 {} +",
-                        formatter::server_name(),
-                        nick
-                    )]
+                    vec![format!(":{} 221 {} +", formatter::server_name(), nick)]
                 }
             } else {
                 vec![formatter::err_needmoreparams(nick, "MODE")]
@@ -297,7 +284,12 @@ fn handle_list(engine: &ChatEngine, nick: &str, msg: &IrcMessage) -> Vec<String>
 
     for ch in &channels {
         let irc_name = to_irc_channel(engine, &server_id, &ch.name);
-        replies.push(formatter::rpl_list(nick, &irc_name, ch.member_count, &ch.topic));
+        replies.push(formatter::rpl_list(
+            nick,
+            &irc_name,
+            ch.member_count,
+            &ch.topic,
+        ));
     }
     replies.push(formatter::rpl_listend(nick));
 

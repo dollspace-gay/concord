@@ -65,12 +65,7 @@ impl ChatEngine {
             .map_err(|e| format!("Failed to load servers: {e}"))?;
 
         for row in rows {
-            let mut state = ServerState::new(
-                row.id.clone(),
-                row.name,
-                row.owner_id,
-                row.icon_url,
-            );
+            let mut state = ServerState::new(row.id.clone(), row.name, row.owner_id, row.icon_url);
 
             let members = crate::db::queries::servers::get_server_members(pool, &row.id)
                 .await
@@ -102,11 +97,8 @@ impl ChatEngine {
                 .map_err(|e| format!("Failed to load channels: {e}"))?;
 
             for row in rows {
-                let mut ch = ChannelState::new(
-                    row.id.clone(),
-                    row.server_id.clone(),
-                    row.name.clone(),
-                );
+                let mut ch =
+                    ChannelState::new(row.id.clone(), row.server_id.clone(), row.name.clone());
                 ch.topic = row.topic;
                 ch.topic_set_by = row.topic_set_by;
 
@@ -359,11 +351,7 @@ impl ChatEngine {
     }
 
     /// Get the role of a user in a server.
-    pub async fn get_server_role(
-        &self,
-        server_id: &str,
-        user_id: &str,
-    ) -> Option<ServerRole> {
+    pub async fn get_server_role(&self, server_id: &str, user_id: &str) -> Option<ServerRole> {
         let Some(pool) = &self.db else {
             return None;
         };
@@ -471,22 +459,20 @@ impl ChatEngine {
             .clone();
 
         // Get or create channel
-        let channel_id = if let Some(id) =
-            self.channel_name_index
-                .get(&(server_id.to_string(), channel_name.clone()))
+        let channel_id = if let Some(id) = self
+            .channel_name_index
+            .get(&(server_id.to_string(), channel_name.clone()))
         {
             id.clone()
         } else {
             // Create channel on-the-fly
             let new_id = Uuid::new_v4().to_string();
-            let ch = ChannelState::new(
-                new_id.clone(),
-                server_id.to_string(),
-                channel_name.clone(),
-            );
+            let ch = ChannelState::new(new_id.clone(), server_id.to_string(), channel_name.clone());
             self.channels.insert(new_id.clone(), ch);
-            self.channel_name_index
-                .insert((server_id.to_string(), channel_name.clone()), new_id.clone());
+            self.channel_name_index.insert(
+                (server_id.to_string(), channel_name.clone()),
+                new_id.clone(),
+            );
             if let Some(mut srv) = self.servers.get_mut(server_id) {
                 srv.channel_ids.insert(new_id.clone());
             }
@@ -498,11 +484,10 @@ impl ChatEngine {
                 let srv_id = server_id.to_string();
                 let ch_name = channel_name.clone();
                 tokio::spawn(async move {
-                    if let Err(e) =
-                        crate::db::queries::channels::ensure_channel(
-                            &pool, &ch_id, &srv_id, &ch_name,
-                        )
-                        .await
+                    if let Err(e) = crate::db::queries::channels::ensure_channel(
+                        &pool, &ch_id, &srv_id, &ch_name,
+                    )
+                    .await
                     {
                         error!(error = %e, "failed to persist channel");
                     }
@@ -657,11 +642,10 @@ impl ChatEngine {
                 let nick = session.nickname.clone();
                 let msg = content.to_string();
                 tokio::spawn(async move {
-                    if let Err(e) =
-                        crate::db::queries::messages::insert_message(
-                            &pool, &id, &srv, &ch, &sid, &nick, &msg,
-                        )
-                        .await
+                    if let Err(e) = crate::db::queries::messages::insert_message(
+                        &pool, &id, &srv, &ch, &sid, &nick, &msg,
+                    )
+                    .await
                     {
                         error!(error = %e, "failed to persist message");
                     }
@@ -684,11 +668,15 @@ impl ChatEngine {
                 let target_sid = target_session_id.value().to_string();
                 let msg = content.to_string();
                 tokio::spawn(async move {
-                    if let Err(e) =
-                        crate::db::queries::messages::insert_dm(
-                            &pool, &id, &sid, &nick, &target_sid, &msg,
-                        )
-                        .await
+                    if let Err(e) = crate::db::queries::messages::insert_dm(
+                        &pool,
+                        &id,
+                        &sid,
+                        &nick,
+                        &target_sid,
+                        &msg,
+                    )
+                    .await
                     {
                         error!(error = %e, "failed to persist DM");
                     }
@@ -742,9 +730,7 @@ impl ChatEngine {
             let t = topic.clone();
             let by = session.nickname.clone();
             tokio::spawn(async move {
-                if let Err(e) =
-                    crate::db::queries::channels::set_topic(&pool, &ch, &t, &by).await
-                {
+                if let Err(e) = crate::db::queries::channels::set_topic(&pool, &ch, &t, &by).await {
                     error!(error = %e, "failed to persist topic");
                 }
             });
@@ -793,10 +779,7 @@ impl ChatEngine {
                 id: row.id.parse().unwrap_or_default(),
                 from: row.sender_nick,
                 content: row.content,
-                timestamp: row
-                    .created_at
-                    .parse()
-                    .unwrap_or_else(|_| Utc::now()),
+                timestamp: row.created_at.parse().unwrap_or_else(|_| Utc::now()),
             })
             .collect();
 
@@ -888,10 +871,10 @@ impl ChatEngine {
             if Some(*member_id) == exclude {
                 continue;
             }
-            if let Some(session) = self.sessions.get(member_id) {
-                if !session.send(event.clone()) {
-                    warn!(%member_id, "failed to send event to session (channel closed)");
-                }
+            if let Some(session) = self.sessions.get(member_id)
+                && !session.send(event.clone())
+            {
+                warn!(%member_id, "failed to send event to session (channel closed)");
             }
         }
     }
@@ -970,8 +953,12 @@ mod tests {
             .connect(None, "bob".into(), Protocol::WebSocket, None)
             .unwrap();
 
-        engine.join_channel(sid1, DEFAULT_SERVER_ID, "#general").unwrap();
-        engine.join_channel(sid2, DEFAULT_SERVER_ID, "#general").unwrap();
+        engine
+            .join_channel(sid1, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        engine
+            .join_channel(sid2, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
 
         while rx1.try_recv().is_ok() {}
         while rx2.try_recv().is_ok() {}
@@ -1003,12 +990,18 @@ mod tests {
             .connect(None, "bob".into(), Protocol::WebSocket, None)
             .unwrap();
 
-        engine.join_channel(sid1, DEFAULT_SERVER_ID, "#general").unwrap();
-        engine.join_channel(sid2, DEFAULT_SERVER_ID, "#general").unwrap();
+        engine
+            .join_channel(sid1, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        engine
+            .join_channel(sid2, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
 
         while rx1.try_recv().is_ok() {}
 
-        engine.part_channel(sid2, DEFAULT_SERVER_ID, "#general", None).unwrap();
+        engine
+            .part_channel(sid2, DEFAULT_SERVER_ID, "#general", None)
+            .unwrap();
 
         let event = rx1.try_recv().unwrap();
         match event {
@@ -1024,11 +1017,18 @@ mod tests {
         let (sid, mut rx) = engine
             .connect(None, "alice".into(), Protocol::WebSocket, None)
             .unwrap();
-        engine.join_channel(sid, DEFAULT_SERVER_ID, "#general").unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
         while rx.try_recv().is_ok() {}
 
         engine
-            .set_topic(sid, DEFAULT_SERVER_ID, "#general", "Welcome to Concord!".into())
+            .set_topic(
+                sid,
+                DEFAULT_SERVER_ID,
+                "#general",
+                "Welcome to Concord!".into(),
+            )
             .unwrap();
 
         let event = rx.try_recv().unwrap();
@@ -1078,8 +1078,12 @@ mod tests {
         let (sid, _rx) = engine
             .connect(None, "alice".into(), Protocol::WebSocket, None)
             .unwrap();
-        engine.join_channel(sid, DEFAULT_SERVER_ID, "#general").unwrap();
-        engine.join_channel(sid, DEFAULT_SERVER_ID, "#rust").unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#rust")
+            .unwrap();
 
         let channels = engine.list_channels(DEFAULT_SERVER_ID);
         assert_eq!(channels.len(), 2);

@@ -1,5 +1,4 @@
 /// IRC numeric reply codes per RFC 2812.
-
 // Connection registration
 pub const RPL_WELCOME: &str = "001";
 pub const RPL_YOURHOST: &str = "002";

@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use uuid::Uuid;
@@ -42,7 +42,11 @@ pub async fn get_channel_history(
     Query(params): Query<HistoryParams>,
 ) -> impl IntoResponse {
     let Some(server_id) = params.server_id else {
-        return (StatusCode::BAD_REQUEST, "server_id query parameter is required").into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            "server_id query parameter is required",
+        )
+            .into_response();
     };
 
     let channel = if channel_name.starts_with('#') {
@@ -73,7 +77,11 @@ pub async fn get_channels(
     Query(params): Query<ChannelListParams>,
 ) -> impl IntoResponse {
     let Some(server_id) = params.server_id else {
-        return (StatusCode::BAD_REQUEST, "server_id query parameter is required").into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            "server_id query parameter is required",
+        )
+            .into_response();
     };
     Json(state.engine.list_channels(&server_id)).into_response()
 }
@@ -81,10 +89,7 @@ pub async fn get_channels(
 // ── Server endpoints (authenticated) ────────────────────
 
 /// GET /api/servers — list the current user's servers.
-pub async fn list_servers(
-    State(state): State<Arc<AppState>>,
-    auth: AuthUser,
-) -> impl IntoResponse {
+pub async fn list_servers(State(state): State<Arc<AppState>>, auth: AuthUser) -> impl IntoResponse {
     Json(state.engine.list_servers_for_user(&auth.user_id))
 }
 
@@ -106,7 +111,11 @@ pub async fn create_server(
         .await
     {
         Ok(server_id) => {
-            let server = state.engine.list_all_servers().into_iter().find(|s| s.id == server_id);
+            let server = state
+                .engine
+                .list_all_servers()
+                .into_iter()
+                .find(|s| s.id == server_id);
             (StatusCode::CREATED, Json(server)).into_response()
         }
         Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
@@ -118,7 +127,12 @@ pub async fn get_server(
     State(state): State<Arc<AppState>>,
     Path(server_id): Path<String>,
 ) -> impl IntoResponse {
-    match state.engine.list_all_servers().into_iter().find(|s| s.id == server_id) {
+    match state
+        .engine
+        .list_all_servers()
+        .into_iter()
+        .find(|s| s.id == server_id)
+    {
         Some(server) => Json(server).into_response(),
         None => (StatusCode::NOT_FOUND, "Server not found").into_response(),
     }
@@ -303,10 +317,7 @@ pub struct UserProfile {
 }
 
 /// GET /api/me — return the current user's profile.
-pub async fn get_me(
-    State(state): State<Arc<AppState>>,
-    auth: AuthUser,
-) -> impl IntoResponse {
+pub async fn get_me(State(state): State<Arc<AppState>>, auth: AuthUser) -> impl IntoResponse {
     match users::get_user(&state.db, &auth.user_id).await {
         Ok(Some((id, username, email, avatar_url))) => Json(UserProfile {
             id,
@@ -395,9 +406,14 @@ pub async fn create_irc_token(
 
     let token_id = Uuid::new_v4().to_string();
 
-    if let Err(e) =
-        users::create_irc_token(&state.db, &token_id, &auth.user_id, &hash, body.label.as_deref())
-            .await
+    if let Err(e) = users::create_irc_token(
+        &state.db,
+        &token_id,
+        &auth.user_id,
+        &hash,
+        body.label.as_deref(),
+    )
+    .await
     {
         error!(error = %e, "Failed to store IRC token");
         return (StatusCode::INTERNAL_SERVER_ERROR, "Token creation failed").into_response();

@@ -7,3 +7,5 @@
 .env
 node_modules/
 /web/dist/
+/concord/server/concord.db-shm
+

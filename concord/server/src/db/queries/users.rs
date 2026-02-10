@@ -1,5 +1,16 @@
 use sqlx::SqlitePool;
 
+/// Parameters for creating a new OAuth-linked user.
+pub struct CreateOAuthUser<'a> {
+    pub user_id: &'a str,
+    pub username: &'a str,
+    pub email: Option<&'a str>,
+    pub avatar_url: Option<&'a str>,
+    pub oauth_id: &'a str,
+    pub provider: &'a str,
+    pub provider_id: &'a str,
+}
+
 /// Find a user by OAuth provider + provider ID. Returns (user_id, username).
 pub async fn find_by_oauth(
     pool: &SqlitePool,
@@ -18,34 +29,26 @@ pub async fn find_by_oauth(
     Ok(row)
 }
 
-/// Create a new user and link an OAuth account. Returns the user_id.
+/// Create a new user and link an OAuth account.
 pub async fn create_with_oauth(
     pool: &SqlitePool,
-    user_id: &str,
-    username: &str,
-    email: Option<&str>,
-    avatar_url: Option<&str>,
-    oauth_id: &str,
-    provider: &str,
-    provider_id: &str,
+    params: &CreateOAuthUser<'_>,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "INSERT INTO users (id, username, email, avatar_url) VALUES (?, ?, ?, ?)",
-    )
-    .bind(user_id)
-    .bind(username)
-    .bind(email)
-    .bind(avatar_url)
-    .execute(pool)
-    .await?;
+    sqlx::query("INSERT INTO users (id, username, email, avatar_url) VALUES (?, ?, ?, ?)")
+        .bind(params.user_id)
+        .bind(params.username)
+        .bind(params.email)
+        .bind(params.avatar_url)
+        .execute(pool)
+        .await?;
 
     sqlx::query(
         "INSERT INTO oauth_accounts (id, user_id, provider, provider_id) VALUES (?, ?, ?, ?)",
     )
-    .bind(oauth_id)
-    .bind(user_id)
-    .bind(provider)
-    .bind(provider_id)
+    .bind(params.oauth_id)
+    .bind(params.user_id)
+    .bind(params.provider)
+    .bind(params.provider_id)
     .execute(pool)
     .await?;
 
@@ -53,8 +56,8 @@ pub async fn create_with_oauth(
     sqlx::query(
         "INSERT OR IGNORE INTO user_nicknames (user_id, nickname, is_primary) VALUES (?, ?, 1)",
     )
-    .bind(user_id)
-    .bind(username)
+    .bind(params.user_id)
+    .bind(params.username)
     .execute(pool)
     .await?;
 
@@ -83,15 +86,13 @@ pub async fn create_irc_token(
     token_hash: &str,
     label: Option<&str>,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "INSERT INTO irc_tokens (id, user_id, token_hash, label) VALUES (?, ?, ?, ?)",
-    )
-    .bind(token_id)
-    .bind(user_id)
-    .bind(token_hash)
-    .bind(label)
-    .execute(pool)
-    .await?;
+    sqlx::query("INSERT INTO irc_tokens (id, user_id, token_hash, label) VALUES (?, ?, ?, ?)")
+        .bind(token_id)
+        .bind(user_id)
+        .bind(token_hash)
+        .bind(label)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -115,13 +116,11 @@ pub async fn delete_irc_token(
     token_id: &str,
     user_id: &str,
 ) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query(
-        "DELETE FROM irc_tokens WHERE id = ? AND user_id = ?",
-    )
-    .bind(token_id)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("DELETE FROM irc_tokens WHERE id = ? AND user_id = ?")
+        .bind(token_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
     Ok(result.rows_affected() > 0)
 }
 
@@ -143,9 +142,28 @@ pub async fn get_all_irc_token_hashes(
 pub async fn get_user_by_nickname(
     pool: &SqlitePool,
     nickname: &str,
-) -> Result<Option<(String, String, Option<String>, Option<String>, Option<String>, Option<String>)>, sqlx::Error>
-{
-    let row = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>, Option<String>)>(
+) -> Result<
+    Option<(
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    )>,
+    sqlx::Error,
+> {
+    let row = sqlx::query_as::<
+        _,
+        (
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        ),
+    >(
         "SELECT u.id, u.username, u.email, u.avatar_url, oa.provider, oa.provider_id \
          FROM users u \
          LEFT JOIN user_nicknames un ON u.id = un.user_id \

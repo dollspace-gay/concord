@@ -10,7 +10,7 @@ Any IRC client (HexChat, irssi, WeeChat) connects alongside web users — messag
 - **Multi-server architecture** — Discord-style servers with isolated channels, members, and permissions
 - **Dual protocol** — WebSocket (browser) + IRC (RFC 2812) on the same instance
 - **Protocol-agnostic engine** — core chat logic never imports protocol-specific code
-- **OAuth authentication** — GitHub, Google, and Bluesky (AT Protocol) login
+- **AT Protocol authentication** — sign in with any Bluesky account, files stored as PDS blobs
 - **Self-hostable** — single binary + static files, or use Docker
 
 ### Messaging
@@ -55,6 +55,14 @@ Any IRC client (HexChat, irssi, WeeChat) connects alongside web users — messag
 - Customizable welcome screen and rules
 - Server templates
 
+### Integrations
+- Incoming and outgoing webhooks
+- Bot accounts with API tokens
+- Slash commands with autocomplete
+- Message components (buttons, select menus)
+- OAuth2 application registration
+- Rich embed format for bot messages
+
 ### User Experience
 - Presence status (online, idle, DND, invisible)
 - Custom status with text and emoji
@@ -76,7 +84,7 @@ Any IRC client (HexChat, irssi, WeeChat) connects alongside web users — messag
 
 | Tool | Purpose |
 |---|---|
-| [ngrok](https://ngrok.com/) | Expose local server for OAuth callbacks and mobile testing |
+| [ngrok](https://ngrok.com/) | Expose local server for AT Protocol OAuth and mobile testing |
 | [Docker](https://www.docker.com/) | Containerized deployment |
 | [cargo-watch](https://crates.io/crates/cargo-watch) | Auto-restart server on code changes |
 
@@ -135,16 +143,7 @@ jwt_secret = "change-me-to-a-random-secret"   # CHANGE THIS
 session_expiry_hours = 720                      # 30 days
 public_url = "http://localhost:8080"            # or your ngrok/production URL
 
-[oauth.github]
-client_id = ""
-client_secret = ""
-
-[oauth.google]
-client_id = ""
-client_secret = ""
-
 [storage]
-upload_dir = "uploads"
 max_file_size_mb = 100
 
 [admin]
@@ -207,9 +206,9 @@ cargo install cargo-watch   # one-time
 cargo watch -x run
 ```
 
-### ngrok Setup (for OAuth and external access)
+### ngrok Setup (for AT Protocol OAuth and external access)
 
-OAuth providers (GitHub, Google, Bluesky) require a publicly reachable callback URL. During local development, [ngrok](https://ngrok.com/) provides a stable HTTPS tunnel to your machine.
+AT Protocol OAuth requires a publicly reachable callback URL. During local development, [ngrok](https://ngrok.com/) provides a stable HTTPS tunnel to your machine.
 
 #### 1. Install ngrok
 
@@ -279,26 +278,11 @@ PUBLIC_URL=https://your-name-here.ngrok-free.dev cargo run
 ```
 
 This is required so that:
-- OAuth callback URLs point to the correct host
+- AT Protocol OAuth callback URLs point to the correct host
 - Session cookies are set with the `Secure` flag (ngrok uses HTTPS)
-- Bluesky AT Protocol OAuth can complete the DPoP flow
+- The DPoP-bound token flow can complete successfully
 
-#### 6. Register OAuth apps with the ngrok URL
-
-**GitHub:**
-1. Go to https://github.com/settings/developers → **New OAuth App**
-2. Set **Homepage URL** to `https://your-name-here.ngrok-free.dev`
-3. Set **Authorization callback URL** to `https://your-name-here.ngrok-free.dev/api/auth/github/callback`
-4. Copy the Client ID and Client Secret into `concord.toml`
-
-**Google:**
-1. Go to https://console.cloud.google.com/apis/credentials → **Create OAuth client ID**
-2. Add `https://your-name-here.ngrok-free.dev` to **Authorized JavaScript origins**
-3. Add `https://your-name-here.ngrok-free.dev/api/auth/google/callback` to **Authorized redirect URIs**
-4. Copy the Client ID and Client Secret into `concord.toml`
-
-**Bluesky:**
-No configuration needed — Bluesky uses AT Protocol OAuth, which auto-discovers your server's metadata at `/.well-known/`. Just ensure `public_url` is set correctly.
+No additional OAuth app registration is needed — AT Protocol auto-discovers your server's client metadata at `/api/auth/atproto/client-metadata.json`. Just ensure `public_url` is set correctly.
 
 ### Running tests
 
@@ -307,7 +291,7 @@ cd concord/server
 cargo test
 ```
 
-51 tests covering the chat engine, IRC parser/formatter, JWT auth, token hashing, permissions, and moderation.
+742 tests covering the chat engine, IRC parser/formatter, JWT auth, token hashing, permissions, moderation, integrations, and community features.
 
 ## Configuration Reference
 
@@ -321,17 +305,12 @@ Concord loads configuration from `concord.toml`. Environment variables override 
 | JWT secret | `auth.jwt_secret` | `JWT_SECRET` | `concord-dev-secret-change-me` |
 | Session expiry | `auth.session_expiry_hours` | `SESSION_EXPIRY_HOURS` | `720` (30 days) |
 | Public URL | `auth.public_url` | `PUBLIC_URL` | `http://localhost:8080` |
-| Upload directory | `storage.upload_dir` | `UPLOAD_DIR` | `uploads` |
 | Max file size (MB) | `storage.max_file_size_mb` | `MAX_FILE_SIZE_MB` | `100` |
-| GitHub OAuth | `oauth.github.client_id` | `GITHUB_CLIENT_ID` | — |
-| GitHub OAuth | `oauth.github.client_secret` | `GITHUB_CLIENT_SECRET` | — |
-| Google OAuth | `oauth.google.client_id` | `GOOGLE_CLIENT_ID` | — |
-| Google OAuth | `oauth.google.client_secret` | `GOOGLE_CLIENT_SECRET` | — |
 | Admin users | `admin.admin_users` | `ADMIN_USERS` (comma-separated) | `[]` |
 
 ## IRC Usage
 
-1. Log in via the web UI (OAuth)
+1. Log in via the web UI (Bluesky / AT Protocol)
 2. Go to Settings and generate an IRC access token
 3. Connect your IRC client:
 
@@ -383,15 +362,15 @@ Dependency direction: `irc` → `engine` ← `web`. The engine knows nothing abo
 | Frontend | React 19, TypeScript, Vite, Zustand, Tailwind CSS 4 |
 | Database | SQLite (WAL mode) |
 | IRC | Custom RFC 2812 parser and formatter |
-| Auth | OAuth2 (GitHub, Google, Bluesky/AT Protocol), JWT sessions, argon2 IRC tokens |
+| Auth | AT Protocol (Bluesky) OAuth, JWT sessions, argon2 IRC tokens |
 | Concurrency | DashMap, tokio mpsc channels |
 
 ## REST API
 
-All endpoints are under `/api`. Authenticated endpoints require a `concord_session` cookie (set by OAuth login).
+All endpoints are under `/api`. Authenticated endpoints require a `concord_session` cookie (set by AT Protocol login).
 
 ### Public
-- `GET /api/auth/status` — available OAuth providers
+- `GET /api/auth/status` — authentication provider info
 - `GET /api/invite/{code}` — invite link preview
 - `GET /api/discover` — server discovery directory
 

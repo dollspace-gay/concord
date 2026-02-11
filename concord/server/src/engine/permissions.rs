@@ -282,10 +282,19 @@ mod tests {
 
     #[test]
     fn test_legacy_role_to_permissions() {
-        assert_eq!(ServerRole::Member.to_default_permissions(), DEFAULT_EVERYONE);
-        assert_eq!(ServerRole::Moderator.to_default_permissions(), DEFAULT_MODERATOR);
+        assert_eq!(
+            ServerRole::Member.to_default_permissions(),
+            DEFAULT_EVERYONE
+        );
+        assert_eq!(
+            ServerRole::Moderator.to_default_permissions(),
+            DEFAULT_MODERATOR
+        );
         assert_eq!(ServerRole::Admin.to_default_permissions(), DEFAULT_ADMIN);
-        assert_eq!(ServerRole::Owner.to_default_permissions(), Permissions::all());
+        assert_eq!(
+            ServerRole::Owner.to_default_permissions(),
+            Permissions::all()
+        );
     }
 
     #[test]
@@ -308,9 +317,7 @@ mod tests {
     fn test_effective_permissions_multi_role() {
         let perms = compute_effective_permissions(
             DEFAULT_EVERYONE,
-            &[
-                ("mod-role".to_string(), DEFAULT_MODERATOR),
-            ],
+            &[("mod-role".to_string(), DEFAULT_MODERATOR)],
             &[],
             "everyone-role-id",
             "user1",
@@ -325,17 +332,13 @@ mod tests {
     fn test_effective_permissions_admin_bypass() {
         let perms = compute_effective_permissions(
             DEFAULT_EVERYONE,
-            &[
-                ("admin-role".to_string(), Permissions::ADMINISTRATOR),
-            ],
-            &[
-                ChannelOverride {
-                    target_type: OverrideTargetType::User,
-                    target_id: "user1".to_string(),
-                    allow: Permissions::empty(),
-                    deny: Permissions::SEND_MESSAGES,
-                },
-            ],
+            &[("admin-role".to_string(), Permissions::ADMINISTRATOR)],
+            &[ChannelOverride {
+                target_type: OverrideTargetType::User,
+                target_id: "user1".to_string(),
+                allow: Permissions::empty(),
+                deny: Permissions::SEND_MESSAGES,
+            }],
             "everyone-role-id",
             "user1",
             false,
@@ -350,14 +353,12 @@ mod tests {
         let perms = compute_effective_permissions(
             Permissions::empty(),
             &[],
-            &[
-                ChannelOverride {
-                    target_type: OverrideTargetType::User,
-                    target_id: "owner1".to_string(),
-                    allow: Permissions::empty(),
-                    deny: Permissions::all(),
-                },
-            ],
+            &[ChannelOverride {
+                target_type: OverrideTargetType::User,
+                target_id: "owner1".to_string(),
+                allow: Permissions::empty(),
+                deny: Permissions::all(),
+            }],
             "everyone-role-id",
             "owner1",
             true, // is_owner
@@ -413,5 +414,416 @@ mod tests {
             false,
         );
         assert!(perms.contains(Permissions::SEND_MESSAGES));
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Additional edge case tests for compute_effective_permissions
+    // ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_empty_role_list_just_everyone_base() {
+        // User with no assigned roles — only @everyone base applies
+        let perms = compute_effective_permissions(
+            Permissions::VIEW_CHANNELS | Permissions::SEND_MESSAGES,
+            &[],
+            &[],
+            "everyone-id",
+            "user1",
+            false,
+        );
+        assert!(perms.contains(Permissions::VIEW_CHANNELS));
+        assert!(perms.contains(Permissions::SEND_MESSAGES));
+        assert!(!perms.contains(Permissions::MANAGE_CHANNELS));
+        assert!(!perms.contains(Permissions::ADMINISTRATOR));
+    }
+
+    #[test]
+    fn test_multiple_roles_permissions_are_ored() {
+        // Multiple roles should have their permissions OR'd together
+        let role1_perms = Permissions::KICK_MEMBERS;
+        let role2_perms = Permissions::BAN_MEMBERS;
+        let perms = compute_effective_permissions(
+            Permissions::VIEW_CHANNELS,
+            &[
+                ("role1".to_string(), role1_perms),
+                ("role2".to_string(), role2_perms),
+            ],
+            &[],
+            "everyone-id",
+            "user1",
+            false,
+        );
+        assert!(perms.contains(Permissions::VIEW_CHANNELS));
+        assert!(perms.contains(Permissions::KICK_MEMBERS));
+        assert!(perms.contains(Permissions::BAN_MEMBERS));
+    }
+
+    #[test]
+    fn test_channel_override_deny_overrides_role_allow() {
+        // Role gives SEND_MESSAGES, but channel override denies it for @everyone
+        let perms = compute_effective_permissions(
+            DEFAULT_EVERYONE,
+            &[("mod-role".to_string(), Permissions::KICK_MEMBERS)],
+            &[ChannelOverride {
+                target_type: OverrideTargetType::Role,
+                target_id: "everyone-id".to_string(),
+                allow: Permissions::empty(),
+                deny: Permissions::SEND_MESSAGES,
+            }],
+            "everyone-id",
+            "user1",
+            false,
+        );
+        // SEND_MESSAGES denied by @everyone override
+        assert!(!perms.contains(Permissions::SEND_MESSAGES));
+        // But other perms remain
+        assert!(perms.contains(Permissions::VIEW_CHANNELS));
+        assert!(perms.contains(Permissions::KICK_MEMBERS));
+    }
+
+    #[test]
+    fn test_role_override_re_allows_after_everyone_deny() {
+        // @everyone override denies SEND_MESSAGES, but user's role override re-allows it
+        let perms = compute_effective_permissions(
+            DEFAULT_EVERYONE,
+            &[("mod-role".to_string(), Permissions::KICK_MEMBERS)],
+            &[
+                ChannelOverride {
+                    target_type: OverrideTargetType::Role,
+                    target_id: "everyone-id".to_string(),
+                    allow: Permissions::empty(),
+                    deny: Permissions::SEND_MESSAGES,
+                },
+                ChannelOverride {
+                    target_type: OverrideTargetType::Role,
+                    target_id: "mod-role".to_string(),
+                    allow: Permissions::SEND_MESSAGES,
+                    deny: Permissions::empty(),
+                },
+            ],
+            "everyone-id",
+            "user1",
+            false,
+        );
+        // Role override re-allows SEND_MESSAGES
+        assert!(perms.contains(Permissions::SEND_MESSAGES));
+    }
+
+    #[test]
+    fn test_user_override_takes_precedence_over_role_override() {
+        // Role override allows SEND_MESSAGES, but user override denies it
+        let perms = compute_effective_permissions(
+            DEFAULT_EVERYONE,
+            &[("mod-role".to_string(), Permissions::KICK_MEMBERS)],
+            &[
+                ChannelOverride {
+                    target_type: OverrideTargetType::Role,
+                    target_id: "mod-role".to_string(),
+                    allow: Permissions::MANAGE_CHANNELS,
+                    deny: Permissions::empty(),
+                },
+                ChannelOverride {
+                    target_type: OverrideTargetType::User,
+                    target_id: "user1".to_string(),
+                    allow: Permissions::empty(),
+                    deny: Permissions::MANAGE_CHANNELS | Permissions::SEND_MESSAGES,
+                },
+            ],
+            "everyone-id",
+            "user1",
+            false,
+        );
+        // User override denies both
+        assert!(!perms.contains(Permissions::MANAGE_CHANNELS));
+        assert!(!perms.contains(Permissions::SEND_MESSAGES));
+        // But KICK_MEMBERS from role remains
+        assert!(perms.contains(Permissions::KICK_MEMBERS));
+    }
+
+    #[test]
+    fn test_administrator_bypasses_all_deny_bits() {
+        // Even if there are channel deny overrides, ADMINISTRATOR bypasses everything
+        let perms = compute_effective_permissions(
+            Permissions::VIEW_CHANNELS,
+            &[("admin-role".to_string(), Permissions::ADMINISTRATOR)],
+            &[
+                ChannelOverride {
+                    target_type: OverrideTargetType::Role,
+                    target_id: "everyone-id".to_string(),
+                    allow: Permissions::empty(),
+                    deny: Permissions::all(),
+                },
+                ChannelOverride {
+                    target_type: OverrideTargetType::User,
+                    target_id: "user1".to_string(),
+                    allow: Permissions::empty(),
+                    deny: Permissions::all(),
+                },
+            ],
+            "everyone-id",
+            "user1",
+            false,
+        );
+        assert_eq!(perms, Permissions::all());
+    }
+
+    #[test]
+    fn test_owner_gets_all_permissions_regardless_of_everything() {
+        // Server owner always gets all permissions, regardless of roles and overrides
+        let perms = compute_effective_permissions(
+            Permissions::empty(),
+            &[],
+            &[ChannelOverride {
+                target_type: OverrideTargetType::Role,
+                target_id: "everyone-id".to_string(),
+                allow: Permissions::empty(),
+                deny: Permissions::all(),
+            }],
+            "everyone-id",
+            "owner-user",
+            true,
+        );
+        assert_eq!(perms, Permissions::all());
+    }
+
+    #[test]
+    fn test_no_channel_overrides_returns_server_level_perms() {
+        let perms = compute_effective_permissions(
+            DEFAULT_EVERYONE,
+            &[(
+                "mod-role".to_string(),
+                Permissions::KICK_MEMBERS | Permissions::MANAGE_MESSAGES,
+            )],
+            &[], // no channel overrides
+            "everyone-id",
+            "user1",
+            false,
+        );
+        // Should just be everyone | mod perms
+        assert!(perms.contains(Permissions::VIEW_CHANNELS));
+        assert!(perms.contains(Permissions::SEND_MESSAGES));
+        assert!(perms.contains(Permissions::KICK_MEMBERS));
+        assert!(perms.contains(Permissions::MANAGE_MESSAGES));
+    }
+
+    #[test]
+    fn test_override_for_unrelated_role_is_ignored() {
+        // Override for a role the user doesn't have should be ignored
+        let perms = compute_effective_permissions(
+            DEFAULT_EVERYONE,
+            &[],
+            &[ChannelOverride {
+                target_type: OverrideTargetType::Role,
+                target_id: "other-role".to_string(),
+                allow: Permissions::empty(),
+                deny: Permissions::SEND_MESSAGES,
+            }],
+            "everyone-id",
+            "user1",
+            false,
+        );
+        // The deny on other-role should not affect user1
+        assert!(perms.contains(Permissions::SEND_MESSAGES));
+    }
+
+    #[test]
+    fn test_override_for_unrelated_user_is_ignored() {
+        // Override for a different user should be ignored
+        let perms = compute_effective_permissions(
+            DEFAULT_EVERYONE,
+            &[],
+            &[ChannelOverride {
+                target_type: OverrideTargetType::User,
+                target_id: "other-user".to_string(),
+                allow: Permissions::empty(),
+                deny: Permissions::SEND_MESSAGES,
+            }],
+            "everyone-id",
+            "user1",
+            false,
+        );
+        assert!(perms.contains(Permissions::SEND_MESSAGES));
+    }
+
+    #[test]
+    fn test_multiple_role_overrides_are_combined() {
+        // User has two roles with channel overrides — allows and denies are collected
+        let perms = compute_effective_permissions(
+            DEFAULT_EVERYONE,
+            &[
+                ("role-a".to_string(), Permissions::empty()),
+                ("role-b".to_string(), Permissions::empty()),
+            ],
+            &[
+                ChannelOverride {
+                    target_type: OverrideTargetType::Role,
+                    target_id: "role-a".to_string(),
+                    allow: Permissions::MANAGE_CHANNELS,
+                    deny: Permissions::empty(),
+                },
+                ChannelOverride {
+                    target_type: OverrideTargetType::Role,
+                    target_id: "role-b".to_string(),
+                    allow: Permissions::empty(),
+                    deny: Permissions::SEND_MESSAGES,
+                },
+            ],
+            "everyone-id",
+            "user1",
+            false,
+        );
+        // role-a allows MANAGE_CHANNELS, role-b denies SEND_MESSAGES
+        assert!(perms.contains(Permissions::MANAGE_CHANNELS));
+        assert!(!perms.contains(Permissions::SEND_MESSAGES));
+    }
+
+    #[test]
+    fn test_everyone_base_empty_gives_no_perms() {
+        let perms = compute_effective_permissions(
+            Permissions::empty(),
+            &[],
+            &[],
+            "everyone-id",
+            "user1",
+            false,
+        );
+        assert_eq!(perms, Permissions::empty());
+    }
+
+    #[test]
+    fn test_all_permission_bits() {
+        // Verify all permission bits can be set
+        let all = Permissions::all();
+        assert!(all.contains(Permissions::VIEW_CHANNELS));
+        assert!(all.contains(Permissions::MANAGE_CHANNELS));
+        assert!(all.contains(Permissions::MANAGE_ROLES));
+        assert!(all.contains(Permissions::MANAGE_SERVER));
+        assert!(all.contains(Permissions::CREATE_INVITES));
+        assert!(all.contains(Permissions::KICK_MEMBERS));
+        assert!(all.contains(Permissions::BAN_MEMBERS));
+        assert!(all.contains(Permissions::ADMINISTRATOR));
+        assert!(all.contains(Permissions::SEND_MESSAGES));
+        assert!(all.contains(Permissions::EMBED_LINKS));
+        assert!(all.contains(Permissions::ATTACH_FILES));
+        assert!(all.contains(Permissions::ADD_REACTIONS));
+        assert!(all.contains(Permissions::MENTION_EVERYONE));
+        assert!(all.contains(Permissions::MANAGE_MESSAGES));
+        assert!(all.contains(Permissions::READ_MESSAGE_HISTORY));
+        assert!(all.contains(Permissions::CONNECT));
+        assert!(all.contains(Permissions::SPEAK));
+        assert!(all.contains(Permissions::MUTE_MEMBERS));
+        assert!(all.contains(Permissions::DEAFEN_MEMBERS));
+        assert!(all.contains(Permissions::MOVE_MEMBERS));
+    }
+
+    #[test]
+    fn test_permission_bits_from_u64() {
+        let bits = Permissions::VIEW_CHANNELS.bits() | Permissions::SEND_MESSAGES.bits();
+        let perms = Permissions::from_bits_truncate(bits);
+        assert!(perms.contains(Permissions::VIEW_CHANNELS));
+        assert!(perms.contains(Permissions::SEND_MESSAGES));
+        assert!(!perms.contains(Permissions::MANAGE_CHANNELS));
+    }
+
+    #[test]
+    fn test_permission_i64_roundtrip() {
+        // Permissions are stored as i64 in SQLite, verify roundtrip
+        let original = DEFAULT_ADMIN;
+        let as_i64 = original.bits() as i64;
+        let restored = Permissions::from_bits_truncate(as_i64 as u64);
+        assert_eq!(original, restored);
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // ServerRole additional tests
+    // ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_role_as_str_roundtrip() {
+        for role in [
+            ServerRole::Owner,
+            ServerRole::Admin,
+            ServerRole::Moderator,
+            ServerRole::Member,
+        ] {
+            assert_eq!(ServerRole::parse(role.as_str()), role);
+        }
+    }
+
+    #[test]
+    fn test_role_can_manage_roles_hierarchy() {
+        // Owner can manage all
+        assert!(ServerRole::Owner.can_manage_roles(&ServerRole::Admin));
+        assert!(ServerRole::Owner.can_manage_roles(&ServerRole::Moderator));
+        assert!(ServerRole::Owner.can_manage_roles(&ServerRole::Member));
+        // Admin can manage mod and member
+        assert!(ServerRole::Admin.can_manage_roles(&ServerRole::Moderator));
+        assert!(ServerRole::Admin.can_manage_roles(&ServerRole::Member));
+        // Admin cannot manage owner or self
+        assert!(!ServerRole::Admin.can_manage_roles(&ServerRole::Owner));
+        assert!(!ServerRole::Admin.can_manage_roles(&ServerRole::Admin));
+        // Mod can manage member
+        assert!(ServerRole::Moderator.can_manage_roles(&ServerRole::Member));
+        // Mod cannot manage self or above
+        assert!(!ServerRole::Moderator.can_manage_roles(&ServerRole::Moderator));
+        // Member cannot manage anyone
+        assert!(!ServerRole::Member.can_manage_roles(&ServerRole::Member));
+    }
+
+    #[test]
+    fn test_role_delete_messages() {
+        assert!(ServerRole::Owner.can_delete_messages());
+        assert!(ServerRole::Admin.can_delete_messages());
+        assert!(ServerRole::Moderator.can_delete_messages());
+        assert!(!ServerRole::Member.can_delete_messages());
+    }
+
+    #[test]
+    fn test_role_update_server() {
+        assert!(ServerRole::Owner.can_update_server());
+        assert!(ServerRole::Admin.can_update_server());
+        assert!(!ServerRole::Moderator.can_update_server());
+        assert!(!ServerRole::Member.can_update_server());
+    }
+
+    #[test]
+    fn test_channel_override_debug() {
+        // Verify ChannelOverride implements Debug
+        let ov = ChannelOverride {
+            target_type: OverrideTargetType::Role,
+            target_id: "test".to_string(),
+            allow: Permissions::empty(),
+            deny: Permissions::empty(),
+        };
+        let debug = format!("{:?}", ov);
+        assert!(debug.contains("Role"));
+    }
+
+    #[test]
+    fn test_override_target_type_equality() {
+        assert_eq!(OverrideTargetType::Role, OverrideTargetType::Role);
+        assert_eq!(OverrideTargetType::User, OverrideTargetType::User);
+        assert_ne!(OverrideTargetType::Role, OverrideTargetType::User);
+    }
+
+    #[test]
+    fn test_user_override_allow_and_deny_same_bit() {
+        // When user override both allows and denies the same bit, deny wins
+        // (applied as: perms |= allow; perms &= !deny; — deny is applied last)
+        let perms = compute_effective_permissions(
+            Permissions::VIEW_CHANNELS,
+            &[],
+            &[ChannelOverride {
+                target_type: OverrideTargetType::User,
+                target_id: "user1".to_string(),
+                allow: Permissions::SEND_MESSAGES,
+                deny: Permissions::SEND_MESSAGES,
+            }],
+            "everyone-id",
+            "user1",
+            false,
+        );
+        // deny is applied after allow, so SEND_MESSAGES should be denied
+        assert!(!perms.contains(Permissions::SEND_MESSAGES));
     }
 }

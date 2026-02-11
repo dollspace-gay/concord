@@ -9,14 +9,16 @@ use uuid::Uuid;
 
 use super::channel::ChannelState;
 use super::events::{
-    AuditLogEntry, AutomodRuleInfo, BanInfo, BookmarkInfo, CategoryInfo, ChannelFollowInfo,
-    ChannelInfo, ChannelPositionInfo, ChatEvent, EventInfo, HistoryMessage, InviteInfo, MemberInfo,
+    AuditLogEntry, AutomodRuleInfo, BanInfo, BookmarkInfo, BotTokenInfo, CategoryInfo,
+    ChannelFollowInfo, ChannelInfo, ChannelPositionInfo, ChatEvent, EventInfo, HistoryMessage,
+    InteractionInfo, InteractionResponseData, InviteInfo, MemberInfo, OAuth2AppInfo,
     PinnedMessageInfo, ReactionGroup, ReplyInfo, RoleInfo, RsvpInfo, ServerCommunityInfo,
-    ServerInfo, SessionId, TemplateInfo, ThreadInfo,
+    ServerInfo, SessionId, SlashCommandInfo, SlashCommandOption, TemplateInfo, ThreadInfo,
+    WebhookInfo,
 };
 use super::permissions::{
-    self, ChannelOverride, OverrideTargetType, Permissions, ServerRole, DEFAULT_ADMIN,
-    DEFAULT_EVERYONE, DEFAULT_MODERATOR,
+    self, ChannelOverride, DEFAULT_ADMIN, DEFAULT_EVERYONE, DEFAULT_MODERATOR, OverrideTargetType,
+    Permissions, ServerRole,
 };
 use super::rate_limiter::RateLimiter;
 use super::server::ServerState;
@@ -87,7 +89,8 @@ impl ChatEngine {
             .map_err(|e| format!("Failed to load servers: {e}"))?;
 
         for row in rows {
-            let mut state = ServerState::new(row.id.clone(), row.name, row.owner_id.clone(), row.icon_url);
+            let mut state =
+                ServerState::new(row.id.clone(), row.name, row.owner_id.clone(), row.icon_url);
 
             let members = crate::db::queries::servers::get_server_members(pool, &row.id)
                 .await
@@ -129,7 +132,10 @@ impl ChatEngine {
                 // Assign Owner role to the server owner
                 if let Some(role_id) = owner_role_id {
                     let _ = crate::db::queries::roles::assign_role(
-                        pool, &row.id, &row.owner_id, &role_id,
+                        pool,
+                        &row.id,
+                        &row.owner_id,
+                        &role_id,
                     )
                     .await;
                 }
@@ -226,7 +232,10 @@ impl ChatEngine {
             let pool = pool.clone();
             let uid = uid.clone();
             tokio::spawn(async move {
-                let _ = crate::db::queries::presence::upsert_presence(&pool, &uid, "online", None, None).await;
+                let _ = crate::db::queries::presence::upsert_presence(
+                    &pool, &uid, "online", None, None,
+                )
+                .await;
             });
         }
 
@@ -270,14 +279,15 @@ impl ChatEngine {
 
         // Update presence if this was the last session for this user
         if let Some(ref uid) = session.user_id {
-            let other_sessions = self.sessions.iter()
+            let other_sessions = self
+                .sessions
+                .iter()
                 .any(|s| s.key() != &session_id && s.user_id.as_deref() == Some(uid));
             if !other_sessions {
                 if let Some(pool) = &self.db {
                     let _ = tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(
-                            crate::db::queries::presence::set_offline(pool, uid)
-                        )
+                        tokio::runtime::Handle::current()
+                            .block_on(crate::db::queries::presence::set_offline(pool, uid))
                     });
                 }
                 // Broadcast offline to shared servers
@@ -343,21 +353,9 @@ impl ChatEngine {
         if let Some(pool) = &self.db {
             let roles = [
                 ("@everyone", None, 0, DEFAULT_EVERYONE.bits() as i64, true),
-                (
-                    "Moderator",
-                    None,
-                    1,
-                    DEFAULT_MODERATOR.bits() as i64,
-                    false,
-                ),
+                ("Moderator", None, 1, DEFAULT_MODERATOR.bits() as i64, false),
                 ("Admin", None, 2, DEFAULT_ADMIN.bits() as i64, false),
-                (
-                    "Owner",
-                    None,
-                    3,
-                    Permissions::all().bits() as i64,
-                    false,
-                ),
+                ("Owner", None, 3, Permissions::all().bits() as i64, false),
             ];
             let mut owner_role_id = None;
             for (role_name, color, position, perms, is_default) in &roles {
@@ -806,43 +804,43 @@ impl ChatEngine {
         };
 
         // Look up attachment metadata if attachment_ids provided
-        let attachments: Option<Vec<super::events::AttachmentInfo>> =
-            if let Some(ids) = attachment_ids
-                && !ids.is_empty()
-            {
-                if let Some(pool) = &self.db {
-                    let pool = pool.clone();
-                    let ids = ids.to_vec();
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(async {
-                            let infos =
-                                crate::db::queries::attachments::get_attachments_by_ids(&pool, &ids)
-                                    .await
-                                    .unwrap_or_default();
-                            if infos.is_empty() {
-                                None
-                            } else {
-                                Some(
-                                    infos
-                                        .into_iter()
-                                        .map(|a| super::events::AttachmentInfo {
-                                            id: a.id.clone(),
-                                            filename: a.original_filename,
-                                            content_type: a.content_type,
-                                            file_size: a.file_size,
-                                            url: format!("/api/uploads/{}", a.id),
-                                        })
-                                        .collect(),
-                                )
-                            }
-                        })
+        let attachments: Option<Vec<super::events::AttachmentInfo>> = if let Some(ids) =
+            attachment_ids
+            && !ids.is_empty()
+        {
+            if let Some(pool) = &self.db {
+                let pool = pool.clone();
+                let ids = ids.to_vec();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let infos =
+                            crate::db::queries::attachments::get_attachments_by_ids(&pool, &ids)
+                                .await
+                                .unwrap_or_default();
+                        if infos.is_empty() {
+                            None
+                        } else {
+                            Some(
+                                infos
+                                    .into_iter()
+                                    .map(|a| super::events::AttachmentInfo {
+                                        id: a.id.clone(),
+                                        filename: a.original_filename,
+                                        content_type: a.content_type,
+                                        file_size: a.file_size,
+                                        url: format!("/api/uploads/{}", a.id),
+                                    })
+                                    .collect(),
+                            )
+                        }
                     })
-                } else {
-                    None
-                }
+                })
             } else {
                 None
-            };
+            }
+        } else {
+            None
+        };
 
         let msg_id = Uuid::new_v4();
         let event = ChatEvent::Message {
@@ -918,65 +916,63 @@ impl ChatEngine {
             if !urls.is_empty()
                 && let Some(pool) = &self.db
             {
-                    let pool = pool.clone();
-                    let client = self.http_client.clone();
-                    let server_id_owned = server_id.to_string();
-                    let channel_name_owned = channel_name.clone();
-                    // Collect senders for channel members before spawning
-                    let member_senders: Vec<mpsc::UnboundedSender<ChatEvent>> =
-                        if let Some(channel) = self.channels.get(&channel_id) {
-                            channel
-                                .members
-                                .iter()
-                                .filter_map(|sid| {
-                                    self.sessions.get(sid).map(|s| s.outbound.clone())
-                                })
-                                .collect()
-                        } else {
-                            vec![]
+                let pool = pool.clone();
+                let client = self.http_client.clone();
+                let server_id_owned = server_id.to_string();
+                let channel_name_owned = channel_name.clone();
+                // Collect senders for channel members before spawning
+                let member_senders: Vec<mpsc::UnboundedSender<ChatEvent>> =
+                    if let Some(channel) = self.channels.get(&channel_id) {
+                        channel
+                            .members
+                            .iter()
+                            .filter_map(|sid| self.sessions.get(sid).map(|s| s.outbound.clone()))
+                            .collect()
+                    } else {
+                        vec![]
+                    };
+                tokio::spawn(async move {
+                    let mut embeds = Vec::new();
+                    for url in urls {
+                        // Check cache first
+                        if let Ok(Some(cached)) =
+                            crate::db::queries::embeds::get_cached_embed(&pool, &url).await
+                        {
+                            embeds.push(super::events::EmbedInfo {
+                                url: cached.url,
+                                title: cached.title,
+                                description: cached.description,
+                                image_url: cached.image_url,
+                                site_name: cached.site_name,
+                            });
+                            continue;
+                        }
+                        // Unfurl
+                        if let Some(info) = super::embeds::unfurl_url(&client, &url).await {
+                            let _ = crate::db::queries::embeds::upsert_embed(
+                                &pool,
+                                &info.url,
+                                info.title.as_deref(),
+                                info.description.as_deref(),
+                                info.image_url.as_deref(),
+                                info.site_name.as_deref(),
+                            )
+                            .await;
+                            embeds.push(info);
+                        }
+                    }
+                    if !embeds.is_empty() {
+                        let embed_event = ChatEvent::MessageEmbed {
+                            message_id: msg_id,
+                            server_id: server_id_owned,
+                            channel: channel_name_owned,
+                            embeds,
                         };
-                    tokio::spawn(async move {
-                        let mut embeds = Vec::new();
-                        for url in urls {
-                            // Check cache first
-                            if let Ok(Some(cached)) =
-                                crate::db::queries::embeds::get_cached_embed(&pool, &url).await
-                            {
-                                embeds.push(super::events::EmbedInfo {
-                                    url: cached.url,
-                                    title: cached.title,
-                                    description: cached.description,
-                                    image_url: cached.image_url,
-                                    site_name: cached.site_name,
-                                });
-                                continue;
-                            }
-                            // Unfurl
-                            if let Some(info) = super::embeds::unfurl_url(&client, &url).await {
-                                let _ = crate::db::queries::embeds::upsert_embed(
-                                    &pool,
-                                    &info.url,
-                                    info.title.as_deref(),
-                                    info.description.as_deref(),
-                                    info.image_url.as_deref(),
-                                    info.site_name.as_deref(),
-                                )
-                                .await;
-                                embeds.push(info);
-                            }
+                        for sender in &member_senders {
+                            let _ = sender.send(embed_event.clone());
                         }
-                        if !embeds.is_empty() {
-                            let embed_event = ChatEvent::MessageEmbed {
-                                message_id: msg_id,
-                                server_id: server_id_owned,
-                                channel: channel_name_owned,
-                                embeds,
-                            };
-                            for sender in &member_senders {
-                                let _ = sender.send(embed_event.clone());
-                            }
-                        }
-                    });
+                    }
+                });
             }
         } else {
             // DM
@@ -1150,8 +1146,10 @@ impl ChatEngine {
                 .unwrap_or_default();
 
         // Group attachments by message_id
-        let mut attachment_map: std::collections::HashMap<String, Vec<super::events::AttachmentInfo>> =
-            std::collections::HashMap::new();
+        let mut attachment_map: std::collections::HashMap<
+            String,
+            Vec<super::events::AttachmentInfo>,
+        > = std::collections::HashMap::new();
         for a in &attachment_rows {
             if let Some(ref mid) = a.message_id {
                 attachment_map.entry(mid.clone()).or_default().push(
@@ -1556,10 +1554,7 @@ impl ChatEngine {
         Ok(rows
             .into_iter()
             .filter_map(|r| {
-                let name = self
-                    .channels
-                    .get(&r.channel_id)
-                    .map(|ch| ch.name.clone())?;
+                let name = self.channels.get(&r.channel_id).map(|ch| ch.name.clone())?;
                 Some(super::events::UnreadCount {
                     channel_name: name,
                     count: r.unread_count,
@@ -1628,12 +1623,11 @@ impl ChatEngine {
         };
 
         // Get @everyone role id
-        let everyone_role_id = match crate::db::queries::roles::get_default_role(pool, server_id)
-            .await
-        {
-            Ok(Some(role)) => role.id,
-            _ => String::new(),
-        };
+        let everyone_role_id =
+            match crate::db::queries::roles::get_default_role(pool, server_id).await {
+                Ok(Some(role)) => role.id,
+                _ => String::new(),
+            };
 
         permissions::compute_effective_permissions(
             base,
@@ -1878,9 +1872,13 @@ impl ChatEngine {
     ) -> Result<(), String> {
         let pool = self.db.as_ref().ok_or("No database configured")?;
         for update in updates {
-            crate::db::queries::channels::update_channel_position(pool, &update.id, update.position)
-                .await
-                .map_err(|e| format!("Failed to update channel position: {e}"))?;
+            crate::db::queries::channels::update_channel_position(
+                pool,
+                &update.id,
+                update.position,
+            )
+            .await
+            .map_err(|e| format!("Failed to update channel position: {e}"))?;
             crate::db::queries::channels::update_channel_category(
                 pool,
                 &update.id,
@@ -1901,7 +1899,10 @@ impl ChatEngine {
     // ── Profiles ───────────────────────────────────────────────────
 
     /// Get a user's full profile.
-    pub async fn get_user_profile(&self, user_id: &str) -> Result<super::events::UserProfileInfo, String> {
+    pub async fn get_user_profile(
+        &self,
+        user_id: &str,
+    ) -> Result<super::events::UserProfileInfo, String> {
         let pool = self.db.as_ref().ok_or("No database configured")?;
 
         // Get basic user info
@@ -1916,13 +1917,12 @@ impl ChatEngine {
             .map_err(|e| format!("DB error: {e}"))?;
 
         // Get user created_at
-        let created_at = sqlx::query_scalar::<_, String>(
-            "SELECT created_at FROM users WHERE id = ?"
-        )
-        .bind(&id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or_else(|_| "unknown".into());
+        let created_at =
+            sqlx::query_scalar::<_, String>("SELECT created_at FROM users WHERE id = ?")
+                .bind(&id)
+                .fetch_one(pool)
+                .await
+                .unwrap_or_else(|_| "unknown".into());
 
         Ok(super::events::UserProfileInfo {
             user_id: id,
@@ -1997,10 +1997,8 @@ impl ChatEngine {
         custom_status: Option<&str>,
         status_emoji: Option<&str>,
     ) -> Result<(), String> {
-        let session = self.get_session(session_id)
-            .ok_or("Session not found")?;
-        let user_id = session.user_id.clone()
-            .ok_or("Not authenticated")?;
+        let session = self.get_session(session_id).ok_or("Session not found")?;
+        let user_id = session.user_id.clone().ok_or("Not authenticated")?;
 
         // Validate status
         match status {
@@ -2011,7 +2009,11 @@ impl ChatEngine {
         // Persist to DB
         if let Some(pool) = &self.db {
             crate::db::queries::presence::upsert_presence(
-                pool, &user_id, status, custom_status, status_emoji,
+                pool,
+                &user_id,
+                status,
+                custom_status,
+                status_emoji,
             )
             .await
             .map_err(|e| format!("Failed to update presence: {e}"))?;
@@ -2022,7 +2024,11 @@ impl ChatEngine {
             user_id: user_id.clone(),
             nickname: session.nickname.clone(),
             avatar_url: session.avatar_url.clone(),
-            status: if status == "invisible" { "offline".into() } else { status.into() },
+            status: if status == "invisible" {
+                "offline".into()
+            } else {
+                status.into()
+            },
             custom_status: custom_status.map(|s| s.to_string()),
             status_emoji: status_emoji.map(|s| s.to_string()),
         };
@@ -2038,7 +2044,9 @@ impl ChatEngine {
                 for channel_id in server.channel_ids.iter() {
                     if let Some(channel) = self.channels.get(channel_id) {
                         for &member_sid in &channel.members {
-                            if member_sid != session_id && let Some(s) = self.sessions.get(&member_sid) {
+                            if member_sid != session_id
+                                && let Some(s) = self.sessions.get(&member_sid)
+                            {
                                 let _ = s.send(event.clone());
                             }
                         }
@@ -2051,8 +2059,13 @@ impl ChatEngine {
     }
 
     /// Get presence list for all members of a server.
-    pub async fn get_server_presences(&self, server_id: &str) -> Result<Vec<super::events::PresenceInfo>, String> {
-        let server = self.servers.get(server_id)
+    pub async fn get_server_presences(
+        &self,
+        server_id: &str,
+    ) -> Result<Vec<super::events::PresenceInfo>, String> {
+        let server = self
+            .servers
+            .get(server_id)
             .ok_or(format!("Server not found: {server_id}"))?;
 
         let user_ids: Vec<String> = server.member_user_ids.iter().cloned().collect();
@@ -2069,7 +2082,11 @@ impl ChatEngine {
             for row in rows {
                 // Find nickname for this user from active sessions
                 let (nickname, avatar_url) = self.find_user_display_info(&row.user_id);
-                let visible_status = if row.status == "invisible" { "offline".to_string() } else { row.status };
+                let visible_status = if row.status == "invisible" {
+                    "offline".to_string()
+                } else {
+                    row.status
+                };
                 presences.push(super::events::PresenceInfo {
                     user_id: row.user_id,
                     nickname,
@@ -2085,12 +2102,19 @@ impl ChatEngine {
         for uid in &user_ids {
             if !presences.iter().any(|p| p.user_id == *uid) {
                 let (nickname, avatar_url) = self.find_user_display_info(uid);
-                let is_online = self.sessions.iter().any(|s| s.user_id.as_deref() == Some(uid));
+                let is_online = self
+                    .sessions
+                    .iter()
+                    .any(|s| s.user_id.as_deref() == Some(uid));
                 presences.push(super::events::PresenceInfo {
                     user_id: uid.clone(),
                     nickname,
                     avatar_url,
-                    status: if is_online { "online".into() } else { "offline".into() },
+                    status: if is_online {
+                        "online".into()
+                    } else {
+                        "offline".into()
+                    },
                     custom_status: None,
                     status_emoji: None,
                 });
@@ -2119,13 +2143,13 @@ impl ChatEngine {
         server_id: &str,
         nickname: Option<&str>,
     ) -> Result<(), String> {
-        let session = self.get_session(session_id)
-            .ok_or("Session not found")?;
-        let user_id = session.user_id.clone()
-            .ok_or("Not authenticated")?;
+        let session = self.get_session(session_id).ok_or("Session not found")?;
+        let user_id = session.user_id.clone().ok_or("Not authenticated")?;
 
         // Verify membership
-        let server = self.servers.get(server_id)
+        let server = self
+            .servers
+            .get(server_id)
             .ok_or(format!("Server not found: {server_id}"))?;
         if !server.member_user_ids.contains(&user_id) {
             return Err("Not a member of this server".into());
@@ -2174,7 +2198,12 @@ impl ChatEngine {
         };
 
         let (rows, total) = crate::db::queries::search::search_messages(
-            pool, server_id, query, channel_id.as_deref(), limit.min(50), offset,
+            pool,
+            server_id,
+            query,
+            channel_id.as_deref(),
+            limit.min(50),
+            offset,
         )
         .await
         .map_err(|e| format!("Search failed: {e}"))?;
@@ -2182,9 +2211,11 @@ impl ChatEngine {
         let results: Vec<super::events::SearchResultMessage> = rows
             .into_iter()
             .filter_map(|row| {
-                let channel_name = row.channel_id.as_ref().and_then(|cid| {
-                    self.channels.get(cid).map(|ch| ch.name.clone())
-                }).unwrap_or_default();
+                let channel_name = row
+                    .channel_id
+                    .as_ref()
+                    .and_then(|cid| self.channels.get(cid).map(|ch| ch.name.clone()))
+                    .unwrap_or_default();
 
                 Some(super::events::SearchResultMessage {
                     id: row.id.parse().ok()?,
@@ -2209,10 +2240,8 @@ impl ChatEngine {
         session_id: SessionId,
         params: &UpdateNotificationSettingsParams<'_>,
     ) -> Result<(), String> {
-        let session = self.get_session(session_id)
-            .ok_or("Session not found")?;
-        let user_id = session.user_id.clone()
-            .ok_or("Not authenticated")?;
+        let session = self.get_session(session_id).ok_or("Session not found")?;
+        let user_id = session.user_id.clone().ok_or("Not authenticated")?;
 
         match params.level {
             "all" | "mentions" | "none" | "default" => {}
@@ -2234,8 +2263,8 @@ impl ChatEngine {
             mute_until: params.mute_until,
         };
         crate::db::queries::notifications::upsert_notification_setting(pool, &db_params)
-        .await
-        .map_err(|e| format!("Failed to update notification settings: {e}"))?;
+            .await
+            .map_err(|e| format!("Failed to update notification settings: {e}"))?;
 
         Ok(())
     }
@@ -2246,27 +2275,29 @@ impl ChatEngine {
         session_id: SessionId,
         server_id: &str,
     ) -> Result<Vec<super::events::NotificationSettingInfo>, String> {
-        let session = self.get_session(session_id)
-            .ok_or("Session not found")?;
-        let user_id = session.user_id.clone()
-            .ok_or("Not authenticated")?;
+        let session = self.get_session(session_id).ok_or("Session not found")?;
+        let user_id = session.user_id.clone().ok_or("Not authenticated")?;
 
         let pool = self.db.as_ref().ok_or("No database configured")?;
 
-        let rows = crate::db::queries::notifications::get_notification_settings(pool, &user_id, server_id)
-            .await
-            .map_err(|e| format!("Failed to get notification settings: {e}"))?;
+        let rows =
+            crate::db::queries::notifications::get_notification_settings(pool, &user_id, server_id)
+                .await
+                .map_err(|e| format!("Failed to get notification settings: {e}"))?;
 
-        Ok(rows.into_iter().map(|r| super::events::NotificationSettingInfo {
-            id: r.id,
-            server_id: r.server_id,
-            channel_id: r.channel_id,
-            level: r.level,
-            suppress_everyone: r.suppress_everyone != 0,
-            suppress_roles: r.suppress_roles != 0,
-            muted: r.muted != 0,
-            mute_until: r.mute_until,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| super::events::NotificationSettingInfo {
+                id: r.id,
+                server_id: r.server_id,
+                channel_id: r.channel_id,
+                level: r.level,
+                suppress_everyone: r.suppress_everyone != 0,
+                suppress_roles: r.suppress_roles != 0,
+                muted: r.muted != 0,
+                mute_until: r.mute_until,
+            })
+            .collect())
     }
 
     // ── Pinning ─────────────────────────────────────────────────
@@ -2392,11 +2423,19 @@ impl ChatEngine {
         let mut pins = Vec::new();
         for row in pin_rows {
             // Look up message content for each pin
-            let (from, content, timestamp) =
-                match crate::db::queries::messages::get_message_by_id(pool, &row.message_id).await {
-                    Ok(Some(msg)) => (msg.sender_nick, msg.content, msg.created_at),
-                    _ => ("unknown".to_string(), "[deleted]".to_string(), String::new()),
-                };
+            let (from, content, timestamp) = match crate::db::queries::messages::get_message_by_id(
+                pool,
+                &row.message_id,
+            )
+            .await
+            {
+                Ok(Some(msg)) => (msg.sender_nick, msg.content, msg.created_at),
+                _ => (
+                    "unknown".to_string(),
+                    "[deleted]".to_string(),
+                    String::new(),
+                ),
+            };
 
             pins.push(PinnedMessageInfo {
                 id: row.id,
@@ -2457,7 +2496,9 @@ impl ChatEngine {
             .channel_name_index
             .contains_key(&(server_id.to_string(), thread_name.clone()))
         {
-            return Err(format!("A channel or thread named {thread_name} already exists"));
+            return Err(format!(
+                "A channel or thread named {thread_name} already exists"
+            ));
         }
 
         crate::db::queries::threads::create_thread(
@@ -2473,14 +2514,20 @@ impl ChatEngine {
         .map_err(|e| format!("Failed to create thread: {e}"))?;
 
         // Add to in-memory state
-        let mut ch = ChannelState::new(thread_id.clone(), server_id.to_string(), thread_name.clone());
+        let mut ch = ChannelState::new(
+            thread_id.clone(),
+            server_id.to_string(),
+            thread_name.clone(),
+        );
         ch.channel_type = channel_type.to_string();
         ch.thread_parent_message_id = Some(message_id.to_string());
         ch.auto_archive_minutes = 1440;
         ch.is_private = is_private;
 
-        self.channel_name_index
-            .insert((server_id.to_string(), thread_name.clone()), thread_id.clone());
+        self.channel_name_index.insert(
+            (server_id.to_string(), thread_name.clone()),
+            thread_id.clone(),
+        );
         if let Some(mut srv) = self.servers.get_mut(server_id) {
             srv.channel_ids.insert(thread_id.clone());
         }
@@ -2567,9 +2614,10 @@ impl ChatEngine {
         let channel_name = normalize_channel_name(channel_name);
         let channel_id = self.resolve_channel_id(server_id, &channel_name)?;
 
-        let rows = crate::db::queries::threads::get_threads_for_channel(pool, &channel_id, server_id)
-            .await
-            .map_err(|e| format!("DB error: {e}"))?;
+        let rows =
+            crate::db::queries::threads::get_threads_for_channel(pool, &channel_id, server_id)
+                .await
+                .map_err(|e| format!("DB error: {e}"))?;
 
         let threads: Vec<ThreadInfo> = rows
             .into_iter()
@@ -2656,10 +2704,7 @@ impl ChatEngine {
     }
 
     /// List all bookmarks for the authenticated user. Sends BookmarkList event to the session.
-    pub async fn list_bookmarks(
-        &self,
-        session_id: SessionId,
-    ) -> Result<(), String> {
+    pub async fn list_bookmarks(&self, session_id: SessionId) -> Result<(), String> {
         let session = self.get_session(session_id).ok_or("Session not found")?;
         let user_id = session.user_id.as_deref().ok_or("AUTH_REQUIRED")?;
         let pool = self.db.as_ref().ok_or("No database configured")?;
@@ -2810,8 +2855,7 @@ impl ChatEngine {
         .map_err(|e| format!("Failed to ban member: {e}"))?;
 
         // Also kick them from the server
-        let _ =
-            crate::db::queries::moderation::kick_member(pool, server_id, target_user_id).await;
+        let _ = crate::db::queries::moderation::kick_member(pool, server_id, target_user_id).await;
 
         // Delete messages if requested
         if days > 0 {
@@ -2909,11 +2953,7 @@ impl ChatEngine {
     }
 
     /// Get the list of bans for a server.
-    pub async fn list_bans(
-        &self,
-        session_id: SessionId,
-        server_id: &str,
-    ) -> Result<(), String> {
+    pub async fn list_bans(&self, session_id: SessionId, server_id: &str) -> Result<(), String> {
         self.require_permission(session_id, server_id, None, Permissions::BAN_MEMBERS)
             .await?;
 
@@ -2974,8 +3014,7 @@ impl ChatEngine {
 
         // Audit log
         let audit_id = Uuid::new_v4().to_string();
-        let changes_json = timeout_until
-            .map(|t| format!("{{\"timeout_until\":\"{t}\"}}"));
+        let changes_json = timeout_until.map(|t| format!("{{\"timeout_until\":\"{t}\"}}"));
         let _ = crate::db::queries::audit_log::create_entry(
             pool,
             &crate::db::models::CreateAuditLogParams {
@@ -3193,9 +3232,7 @@ impl ChatEngine {
         }
         // Validate action_type
         if !["delete", "timeout", "flag"].contains(&action_type) {
-            return Err(
-                "Invalid action type. Must be 'delete', 'timeout', or 'flag'".into(),
-            );
+            return Err("Invalid action type. Must be 'delete', 'timeout', or 'flag'".into());
         }
 
         let rule_id = Uuid::new_v4().to_string();
@@ -3384,14 +3421,7 @@ impl ChatEngine {
             .collect();
 
         crate::db::queries::invites::create_invite(
-            pool,
-            &invite_id,
-            server_id,
-            &code,
-            &user_id,
-            max_uses,
-            expires_at,
-            channel_id,
+            pool, &invite_id, server_id, &code, &user_id, max_uses, expires_at, channel_id,
         )
         .await
         .map_err(|e| format!("Failed to create invite: {e}"))?;
@@ -3419,11 +3449,7 @@ impl ChatEngine {
     }
 
     /// List invites for a server. Requires MANAGE_SERVER permission.
-    pub async fn list_invites(
-        &self,
-        session_id: SessionId,
-        server_id: &str,
-    ) -> Result<(), String> {
+    pub async fn list_invites(&self, session_id: SessionId, server_id: &str) -> Result<(), String> {
         self.require_permission(session_id, server_id, None, Permissions::MANAGE_SERVER)
             .await?;
 
@@ -3489,11 +3515,7 @@ impl ChatEngine {
     }
 
     /// Use an invite code to join a server. Any authenticated user can use this.
-    pub async fn use_invite(
-        &self,
-        session_id: SessionId,
-        code: &str,
-    ) -> Result<(), String> {
+    pub async fn use_invite(&self, session_id: SessionId, code: &str) -> Result<(), String> {
         let session = self.get_session(session_id).ok_or("Session not found")?;
         let user_id = session
             .user_id
@@ -3564,8 +3586,13 @@ impl ChatEngine {
         session_id: SessionId,
         params: &crate::db::models::CreateServerEventParams<'_>,
     ) -> Result<(), String> {
-        self.require_permission(session_id, params.server_id, None, Permissions::MANAGE_SERVER)
-            .await?;
+        self.require_permission(
+            session_id,
+            params.server_id,
+            None,
+            Permissions::MANAGE_SERVER,
+        )
+        .await?;
 
         let Some(pool) = &self.db else {
             return Err("No database configured".into());
@@ -3600,11 +3627,7 @@ impl ChatEngine {
     }
 
     /// List events for a server. Requires VIEW_CHANNELS permission.
-    pub async fn list_events(
-        &self,
-        session_id: SessionId,
-        server_id: &str,
-    ) -> Result<(), String> {
+    pub async fn list_events(&self, session_id: SessionId, server_id: &str) -> Result<(), String> {
         self.require_permission(session_id, server_id, None, Permissions::VIEW_CHANNELS)
             .await?;
 
@@ -3803,11 +3826,7 @@ impl ChatEngine {
     }
 
     /// List RSVPs for an event. Sends EventRsvpList to the requesting session.
-    pub async fn list_rsvps(
-        &self,
-        session_id: SessionId,
-        event_id: &str,
-    ) -> Result<(), String> {
+    pub async fn list_rsvps(&self, session_id: SessionId, event_id: &str) -> Result<(), String> {
         let Some(pool) = &self.db else {
             return Err("No database configured".into());
         };
@@ -3952,11 +3971,7 @@ impl ChatEngine {
     }
 
     /// Accept server rules as a member.
-    pub async fn accept_rules(
-        &self,
-        session_id: SessionId,
-        server_id: &str,
-    ) -> Result<(), String> {
+    pub async fn accept_rules(&self, session_id: SessionId, server_id: &str) -> Result<(), String> {
         let session = self.get_session(session_id).ok_or("Session not found")?;
         let user_id = session
             .user_id
@@ -4257,6 +4272,865 @@ impl ChatEngine {
 
         Ok(())
     }
+
+    // ── Phase 8: Integrations & Bots ──
+
+    /// Create a webhook for a channel. Requires MANAGE_SERVER permission.
+    pub async fn create_webhook(
+        &self,
+        session_id: SessionId,
+        server_id: &str,
+        channel_id: &str,
+        name: &str,
+        webhook_type: &str,
+        url: Option<&str>,
+    ) -> Result<(), String> {
+        self.require_permission(session_id, server_id, None, Permissions::MANAGE_SERVER)
+            .await?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        if webhook_type != "incoming" && webhook_type != "outgoing" {
+            return Err("webhook_type must be 'incoming' or 'outgoing'".into());
+        }
+
+        let id = Uuid::new_v4().to_string();
+        let token = format!("{}.{}", id, Uuid::new_v4());
+
+        use crate::db::models::CreateWebhookParams;
+        let params = CreateWebhookParams {
+            id: &id,
+            server_id,
+            channel_id,
+            name,
+            avatar_url: None,
+            webhook_type,
+            token: &token,
+            url,
+            created_by: &self.get_user_id(session_id)?,
+        };
+
+        crate::db::queries::webhooks::create_webhook(pool, &params)
+            .await
+            .map_err(|e| format!("Failed to create webhook: {e}"))?;
+
+        let webhook = WebhookInfo {
+            id: id.clone(),
+            server_id: server_id.to_string(),
+            channel_id: channel_id.to_string(),
+            name: name.to_string(),
+            avatar_url: None,
+            webhook_type: webhook_type.to_string(),
+            token,
+            url: url.map(String::from),
+            created_by: self.get_user_id(session_id)?,
+            created_at: Utc::now().to_rfc3339(),
+        };
+
+        self.broadcast_to_server(
+            server_id,
+            &ChatEvent::WebhookUpdate {
+                server_id: server_id.to_string(),
+                webhook,
+            },
+        );
+
+        Ok(())
+    }
+
+    /// List webhooks for a server. Requires MANAGE_SERVER permission.
+    pub async fn list_webhooks(
+        &self,
+        session_id: SessionId,
+        server_id: &str,
+    ) -> Result<(), String> {
+        self.require_permission(session_id, server_id, None, Permissions::MANAGE_SERVER)
+            .await?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let rows = crate::db::queries::webhooks::list_webhooks(pool, server_id)
+            .await
+            .map_err(|e| format!("Failed to list webhooks: {e}"))?;
+
+        let webhooks: Vec<WebhookInfo> = rows.into_iter().map(webhook_row_to_info).collect();
+
+        if let Some(session) = self.get_session(session_id) {
+            let _ = session.send(ChatEvent::WebhookList {
+                server_id: server_id.to_string(),
+                webhooks,
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Update a webhook.
+    pub async fn update_webhook(
+        &self,
+        session_id: SessionId,
+        webhook_id: &str,
+        name: &str,
+        avatar_url: Option<&str>,
+        channel_id: &str,
+    ) -> Result<(), String> {
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let wh = crate::db::queries::webhooks::get_webhook(pool, webhook_id)
+            .await
+            .map_err(|e| format!("DB error: {e}"))?
+            .ok_or("Webhook not found")?;
+
+        self.require_permission(session_id, &wh.server_id, None, Permissions::MANAGE_SERVER)
+            .await?;
+
+        crate::db::queries::webhooks::update_webhook(
+            pool, webhook_id, name, avatar_url, channel_id,
+        )
+        .await
+        .map_err(|e| format!("Failed to update webhook: {e}"))?;
+
+        let sid = wh.server_id.clone();
+        let updated = WebhookInfo {
+            id: wh.id,
+            server_id: wh.server_id,
+            channel_id: channel_id.to_string(),
+            name: name.to_string(),
+            avatar_url: avatar_url.map(String::from),
+            webhook_type: wh.webhook_type,
+            token: wh.token,
+            url: wh.url,
+            created_by: wh.created_by,
+            created_at: wh.created_at,
+        };
+
+        self.broadcast_to_server(
+            &sid,
+            &ChatEvent::WebhookUpdate {
+                server_id: sid.clone(),
+                webhook: updated,
+            },
+        );
+
+        Ok(())
+    }
+
+    /// Delete a webhook.
+    pub async fn delete_webhook(
+        &self,
+        session_id: SessionId,
+        webhook_id: &str,
+    ) -> Result<(), String> {
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let wh = crate::db::queries::webhooks::get_webhook(pool, webhook_id)
+            .await
+            .map_err(|e| format!("DB error: {e}"))?
+            .ok_or("Webhook not found")?;
+
+        self.require_permission(session_id, &wh.server_id, None, Permissions::MANAGE_SERVER)
+            .await?;
+
+        crate::db::queries::webhooks::delete_webhook(pool, webhook_id)
+            .await
+            .map_err(|e| format!("Failed to delete webhook: {e}"))?;
+
+        let sid = wh.server_id;
+        self.broadcast_to_server(
+            &sid,
+            &ChatEvent::WebhookDelete {
+                server_id: sid.clone(),
+                webhook_id: webhook_id.to_string(),
+            },
+        );
+
+        Ok(())
+    }
+
+    /// Create a bot account. Only authenticated users can create bots.
+    pub async fn create_bot(
+        &self,
+        session_id: SessionId,
+        username: &str,
+        avatar_url: Option<&str>,
+    ) -> Result<(), String> {
+        let _creator_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        validation::validate_nickname(username)?;
+
+        let bot_user_id = Uuid::new_v4().to_string();
+        crate::db::queries::bots::create_bot_user(pool, &bot_user_id, username, avatar_url)
+            .await
+            .map_err(|e| format!("Failed to create bot: {e}"))?;
+
+        // Generate an initial token
+        let token_id = Uuid::new_v4().to_string();
+        let raw_token = format!("bot_{}.{}", bot_user_id, Uuid::new_v4());
+        let token_hash = crate::auth::token::hash_irc_token(&raw_token)
+            .map_err(|e| format!("Failed to hash token: {e}"))?;
+
+        crate::db::queries::bots::create_bot_token(
+            pool,
+            &token_id,
+            &bot_user_id,
+            &token_hash,
+            "Default",
+            "bot",
+        )
+        .await
+        .map_err(|e| format!("Failed to create bot token: {e}"))?;
+
+        if let Some(session) = self.get_session(session_id) {
+            // Send back the raw token (only time it's visible)
+            let _ = session.send(ChatEvent::ServerNotice {
+                message: format!("Bot created! User ID: {bot_user_id}, Token: {raw_token}"),
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Create a new token for a bot. Caller must own the bot.
+    pub async fn create_bot_token(
+        &self,
+        session_id: SessionId,
+        bot_user_id: &str,
+        name: &str,
+        scopes: Option<&str>,
+    ) -> Result<(), String> {
+        let _user_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let token_id = Uuid::new_v4().to_string();
+        let raw_token = format!("bot_{}.{}", bot_user_id, Uuid::new_v4());
+        let token_hash = crate::auth::token::hash_irc_token(&raw_token)
+            .map_err(|e| format!("Failed to hash token: {e}"))?;
+
+        crate::db::queries::bots::create_bot_token(
+            pool,
+            &token_id,
+            bot_user_id,
+            &token_hash,
+            name,
+            scopes.unwrap_or("bot"),
+        )
+        .await
+        .map_err(|e| format!("Failed to create bot token: {e}"))?;
+
+        if let Some(session) = self.get_session(session_id) {
+            let _ = session.send(ChatEvent::ServerNotice {
+                message: format!("Bot token created: {raw_token}"),
+            });
+        }
+
+        Ok(())
+    }
+
+    /// List bot tokens (without hashes).
+    pub async fn list_bot_tokens(
+        &self,
+        session_id: SessionId,
+        bot_user_id: &str,
+    ) -> Result<(), String> {
+        let _user_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let rows = crate::db::queries::bots::list_bot_tokens(pool, bot_user_id)
+            .await
+            .map_err(|e| format!("Failed to list bot tokens: {e}"))?;
+
+        let tokens: Vec<BotTokenInfo> = rows
+            .into_iter()
+            .map(|r| BotTokenInfo {
+                id: r.id,
+                name: r.name,
+                scopes: r.scopes,
+                created_at: r.created_at,
+                last_used: r.last_used,
+            })
+            .collect();
+
+        if let Some(session) = self.get_session(session_id) {
+            let _ = session.send(ChatEvent::BotTokenList {
+                bot_user_id: bot_user_id.to_string(),
+                tokens,
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Delete a bot token.
+    pub async fn delete_bot_token(
+        &self,
+        session_id: SessionId,
+        token_id: &str,
+    ) -> Result<(), String> {
+        let _user_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        crate::db::queries::bots::delete_bot_token(pool, token_id)
+            .await
+            .map_err(|e| format!("Failed to delete bot token: {e}"))?;
+
+        Ok(())
+    }
+
+    /// Add a bot to a server. Requires MANAGE_SERVER permission.
+    pub async fn add_bot_to_server(
+        &self,
+        session_id: SessionId,
+        server_id: &str,
+        bot_user_id: &str,
+    ) -> Result<(), String> {
+        self.require_permission(session_id, server_id, None, Permissions::MANAGE_SERVER)
+            .await?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        crate::db::queries::bots::add_bot_to_server(pool, server_id, bot_user_id)
+            .await
+            .map_err(|e| format!("Failed to add bot to server: {e}"))?;
+
+        Ok(())
+    }
+
+    /// Remove a bot from a server. Requires MANAGE_SERVER permission.
+    pub async fn remove_bot_from_server(
+        &self,
+        session_id: SessionId,
+        server_id: &str,
+        bot_user_id: &str,
+    ) -> Result<(), String> {
+        self.require_permission(session_id, server_id, None, Permissions::MANAGE_SERVER)
+            .await?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        crate::db::queries::bots::remove_bot_from_server(pool, server_id, bot_user_id)
+            .await
+            .map_err(|e| format!("Failed to remove bot from server: {e}"))?;
+
+        Ok(())
+    }
+
+    /// Register a slash command for a bot. Caller must own the bot.
+    pub async fn register_slash_command(
+        &self,
+        session_id: SessionId,
+        server_id: &str,
+        name: &str,
+        description: &str,
+        options_json: Option<&str>,
+    ) -> Result<(), String> {
+        let _user_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        if name.is_empty() || name.len() > 32 || name.contains(' ') {
+            return Err("Command name must be 1-32 chars with no spaces".into());
+        }
+
+        let id = Uuid::new_v4().to_string();
+        let opts = options_json.unwrap_or("[]");
+        // Validate JSON
+        serde_json::from_str::<Vec<SlashCommandOption>>(opts)
+            .map_err(|e| format!("Invalid options JSON: {e}"))?;
+
+        use crate::db::models::CreateSlashCommandParams;
+        let params = CreateSlashCommandParams {
+            id: &id,
+            bot_user_id: &self.get_user_id(session_id)?,
+            server_id: Some(server_id),
+            name,
+            description,
+            options_json: opts,
+        };
+
+        crate::db::queries::slash_commands::create_command(pool, &params)
+            .await
+            .map_err(|e| format!("Failed to register command: {e}"))?;
+
+        let options: Vec<SlashCommandOption> = serde_json::from_str(opts).unwrap_or_default();
+        let cmd = SlashCommandInfo {
+            id: id.clone(),
+            bot_user_id: self.get_user_id(session_id)?,
+            name: name.to_string(),
+            description: description.to_string(),
+            options,
+        };
+
+        self.broadcast_to_server(
+            server_id,
+            &ChatEvent::SlashCommandUpdate {
+                server_id: server_id.to_string(),
+                command: cmd,
+            },
+        );
+
+        Ok(())
+    }
+
+    /// List slash commands available in a server.
+    pub async fn list_slash_commands(
+        &self,
+        session_id: SessionId,
+        server_id: &str,
+    ) -> Result<(), String> {
+        let _user_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let rows = crate::db::queries::slash_commands::list_commands_for_server(pool, server_id)
+            .await
+            .map_err(|e| format!("Failed to list commands: {e}"))?;
+
+        let commands: Vec<SlashCommandInfo> = rows
+            .into_iter()
+            .map(|r| {
+                let options: Vec<SlashCommandOption> =
+                    serde_json::from_str(&r.options_json).unwrap_or_default();
+                SlashCommandInfo {
+                    id: r.id,
+                    bot_user_id: r.bot_user_id,
+                    name: r.name,
+                    description: r.description,
+                    options,
+                }
+            })
+            .collect();
+
+        if let Some(session) = self.get_session(session_id) {
+            let _ = session.send(ChatEvent::SlashCommandList {
+                server_id: server_id.to_string(),
+                commands,
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Delete a slash command.
+    pub async fn delete_slash_command(
+        &self,
+        session_id: SessionId,
+        command_id: &str,
+    ) -> Result<(), String> {
+        let _user_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let cmd = crate::db::queries::slash_commands::get_command(pool, command_id)
+            .await
+            .map_err(|e| format!("DB error: {e}"))?
+            .ok_or("Command not found")?;
+
+        crate::db::queries::slash_commands::delete_command(pool, command_id)
+            .await
+            .map_err(|e| format!("Failed to delete command: {e}"))?;
+
+        if let Some(sid) = &cmd.server_id {
+            self.broadcast_to_server(
+                sid,
+                &ChatEvent::SlashCommandDelete {
+                    server_id: sid.clone(),
+                    command_id: command_id.to_string(),
+                },
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Invoke a slash command. Creates an interaction and dispatches to the bot.
+    pub async fn invoke_slash_command(
+        &self,
+        session_id: SessionId,
+        server_id: &str,
+        channel: &str,
+        command_name: &str,
+        args_json: Option<&str>,
+    ) -> Result<(), String> {
+        let user_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        // Find the command by name in this server
+        let commands =
+            crate::db::queries::slash_commands::list_commands_for_server(pool, server_id)
+                .await
+                .map_err(|e| format!("DB error: {e}"))?;
+
+        let cmd = commands
+            .iter()
+            .find(|c| c.name == command_name)
+            .ok_or_else(|| format!("Unknown command: /{command_name}"))?;
+
+        let interaction_id = Uuid::new_v4().to_string();
+        let data: serde_json::Value = args_json
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+
+        // Resolve channel_id from name
+        let channel_id = self.resolve_channel_id(server_id, channel)?;
+
+        let data_str = serde_json::to_string(&data).unwrap_or_default();
+        let interaction_params = crate::db::models::CreateInteractionParams {
+            id: &interaction_id,
+            interaction_type: "slash_command",
+            command_id: Some(&cmd.id),
+            user_id: &user_id,
+            server_id,
+            channel_id: &channel_id,
+            data_json: &data_str,
+        };
+        crate::db::queries::slash_commands::create_interaction(pool, &interaction_params)
+            .await
+            .map_err(|e| format!("Failed to create interaction: {e}"))?;
+
+        let interaction = InteractionInfo {
+            id: interaction_id.clone(),
+            interaction_type: "slash_command".to_string(),
+            command_name: Some(command_name.to_string()),
+            user_id: user_id.clone(),
+            server_id: server_id.to_string(),
+            channel_id: channel_id.clone(),
+            data,
+        };
+
+        // Send to the bot (find sessions for the bot user)
+        for entry in self.sessions.iter() {
+            let s = entry.value();
+            if let Some(ref uid) = s.user_id
+                && uid == &cmd.bot_user_id
+            {
+                let _ = s.send(ChatEvent::InteractionCreate {
+                    interaction: interaction.clone(),
+                });
+            }
+        }
+
+        // Also send a notice to the invoker
+        if let Some(session) = self.get_session(session_id) {
+            let _ = session.send(ChatEvent::ServerNotice {
+                message: format!("/{command_name} invoked"),
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Respond to an interaction (bot -> channel).
+    pub async fn respond_to_interaction(
+        &self,
+        session_id: SessionId,
+        interaction_id: &str,
+        content: Option<&str>,
+        embeds_json: Option<&str>,
+        components_json: Option<&str>,
+        ephemeral: bool,
+    ) -> Result<(), String> {
+        let _user_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let interaction = crate::db::queries::slash_commands::get_interaction(pool, interaction_id)
+            .await
+            .map_err(|e| format!("DB error: {e}"))?
+            .ok_or("Interaction not found")?;
+
+        crate::db::queries::slash_commands::mark_interaction_responded(pool, interaction_id)
+            .await
+            .map_err(|e| format!("Failed to mark interaction: {e}"))?;
+
+        let embeds = embeds_json.and_then(|s| serde_json::from_str(s).ok());
+        let components = components_json.and_then(|s| serde_json::from_str(s).ok());
+
+        let response = InteractionResponseData {
+            content: content.map(String::from),
+            embeds,
+            components,
+            ephemeral,
+        };
+
+        // Resolve channel name from channel_id
+        let channel_name = self
+            .resolve_channel_name_from_id(&interaction.channel_id)
+            .unwrap_or_else(|_| interaction.channel_id.clone());
+
+        if ephemeral {
+            // Send only to the invoker
+            for entry in self.sessions.iter() {
+                let s = entry.value();
+                if let Some(ref uid) = s.user_id
+                    && uid == &interaction.user_id
+                {
+                    let _ = s.send(ChatEvent::InteractionResponse {
+                        interaction_id: interaction_id.to_string(),
+                        server_id: interaction.server_id.clone(),
+                        channel: channel_name.clone(),
+                        response: response.clone(),
+                    });
+                }
+            }
+        } else {
+            self.broadcast_to_server(
+                &interaction.server_id,
+                &ChatEvent::InteractionResponse {
+                    interaction_id: interaction_id.to_string(),
+                    server_id: interaction.server_id.clone(),
+                    channel: channel_name,
+                    response,
+                },
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Create an OAuth2 application.
+    pub async fn create_oauth2_app(
+        &self,
+        session_id: SessionId,
+        name: &str,
+        description: Option<&str>,
+        redirect_uris: &[String],
+    ) -> Result<(), String> {
+        let user_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let id = Uuid::new_v4().to_string();
+        let client_secret = format!("secret_{}", Uuid::new_v4());
+        let uris_json = serde_json::to_string(redirect_uris)
+            .map_err(|e| format!("Invalid redirect URIs: {e}"))?;
+
+        use crate::db::models::CreateOAuth2AppParams;
+        let params = CreateOAuth2AppParams {
+            id: &id,
+            name,
+            description: description.unwrap_or(""),
+            icon_url: None,
+            owner_id: &user_id,
+            client_secret: &client_secret,
+            redirect_uris: &uris_json,
+            scopes: "identify",
+        };
+
+        crate::db::queries::oauth2::create_app(pool, &params)
+            .await
+            .map_err(|e| format!("Failed to create OAuth2 app: {e}"))?;
+
+        if let Some(session) = self.get_session(session_id) {
+            let app = OAuth2AppInfo {
+                id: id.clone(),
+                name: name.to_string(),
+                description: description.unwrap_or("").to_string(),
+                icon_url: None,
+                owner_id: user_id,
+                redirect_uris: redirect_uris.to_vec(),
+                scopes: "identify".to_string(),
+                is_public: false,
+                created_at: Utc::now().to_rfc3339(),
+            };
+            let _ = session.send(ChatEvent::OAuth2AppUpdate { app });
+            // Also show the secret (only time visible)
+            let _ = session.send(ChatEvent::ServerNotice {
+                message: format!(
+                    "OAuth2 app created! Client ID: {id}, Client Secret: {client_secret}"
+                ),
+            });
+        }
+
+        Ok(())
+    }
+
+    /// List OAuth2 apps owned by the current user.
+    pub async fn list_oauth2_apps(&self, session_id: SessionId) -> Result<(), String> {
+        let user_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let rows = crate::db::queries::oauth2::list_apps_by_owner(pool, &user_id)
+            .await
+            .map_err(|e| format!("Failed to list OAuth2 apps: {e}"))?;
+
+        let apps: Vec<OAuth2AppInfo> = rows
+            .into_iter()
+            .map(|r| {
+                let uris: Vec<String> = serde_json::from_str(&r.redirect_uris).unwrap_or_default();
+                OAuth2AppInfo {
+                    id: r.id,
+                    name: r.name,
+                    description: r.description,
+                    icon_url: r.icon_url,
+                    owner_id: r.owner_id,
+                    redirect_uris: uris,
+                    scopes: r.scopes,
+                    is_public: r.is_public != 0,
+                    created_at: r.created_at,
+                }
+            })
+            .collect();
+
+        if let Some(session) = self.get_session(session_id) {
+            let _ = session.send(ChatEvent::OAuth2AppList { apps });
+        }
+
+        Ok(())
+    }
+
+    /// Delete an OAuth2 app. Only the owner can delete.
+    pub async fn delete_oauth2_app(
+        &self,
+        session_id: SessionId,
+        app_id: &str,
+    ) -> Result<(), String> {
+        let user_id = self.get_user_id(session_id)?;
+
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let app = crate::db::queries::oauth2::get_app(pool, app_id)
+            .await
+            .map_err(|e| format!("DB error: {e}"))?
+            .ok_or("OAuth2 app not found")?;
+
+        if app.owner_id != user_id {
+            return Err("You can only delete your own apps".into());
+        }
+
+        crate::db::queries::oauth2::delete_app(pool, app_id)
+            .await
+            .map_err(|e| format!("Failed to delete app: {e}"))?;
+
+        Ok(())
+    }
+
+    /// Execute an incoming webhook — post a message to the webhook's channel.
+    /// No session required; the webhook token is the authentication.
+    pub async fn execute_incoming_webhook(
+        &self,
+        webhook_token: &str,
+        content: &str,
+        username_override: Option<&str>,
+        avatar_override: Option<&str>,
+    ) -> Result<(), String> {
+        let Some(pool) = &self.db else {
+            return Err("No database configured".into());
+        };
+
+        let wh = crate::db::queries::webhooks::get_webhook_by_token(pool, webhook_token)
+            .await
+            .map_err(|e| format!("DB error: {e}"))?
+            .ok_or("Invalid webhook token")?;
+
+        if wh.webhook_type != "incoming" {
+            return Err("This endpoint is only for incoming webhooks".into());
+        }
+
+        let channel_name = self.resolve_channel_name_from_id(&wh.channel_id)?;
+        let display_name = username_override.unwrap_or(&wh.name);
+        let avatar = avatar_override.map(String::from).or(wh.avatar_url.clone());
+
+        let msg_id = Uuid::new_v4();
+        let event = ChatEvent::Message {
+            id: msg_id,
+            server_id: Some(wh.server_id.clone()),
+            from: display_name.to_string(),
+            target: channel_name.clone(),
+            content: content.to_string(),
+            timestamp: Utc::now(),
+            avatar_url: avatar,
+            reply_to: None,
+            attachments: None,
+        };
+
+        // Persist the message
+        {
+            let pool = pool.clone();
+            let id = msg_id.to_string();
+            let srv = wh.server_id.clone();
+            let ch = wh.channel_id.clone();
+            let wh_id = wh.id.clone();
+            let nick = display_name.to_string();
+            let msg = content.to_string();
+            tokio::spawn(async move {
+                let params = crate::db::queries::messages::InsertMessageParams {
+                    id: &id,
+                    server_id: &srv,
+                    channel_id: &ch,
+                    sender_id: &format!("webhook:{wh_id}"),
+                    sender_nick: &nick,
+                    content: &msg,
+                    reply_to_id: None,
+                };
+                if let Err(e) = crate::db::queries::messages::insert_message(&pool, &params).await {
+                    error!(error = %e, "failed to persist webhook message");
+                }
+            });
+        }
+
+        self.broadcast_to_channel(&wh.channel_id, &event, None);
+        Ok(())
+    }
+
+    /// Helper: get user_id for a session.
+    fn get_user_id(&self, session_id: SessionId) -> Result<String, String> {
+        let session = self.sessions.get(&session_id).ok_or("Session not found")?;
+        session
+            .user_id
+            .clone()
+            .ok_or_else(|| "AUTH_REQUIRED".into())
+    }
+
+    /// Helper: resolve channel name from a channel_id by looking it up in self.channels.
+    fn resolve_channel_name_from_id(&self, channel_id: &str) -> Result<String, String> {
+        self.channels
+            .get(channel_id)
+            .map(|ch| ch.name.clone())
+            .ok_or_else(|| format!("Channel ID {channel_id} not found"))
+    }
 }
 
 /// Convert a RoleRow to a RoleInfo for client consumption.
@@ -4280,6 +5154,22 @@ fn category_row_to_info(row: crate::db::models::ChannelCategoryRow) -> CategoryI
         server_id: row.server_id,
         name: row.name,
         position: row.position,
+    }
+}
+
+/// Convert a WebhookRow to a WebhookInfo for client consumption.
+fn webhook_row_to_info(row: crate::db::models::WebhookRow) -> WebhookInfo {
+    WebhookInfo {
+        id: row.id,
+        server_id: row.server_id,
+        channel_id: row.channel_id,
+        name: row.name,
+        avatar_url: row.avatar_url,
+        webhook_type: row.webhook_type,
+        token: row.token,
+        url: row.url,
+        created_by: row.created_by,
+        created_at: row.created_at,
     }
 }
 
@@ -4546,5 +5436,703 @@ mod tests {
         // Alice is not in server_b's #general — should fail
         let result = engine.send_message(sid, &server_b, "#general", "Hello", None, None);
         assert!(result.is_err());
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Edge cases: sessions
+    // ────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_disconnect_nonexistent_session_is_noop() {
+        let engine = setup_engine();
+        let fake_id = Uuid::new_v4();
+        // Should not panic
+        engine.disconnect(fake_id);
+    }
+
+    #[tokio::test]
+    async fn test_get_session_nonexistent() {
+        let engine = setup_engine();
+        assert!(engine.get_session(Uuid::new_v4()).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_is_nick_available() {
+        let engine = setup_engine();
+        assert!(engine.is_nick_available("alice"));
+        let (_sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        assert!(!engine.is_nick_available("alice"));
+        assert!(engine.is_nick_available("bob"));
+    }
+
+    #[tokio::test]
+    async fn test_connect_invalid_nickname_rejected() {
+        let engine = setup_engine();
+        let result = engine.connect(None, "".into(), Protocol::WebSocket, None);
+        assert!(result.is_err());
+
+        let result = engine.connect(None, "has space".into(), Protocol::WebSocket, None);
+        assert!(result.is_err());
+
+        let result = engine.connect(None, "has!bang".into(), Protocol::WebSocket, None);
+        assert!(result.is_err());
+
+        // Exactly at max length should be fine
+        let nick32 = "a".repeat(32);
+        let result = engine.connect(None, nick32, Protocol::WebSocket, None);
+        assert!(result.is_ok());
+
+        // Over max length should fail
+        let nick33 = "b".repeat(33);
+        let result = engine.connect(None, nick33, Protocol::WebSocket, None);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_connect_with_user_id_and_avatar() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(
+                Some("user_123".into()),
+                "alice".into(),
+                Protocol::WebSocket,
+                Some("https://example.com/avatar.png".into()),
+            )
+            .unwrap();
+        let session = engine.get_session(sid).unwrap();
+        assert_eq!(session.user_id.as_deref(), Some("user_123"));
+        assert_eq!(
+            session.avatar_url.as_deref(),
+            Some("https://example.com/avatar.png")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_connect_irc_protocol() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "irc-user".into(), Protocol::Irc, None)
+            .unwrap();
+        let session = engine.get_session(sid).unwrap();
+        assert_eq!(session.protocol, Protocol::Irc);
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Edge cases: channels and messaging
+    // ────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_send_message_to_nonexistent_channel() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        let result =
+            engine.send_message(sid, DEFAULT_SERVER_ID, "#nonexistent", "hello", None, None);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_send_message_with_invalid_session() {
+        let engine = setup_engine();
+        let fake = Uuid::new_v4();
+        let result = engine.send_message(fake, DEFAULT_SERVER_ID, "#general", "hi", None, None);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_join_channel_nonexistent_server() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        // join_channel creates channels on-the-fly even for servers not
+        // registered in the servers map, so this should succeed.
+        let result = engine.join_channel(sid, "no-such-server", "#general");
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_join_channel_creates_it() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        // #new-channel doesn't exist yet
+        assert!(engine.list_channels(DEFAULT_SERVER_ID).is_empty());
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#new-channel")
+            .unwrap();
+        let channels = engine.list_channels(DEFAULT_SERVER_ID);
+        assert_eq!(channels.len(), 1);
+        assert_eq!(channels[0].name, "#new-channel");
+    }
+
+    #[tokio::test]
+    async fn test_join_channel_twice_is_ok() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        // Joining again should be a no-op, not an error
+        let result = engine.join_channel(sid, DEFAULT_SERVER_ID, "#general");
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_part_channel_not_in() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        // Create the channel first by having someone join
+        let (sid2, _rx2) = engine
+            .connect(None, "bob".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid2, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        // alice never joined, so parting should fail
+        let result = engine.part_channel(sid, DEFAULT_SERVER_ID, "#general", None);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_channel_name_normalization_on_join() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        // Joining with "General" should normalize to "#general"
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "General")
+            .unwrap();
+        let channels = engine.list_channels(DEFAULT_SERVER_ID);
+        assert_eq!(channels[0].name, "#general");
+    }
+
+    #[tokio::test]
+    async fn test_message_not_echoed_to_sender() {
+        let engine = setup_engine();
+        let (sid, mut rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        // Drain join events
+        while rx.try_recv().is_ok() {}
+
+        engine
+            .send_message(sid, DEFAULT_SERVER_ID, "#general", "hello", None, None)
+            .unwrap();
+        // Message should NOT be echoed back to the sender
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_empty_message_rejected() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "#general", "", None, None);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_whitespace_only_message_rejected() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "#general", "   ", None, None);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_oversized_message_rejected() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        let long_msg = "x".repeat(2001);
+        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "#general", &long_msg, None, None);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_message_at_max_length_accepted() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        let max_msg = "x".repeat(2000);
+        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "#general", &max_msg, None, None);
+        assert!(result.is_ok());
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Topic edge cases
+    // ────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_set_topic_too_long() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        let long_topic = "t".repeat(501);
+        let result = engine.set_topic(sid, DEFAULT_SERVER_ID, "#general", long_topic);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_set_topic_empty_clears() {
+        let engine = setup_engine();
+        let (sid, mut rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        while rx.try_recv().is_ok() {}
+
+        // Set a topic first
+        engine
+            .set_topic(sid, DEFAULT_SERVER_ID, "#general", "Hello".into())
+            .unwrap();
+        while rx.try_recv().is_ok() {}
+
+        // Clear topic
+        engine
+            .set_topic(sid, DEFAULT_SERVER_ID, "#general", "".into())
+            .unwrap();
+        let event = rx.try_recv().unwrap();
+        match event {
+            ChatEvent::TopicChange { topic, .. } => {
+                assert_eq!(topic, "");
+            }
+            _ => panic!("Expected TopicChange event"),
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Server management
+    // ────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_create_server_invalid_name() {
+        let engine = setup_engine();
+        // Empty name
+        let result = engine.create_server("".into(), "user1".into(), None).await;
+        assert!(result.is_err());
+
+        // Whitespace-only name
+        let result = engine
+            .create_server("   ".into(), "user1".into(), None)
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_create_server_too_long_name() {
+        let engine = setup_engine();
+        let long_name = "a".repeat(101);
+        let result = engine.create_server(long_name, "user1".into(), None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_create_server_max_name_length() {
+        let engine = setup_engine();
+        let max_name = "a".repeat(100);
+        let result = engine.create_server(max_name, "user1".into(), None).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_create_server_with_icon() {
+        let engine = setup_engine();
+        let server_id = engine
+            .create_server(
+                "My Server".into(),
+                "user1".into(),
+                Some("https://example.com/icon.png".into()),
+            )
+            .await
+            .unwrap();
+        let server = engine.servers.get(&server_id).unwrap();
+        assert_eq!(
+            server.icon_url.as_deref(),
+            Some("https://example.com/icon.png")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_find_server_by_name() {
+        let engine = setup_engine();
+        let server_id = engine
+            .create_server("Test Server".into(), "user1".into(), None)
+            .await
+            .unwrap();
+        // Case insensitive lookup
+        assert_eq!(
+            engine.find_server_by_name("test server"),
+            Some(server_id.clone())
+        );
+        assert_eq!(engine.find_server_by_name("TEST SERVER"), Some(server_id));
+        assert!(engine.find_server_by_name("nonexistent").is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_server_name() {
+        let engine = setup_engine();
+        let server_id = engine
+            .create_server("My Server".into(), "user1".into(), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            engine.get_server_name(&server_id),
+            Some("My Server".to_string())
+        );
+        assert!(engine.get_server_name("nonexistent").is_none());
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Multiple channels and users
+    // ────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_multiple_channels_message_isolation() {
+        let engine = setup_engine();
+        let (sid_alice, mut rx_alice) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        let (sid_bob, mut rx_bob) = engine
+            .connect(None, "bob".into(), Protocol::WebSocket, None)
+            .unwrap();
+
+        // Alice joins #general, Bob joins #rust
+        engine
+            .join_channel(sid_alice, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        engine
+            .join_channel(sid_bob, DEFAULT_SERVER_ID, "#rust")
+            .unwrap();
+        while rx_alice.try_recv().is_ok() {}
+        while rx_bob.try_recv().is_ok() {}
+
+        // Alice sends to #general — Bob should NOT receive it (different channel)
+        engine
+            .send_message(
+                sid_alice,
+                DEFAULT_SERVER_ID,
+                "#general",
+                "hello general",
+                None,
+                None,
+            )
+            .unwrap();
+        assert!(rx_bob.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_disconnect_broadcasts_quit() {
+        let engine = setup_engine();
+        let (sid_alice, _rx_alice) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        let (sid_bob, mut rx_bob) = engine
+            .connect(None, "bob".into(), Protocol::WebSocket, None)
+            .unwrap();
+
+        engine
+            .join_channel(sid_alice, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        engine
+            .join_channel(sid_bob, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        while rx_bob.try_recv().is_ok() {}
+
+        engine.disconnect(sid_alice);
+
+        let event = rx_bob.try_recv().unwrap();
+        match event {
+            ChatEvent::Quit { nickname, .. } => assert_eq!(nickname, "alice"),
+            _ => panic!("Expected Quit event, got {:?}", event),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_disconnect_removes_from_channel() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+
+        engine.disconnect(sid);
+
+        // Channel should have 0 members now
+        let channels = engine.list_channels(DEFAULT_SERVER_ID);
+        assert_eq!(channels[0].member_count, 0);
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Normalize channel name additional tests
+    // ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_normalize_channel_name_already_lowercase() {
+        assert_eq!(normalize_channel_name("#already-lower"), "#already-lower");
+    }
+
+    #[test]
+    fn test_normalize_channel_name_mixed_case() {
+        assert_eq!(normalize_channel_name("MixedCase"), "#mixedcase");
+    }
+
+    #[test]
+    fn test_normalize_channel_name_uppercase_with_hash() {
+        assert_eq!(normalize_channel_name("#UPPER"), "#upper");
+    }
+
+    #[test]
+    fn test_normalize_channel_name_with_numbers() {
+        assert_eq!(normalize_channel_name("channel123"), "#channel123");
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // DM edge cases
+    // ────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_dm_to_nonexistent_user() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "nobody", "hello", None, None);
+        // DMs to non-existent users fail because there's no channel and no user session
+        assert!(result.is_err());
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Rate limiting
+    // ────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_message_rate_limiting() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+
+        // The default rate limiter allows burst of 10.
+        // Send 10 messages — all should succeed.
+        for i in 0..10 {
+            let result = engine.send_message(
+                sid,
+                DEFAULT_SERVER_ID,
+                "#general",
+                &format!("msg {i}"),
+                None,
+                None,
+            );
+            assert!(result.is_ok(), "Message {i} should succeed");
+        }
+
+        // 11th should be rate-limited
+        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "#general", "msg 10", None, None);
+        assert!(result.is_err());
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Server owner and join_server (in-memory only, no DB)
+    // ────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_create_server_sets_owner() {
+        let engine = setup_engine();
+        let server_id = engine
+            .create_server("Test".into(), "user1".into(), None)
+            .await
+            .unwrap();
+        let server = engine.servers.get(&server_id).unwrap();
+        assert_eq!(server.owner_id, "user1");
+    }
+
+    #[tokio::test]
+    async fn test_join_server_nonexistent() {
+        let engine = setup_engine();
+        let result = engine.join_server("user1", "nonexistent").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_join_server_adds_member() {
+        let engine = setup_engine();
+        let server_id = engine
+            .create_server("Test".into(), "owner".into(), None)
+            .await
+            .unwrap();
+        engine.join_server("user1", &server_id).await.unwrap();
+        let server = engine.servers.get(&server_id).unwrap();
+        assert!(server.member_user_ids.contains("user1"));
+    }
+
+    #[tokio::test]
+    async fn test_leave_server_removes_member() {
+        let engine = setup_engine();
+        let server_id = engine
+            .create_server("Test".into(), "owner".into(), None)
+            .await
+            .unwrap();
+        engine.join_server("user1", &server_id).await.unwrap();
+        engine.leave_server("user1", &server_id).await.unwrap();
+        let server = engine.servers.get(&server_id).unwrap();
+        assert!(!server.member_user_ids.contains("user1"));
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Part channel with reason
+    // ────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_part_channel_with_reason() {
+        let engine = setup_engine();
+        let (sid_alice, mut rx_alice) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        let (sid_bob, _rx_bob) = engine
+            .connect(None, "bob".into(), Protocol::WebSocket, None)
+            .unwrap();
+
+        engine
+            .join_channel(sid_alice, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        engine
+            .join_channel(sid_bob, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        while rx_alice.try_recv().is_ok() {}
+
+        engine
+            .part_channel(
+                sid_bob,
+                DEFAULT_SERVER_ID,
+                "#general",
+                Some("bye!".to_string()),
+            )
+            .unwrap();
+
+        let event = rx_alice.try_recv().unwrap();
+        match event {
+            ChatEvent::Part {
+                nickname, reason, ..
+            } => {
+                assert_eq!(nickname, "bob");
+                assert_eq!(reason, Some("bye!".to_string()));
+            }
+            _ => panic!("Expected Part event"),
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Resolve channel ID
+    // ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_resolve_channel_id_nonexistent() {
+        let engine = setup_engine();
+        let result = engine.resolve_channel_id(DEFAULT_SERVER_ID, "#nothing");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_channel_id_after_join() {
+        let engine = setup_engine();
+        let (sid, _rx) = engine
+            .connect(None, "alice".into(), Protocol::WebSocket, None)
+            .unwrap();
+        engine
+            .join_channel(sid, DEFAULT_SERVER_ID, "#general")
+            .unwrap();
+        let result = engine.resolve_channel_id(DEFAULT_SERVER_ID, "#general");
+        assert!(result.is_ok());
+        assert!(!result.unwrap().is_empty());
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // list_servers_for_user (in-memory, no DB)
+    // ────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_list_servers_for_user() {
+        let engine = setup_engine();
+        let sid1 = engine
+            .create_server("Server A".into(), "user1".into(), None)
+            .await
+            .unwrap();
+        let sid2 = engine
+            .create_server("Server B".into(), "user1".into(), None)
+            .await
+            .unwrap();
+        let _ = engine
+            .create_server("Server C".into(), "user2".into(), None)
+            .await
+            .unwrap();
+
+        // user1 should see Server A and Server B (they're the owner)
+        engine.join_server("user1", &sid1).await.unwrap();
+        engine.join_server("user1", &sid2).await.unwrap();
+        let servers = engine.list_servers_for_user("user1");
+        assert_eq!(servers.len(), 2);
+        let names: Vec<&str> = servers.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains(&"Server A"));
+        assert!(names.contains(&"Server B"));
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Multiple server creation generates unique IDs
+    // ────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_server_ids_are_unique() {
+        let engine = setup_engine();
+        let id1 = engine
+            .create_server("S1".into(), "user1".into(), None)
+            .await
+            .unwrap();
+        let id2 = engine
+            .create_server("S2".into(), "user1".into(), None)
+            .await
+            .unwrap();
+        assert_ne!(id1, id2);
     }
 }

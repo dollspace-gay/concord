@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::Json;
 use axum::body::Body;
-use axum::extract::{Multipart, Path, Query, State};
+use axum::extract::{FromRef, FromRequestParts, Multipart, Path, Query, State};
 use axum::http::StatusCode;
 use axum::http::header;
 use axum::response::IntoResponse;
@@ -12,12 +12,64 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::auth::token::{generate_irc_token, hash_irc_token};
-use crate::db::queries::{attachments, community, emoji, invites, servers, users};
-use sqlx;
+use crate::db::queries::{attachments, bots, community, emoji, invites, servers, users};
 use crate::engine::events::HistoryMessage;
+use sqlx;
 
 use super::app_state::AppState;
 use super::auth_middleware::AuthUser;
+
+// ── Phase 8: Bot token auth extractor ──────────────────────
+
+/// Extractor that validates a `Authorization: Bot <token>` header.
+/// Used for bot API endpoints that authenticate via bot tokens.
+pub struct BotAuth {
+    pub user_id: String,
+}
+
+impl<S: Send + Sync> FromRequestParts<S> for BotAuth
+where
+    Arc<AppState>: FromRef<S>,
+{
+    type Rejection = (StatusCode, &'static str);
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let app_state = Arc::<AppState>::from_ref(state);
+
+        let auth_header = parts
+            .headers
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .ok_or((StatusCode::UNAUTHORIZED, "Missing Authorization header"))?;
+
+        let token = auth_header
+            .strip_prefix("Bot ")
+            .ok_or((StatusCode::UNAUTHORIZED, "Expected 'Bot <token>' format"))?;
+
+        // Hash the token and look it up
+        let token_hash = hash_irc_token(token)
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Token hash failed"))?;
+
+        let row = bots::get_bot_token_by_hash(&app_state.db, &token_hash)
+            .await
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Database error"))?
+            .ok_or((StatusCode::UNAUTHORIZED, "Invalid bot token"))?;
+
+        // Update last_used timestamp in background
+        let pool = app_state.db.clone();
+        let tid = row.id.clone();
+        tokio::spawn(async move {
+            let _ = bots::update_token_last_used(&pool, &tid).await;
+        });
+
+        Ok(BotAuth {
+            user_id: row.user_id,
+        })
+    }
+}
 
 // ── Channel endpoints (public, require server_id query param) ──
 
@@ -493,10 +545,7 @@ pub async fn upload_file(
 
     while let Ok(Some(field)) = multipart.next_field().await {
         if field.name() == Some("file") {
-            let filename = field
-                .file_name()
-                .unwrap_or("unnamed")
-                .to_string();
+            let filename = field.file_name().unwrap_or("unnamed").to_string();
             let content_type = field
                 .content_type()
                 .unwrap_or("application/octet-stream")
@@ -744,8 +793,15 @@ pub async fn create_server_emoji(
     }
 
     let id = Uuid::new_v4().to_string();
-    match emoji::insert_emoji(&state.db, &id, &server_id, &name, &body.image_url, &user.user_id)
-        .await
+    match emoji::insert_emoji(
+        &state.db,
+        &id,
+        &server_id,
+        &name,
+        &body.image_url,
+        &user.user_id,
+    )
+    .await
     {
         Ok(()) => Json(EmojiResponse {
             id,
@@ -756,7 +812,11 @@ pub async fn create_server_emoji(
         .into_response(),
         Err(e) => {
             if e.to_string().contains("UNIQUE") {
-                (StatusCode::CONFLICT, "An emoji with that name already exists").into_response()
+                (
+                    StatusCode::CONFLICT,
+                    "An emoji with that name already exists",
+                )
+                    .into_response()
             } else {
                 error!(error = %e, "Failed to create emoji");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
@@ -870,7 +930,13 @@ pub async fn search_messages(
 
     // Resolve channel name to ID if needed
     let channel_id = if let Some(ref ch_name) = params.channel {
-        match crate::db::queries::channels::get_channel_by_name(&state.db, &params.server_id, ch_name).await {
+        match crate::db::queries::channels::get_channel_by_name(
+            &state.db,
+            &params.server_id,
+            ch_name,
+        )
+        .await
+        {
             Ok(Some(row)) => Some(row.id),
             _ => None,
         }
@@ -932,24 +998,31 @@ pub async fn get_invite_preview(
             if let Some(ref exp) = invite.expires_at
                 && exp < &chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
             {
-                return (StatusCode::GONE, Json(serde_json::json!({"error": "Invite expired"}))).into_response();
+                return (
+                    StatusCode::GONE,
+                    Json(serde_json::json!({"error": "Invite expired"})),
+                )
+                    .into_response();
             }
             // Check max uses
             if let Some(max) = invite.max_uses
                 && invite.use_count >= max
             {
-                return (StatusCode::GONE, Json(serde_json::json!({"error": "Invite has reached max uses"}))).into_response();
+                return (
+                    StatusCode::GONE,
+                    Json(serde_json::json!({"error": "Invite has reached max uses"})),
+                )
+                    .into_response();
             }
             // Get server info
             match servers::get_server(pool, &invite.server_id).await {
-                Ok(Some(server)) => {
-                    Json(serde_json::json!({
-                        "code": invite.code,
-                        "server_id": server.id,
-                        "server_name": server.name,
-                        "server_icon_url": server.icon_url,
-                    })).into_response()
-                }
+                Ok(Some(server)) => Json(serde_json::json!({
+                    "code": invite.code,
+                    "server_id": server.id,
+                    "server_name": server.name,
+                    "server_icon_url": server.icon_url,
+                }))
+                .into_response(),
                 _ => StatusCode::NOT_FOUND.into_response(),
             }
         }
@@ -970,19 +1043,490 @@ pub async fn discover_servers(
     let pool = &state.db;
     match community::list_discoverable_servers(pool, params.category.as_deref()).await {
         Ok(servers) => {
-            let results: Vec<serde_json::Value> = servers.iter().map(|s| {
-                serde_json::json!({
-                    "id": s.id,
-                    "name": s.name,
-                    "icon_url": s.icon_url,
-                    "description": s.description,
-                    "category": s.category,
+            let results: Vec<serde_json::Value> = servers
+                .iter()
+                .map(|s| {
+                    serde_json::json!({
+                        "id": s.id,
+                        "name": s.name,
+                        "icon_url": s.icon_url,
+                        "description": s.description,
+                        "category": s.category,
+                    })
                 })
-            }).collect();
+                .collect();
             Json(serde_json::json!({ "servers": results })).into_response()
         }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+// ── Phase 8: Webhook incoming endpoint (public, token-authed via URL) ──
+
+#[derive(Deserialize)]
+pub struct WebhookExecuteRequest {
+    pub content: String,
+    pub username: Option<String>,
+    pub avatar_url: Option<String>,
+}
+
+/// POST /api/webhooks/{id}/{token} — execute an incoming webhook (public, no session auth).
+pub async fn execute_webhook(
+    State(state): State<Arc<AppState>>,
+    Path((_webhook_id, token)): Path<(String, String)>,
+    Json(body): Json<WebhookExecuteRequest>,
+) -> impl IntoResponse {
+    match state
+        .engine
+        .execute_incoming_webhook(
+            &token,
+            &body.content,
+            body.username.as_deref(),
+            body.avatar_url.as_deref(),
+        )
+        .await
+    {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response()
+            if e.contains("Invalid webhook token") {
+                (
+                    StatusCode::UNAUTHORIZED,
+                    Json(serde_json::json!({"error": e})),
+                )
+                    .into_response()
+            } else {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({"error": e})),
+                )
+                    .into_response()
+            }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── HistoryParams deserialization ──
+
+    #[test]
+    fn test_history_params_full() {
+        let json = r#"{"server_id": "srv-1", "before": "msg-abc", "limit": 100}"#;
+        let params: HistoryParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.server_id, Some("srv-1".into()));
+        assert_eq!(params.before, Some("msg-abc".into()));
+        assert_eq!(params.limit, Some(100));
+    }
+
+    #[test]
+    fn test_history_params_minimal() {
+        let json = r#"{}"#;
+        let params: HistoryParams = serde_json::from_str(json).unwrap();
+        assert!(params.server_id.is_none());
+        assert!(params.before.is_none());
+        assert!(params.limit.is_none());
+    }
+
+    #[test]
+    fn test_history_params_only_server_id() {
+        let json = r#"{"server_id": "default"}"#;
+        let params: HistoryParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.server_id, Some("default".into()));
+        assert!(params.before.is_none());
+        assert!(params.limit.is_none());
+    }
+
+    // ── ChannelListParams deserialization ──
+
+    #[test]
+    fn test_channel_list_params() {
+        let json = r#"{"server_id": "srv-1"}"#;
+        let params: ChannelListParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.server_id, Some("srv-1".into()));
+    }
+
+    #[test]
+    fn test_channel_list_params_empty() {
+        let json = r#"{}"#;
+        let params: ChannelListParams = serde_json::from_str(json).unwrap();
+        assert!(params.server_id.is_none());
+    }
+
+    // ── CreateServerRequest deserialization ──
+
+    #[test]
+    fn test_create_server_request_full() {
+        let json = r#"{"name": "My Server", "icon_url": "https://example.com/icon.png"}"#;
+        let req: CreateServerRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.name, "My Server");
+        assert_eq!(req.icon_url, Some("https://example.com/icon.png".into()));
+    }
+
+    #[test]
+    fn test_create_server_request_name_only() {
+        let json = r#"{"name": "Test"}"#;
+        let req: CreateServerRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.name, "Test");
+        assert!(req.icon_url.is_none());
+    }
+
+    #[test]
+    fn test_create_server_request_missing_name_fails() {
+        let json = r#"{"icon_url": "https://example.com/icon.png"}"#;
+        assert!(serde_json::from_str::<CreateServerRequest>(json).is_err());
+    }
+
+    // ── SetAdminRequest deserialization ──
+
+    #[test]
+    fn test_set_admin_request_true() {
+        let json = r#"{"is_admin": true}"#;
+        let req: SetAdminRequest = serde_json::from_str(json).unwrap();
+        assert!(req.is_admin);
+    }
+
+    #[test]
+    fn test_set_admin_request_false() {
+        let json = r#"{"is_admin": false}"#;
+        let req: SetAdminRequest = serde_json::from_str(json).unwrap();
+        assert!(!req.is_admin);
+    }
+
+    #[test]
+    fn test_set_admin_request_missing_field_fails() {
+        let json = r#"{}"#;
+        assert!(serde_json::from_str::<SetAdminRequest>(json).is_err());
+    }
+
+    // ── AuthStatusResponse serialization ──
+
+    #[test]
+    fn test_auth_status_response_serialize() {
+        let resp = AuthStatusResponse {
+            authenticated: false,
+            providers: vec!["atproto".into(), "github".into()],
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["authenticated"], false);
+        let providers = json["providers"].as_array().unwrap();
+        assert_eq!(providers.len(), 2);
+        assert_eq!(providers[0], "atproto");
+        assert_eq!(providers[1], "github");
+    }
+
+    #[test]
+    fn test_auth_status_response_single_provider() {
+        let resp = AuthStatusResponse {
+            authenticated: false,
+            providers: vec!["atproto".into()],
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["providers"].as_array().unwrap().len(), 1);
+    }
+
+    // ── UserProfile serialization ──
+
+    #[test]
+    fn test_user_profile_serialize_full() {
+        let profile = UserProfile {
+            id: "user-1".into(),
+            username: "alice".into(),
+            email: Some("alice@example.com".into()),
+            avatar_url: Some("https://example.com/avatar.jpg".into()),
+        };
+        let json = serde_json::to_value(&profile).unwrap();
+        assert_eq!(json["id"], "user-1");
+        assert_eq!(json["username"], "alice");
+        assert_eq!(json["email"], "alice@example.com");
+        assert_eq!(json["avatar_url"], "https://example.com/avatar.jpg");
+    }
+
+    #[test]
+    fn test_user_profile_serialize_minimal() {
+        let profile = UserProfile {
+            id: "u1".into(),
+            username: "bob".into(),
+            email: None,
+            avatar_url: None,
+        };
+        let json = serde_json::to_value(&profile).unwrap();
+        assert_eq!(json["id"], "u1");
+        assert_eq!(json["username"], "bob");
+        assert!(json["email"].is_null());
+        assert!(json["avatar_url"].is_null());
+    }
+
+    // ── PublicUserProfile serialization ──
+
+    #[test]
+    fn test_public_user_profile_serialize() {
+        let profile = PublicUserProfile {
+            username: "alice".into(),
+            avatar_url: Some("https://example.com/pic.jpg".into()),
+            provider: Some("github".into()),
+            provider_id: Some("12345".into()),
+        };
+        let json = serde_json::to_value(&profile).unwrap();
+        assert_eq!(json["username"], "alice");
+        assert_eq!(json["provider"], "github");
+        assert_eq!(json["provider_id"], "12345");
+    }
+
+    #[test]
+    fn test_public_user_profile_serialize_no_optionals() {
+        let profile = PublicUserProfile {
+            username: "bob".into(),
+            avatar_url: None,
+            provider: None,
+            provider_id: None,
+        };
+        let json = serde_json::to_value(&profile).unwrap();
+        assert_eq!(json["username"], "bob");
+        assert!(json["avatar_url"].is_null());
+        assert!(json["provider"].is_null());
+    }
+
+    // ── CreateTokenRequest deserialization ──
+
+    #[test]
+    fn test_create_token_request_with_label() {
+        let json = r#"{"label": "My IRC client"}"#;
+        let req: CreateTokenRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.label, Some("My IRC client".into()));
+    }
+
+    #[test]
+    fn test_create_token_request_no_label() {
+        let json = r#"{}"#;
+        let req: CreateTokenRequest = serde_json::from_str(json).unwrap();
+        assert!(req.label.is_none());
+    }
+
+    // ── CreateTokenResponse serialization ──
+
+    #[test]
+    fn test_create_token_response_serialize() {
+        let resp = CreateTokenResponse {
+            id: "tok-1".into(),
+            token: "abcdef123456".into(),
+            label: Some("dev".into()),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["id"], "tok-1");
+        assert_eq!(json["token"], "abcdef123456");
+        assert_eq!(json["label"], "dev");
+    }
+
+    // ── IrcTokenInfo serialization ──
+
+    #[test]
+    fn test_irc_token_info_serialize() {
+        let info = IrcTokenInfo {
+            id: "t1".into(),
+            label: Some("test".into()),
+            last_used: Some("2025-01-01T00:00:00Z".into()),
+            created_at: "2025-01-01T00:00:00Z".into(),
+        };
+        let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(json["id"], "t1");
+        assert_eq!(json["label"], "test");
+        assert_eq!(json["last_used"], "2025-01-01T00:00:00Z");
+        assert_eq!(json["created_at"], "2025-01-01T00:00:00Z");
+    }
+
+    #[test]
+    fn test_irc_token_info_serialize_no_optionals() {
+        let info = IrcTokenInfo {
+            id: "t2".into(),
+            label: None,
+            last_used: None,
+            created_at: "2025-01-01".into(),
+        };
+        let json = serde_json::to_value(&info).unwrap();
+        assert!(json["label"].is_null());
+        assert!(json["last_used"].is_null());
+    }
+
+    // ── UploadResponse serialization ──
+
+    #[test]
+    fn test_upload_response_serialize() {
+        let resp = UploadResponse {
+            id: "att-1".into(),
+            filename: "photo.jpg".into(),
+            content_type: "image/jpeg".into(),
+            file_size: 1024,
+            url: "/api/uploads/att-1".into(),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["id"], "att-1");
+        assert_eq!(json["filename"], "photo.jpg");
+        assert_eq!(json["content_type"], "image/jpeg");
+        assert_eq!(json["file_size"], 1024);
+        assert_eq!(json["url"], "/api/uploads/att-1");
+    }
+
+    // ── EmojiResponse serialization ──
+
+    #[test]
+    fn test_emoji_response_serialize() {
+        let resp = EmojiResponse {
+            id: "e1".into(),
+            server_id: "s1".into(),
+            name: "thumbsup".into(),
+            image_url: "/api/uploads/emoji.png".into(),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["name"], "thumbsup");
+        assert_eq!(json["server_id"], "s1");
+    }
+
+    // ── CreateEmojiRequest deserialization ──
+
+    #[test]
+    fn test_create_emoji_request() {
+        let json = r#"{"name": "smile", "image_url": "https://example.com/smile.png"}"#;
+        let req: CreateEmojiRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.name, "smile");
+        assert_eq!(req.image_url, "https://example.com/smile.png");
+    }
+
+    #[test]
+    fn test_create_emoji_request_missing_name_fails() {
+        let json = r#"{"image_url": "url"}"#;
+        assert!(serde_json::from_str::<CreateEmojiRequest>(json).is_err());
+    }
+
+    #[test]
+    fn test_create_emoji_request_missing_url_fails() {
+        let json = r#"{"name": "smile"}"#;
+        assert!(serde_json::from_str::<CreateEmojiRequest>(json).is_err());
+    }
+
+    // ── UpdateProfileRequest deserialization ──
+
+    #[test]
+    fn test_update_profile_request_full() {
+        let json = r#"{"bio": "Hello!", "pronouns": "they/them", "banner_url": "https://example.com/banner.jpg"}"#;
+        let req: UpdateProfileRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.bio, Some("Hello!".into()));
+        assert_eq!(req.pronouns, Some("they/them".into()));
+        assert_eq!(
+            req.banner_url,
+            Some("https://example.com/banner.jpg".into())
+        );
+    }
+
+    #[test]
+    fn test_update_profile_request_empty() {
+        let json = r#"{}"#;
+        let req: UpdateProfileRequest = serde_json::from_str(json).unwrap();
+        assert!(req.bio.is_none());
+        assert!(req.pronouns.is_none());
+        assert!(req.banner_url.is_none());
+    }
+
+    // ── SearchParams deserialization ──
+
+    #[test]
+    fn test_search_params_full() {
+        let json = r##"{"server_id": "s1", "q": "hello", "channel": "#general", "limit": 10, "offset": 5}"##;
+        let params: SearchParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.server_id, "s1");
+        assert_eq!(params.q, "hello");
+        assert_eq!(params.channel, Some("#general".into()));
+        assert_eq!(params.limit, Some(10));
+        assert_eq!(params.offset, Some(5));
+    }
+
+    #[test]
+    fn test_search_params_minimal() {
+        let json = r#"{"server_id": "s1", "q": "test"}"#;
+        let params: SearchParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.server_id, "s1");
+        assert_eq!(params.q, "test");
+        assert!(params.channel.is_none());
+        assert!(params.limit.is_none());
+        assert!(params.offset.is_none());
+    }
+
+    #[test]
+    fn test_search_params_missing_required_fails() {
+        let json = r#"{"q": "test"}"#;
+        assert!(serde_json::from_str::<SearchParams>(json).is_err());
+    }
+
+    // ── DiscoverParams deserialization ──
+
+    #[test]
+    fn test_discover_params_with_category() {
+        let json = r#"{"category": "gaming"}"#;
+        let params: DiscoverParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.category, Some("gaming".into()));
+    }
+
+    #[test]
+    fn test_discover_params_empty() {
+        let json = r#"{}"#;
+        let params: DiscoverParams = serde_json::from_str(json).unwrap();
+        assert!(params.category.is_none());
+    }
+
+    // ── WebhookExecuteRequest deserialization ──
+
+    #[test]
+    fn test_webhook_execute_request_full() {
+        let json = r#"{"content": "Hello from webhook", "username": "Bot", "avatar_url": "https://example.com/bot.png"}"#;
+        let req: WebhookExecuteRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.content, "Hello from webhook");
+        assert_eq!(req.username, Some("Bot".into()));
+        assert_eq!(req.avatar_url, Some("https://example.com/bot.png".into()));
+    }
+
+    #[test]
+    fn test_webhook_execute_request_content_only() {
+        let json = r#"{"content": "test message"}"#;
+        let req: WebhookExecuteRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.content, "test message");
+        assert!(req.username.is_none());
+        assert!(req.avatar_url.is_none());
+    }
+
+    #[test]
+    fn test_webhook_execute_request_missing_content_fails() {
+        let json = r#"{"username": "Bot"}"#;
+        assert!(serde_json::from_str::<WebhookExecuteRequest>(json).is_err());
+    }
+
+    // ── HistoryResponse serialization ──
+
+    #[test]
+    fn test_history_response_serialize() {
+        let resp = HistoryResponse {
+            channel: "#general".into(),
+            messages: vec![],
+            has_more: false,
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["channel"], "#general");
+        assert_eq!(json["messages"].as_array().unwrap().len(), 0);
+        assert_eq!(json["has_more"], false);
+    }
+
+    #[test]
+    fn test_history_response_serialize_has_more() {
+        let resp = HistoryResponse {
+            channel: "#dev".into(),
+            messages: vec![],
+            has_more: true,
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["has_more"], true);
     }
 }

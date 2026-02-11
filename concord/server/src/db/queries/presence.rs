@@ -72,3 +72,128 @@ pub async fn set_offline(pool: &SqlitePool, user_id: &str) -> Result<(), sqlx::E
     .await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::pool::{create_pool, run_migrations};
+    use crate::db::queries::users::{self, CreateOAuthUser};
+
+    async fn setup_db() -> SqlitePool {
+        let pool = create_pool("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        pool
+    }
+
+    async fn create_user(pool: &SqlitePool, id: &str) {
+        users::create_with_oauth(
+            pool,
+            &CreateOAuthUser {
+                user_id: id,
+                username: &format!("user-{id}"),
+                email: None,
+                avatar_url: None,
+                oauth_id: &format!("oauth-{id}"),
+                provider: "github",
+                provider_id: &format!("gh-{id}"),
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_upsert_and_get_presence() {
+        let pool = setup_db().await;
+        create_user(&pool, "u1").await;
+
+        upsert_presence(&pool, "u1", "online", None, None)
+            .await
+            .unwrap();
+
+        let p = get_presence(&pool, "u1").await.unwrap();
+        assert!(p.is_some());
+        let pres = p.unwrap();
+        assert_eq!(pres.status, "online");
+        assert!(pres.custom_status.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_upsert_with_custom_status() {
+        let pool = setup_db().await;
+        create_user(&pool, "u1").await;
+
+        upsert_presence(&pool, "u1", "dnd", Some("Busy coding"), Some("laptop"))
+            .await
+            .unwrap();
+
+        let pres = get_presence(&pool, "u1").await.unwrap().unwrap();
+        assert_eq!(pres.status, "dnd");
+        assert_eq!(pres.custom_status, Some("Busy coding".to_string()));
+        assert_eq!(pres.status_emoji, Some("laptop".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_upsert_updates_existing() {
+        let pool = setup_db().await;
+        create_user(&pool, "u1").await;
+
+        upsert_presence(&pool, "u1", "online", None, None)
+            .await
+            .unwrap();
+        upsert_presence(&pool, "u1", "idle", Some("AFK"), None)
+            .await
+            .unwrap();
+
+        let pres = get_presence(&pool, "u1").await.unwrap().unwrap();
+        assert_eq!(pres.status, "idle");
+        assert_eq!(pres.custom_status, Some("AFK".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_set_offline() {
+        let pool = setup_db().await;
+        create_user(&pool, "u1").await;
+
+        upsert_presence(&pool, "u1", "online", None, None)
+            .await
+            .unwrap();
+        set_offline(&pool, "u1").await.unwrap();
+
+        let pres = get_presence(&pool, "u1").await.unwrap().unwrap();
+        assert_eq!(pres.status, "offline");
+    }
+
+    #[tokio::test]
+    async fn test_get_presences_for_users() {
+        let pool = setup_db().await;
+        create_user(&pool, "u1").await;
+        create_user(&pool, "u2").await;
+
+        upsert_presence(&pool, "u1", "online", None, None)
+            .await
+            .unwrap();
+        upsert_presence(&pool, "u2", "idle", None, None)
+            .await
+            .unwrap();
+
+        let presences = get_presences_for_users(&pool, &["u1".to_string(), "u2".to_string()])
+            .await
+            .unwrap();
+        assert_eq!(presences.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_get_presences_empty_list() {
+        let pool = setup_db().await;
+        let presences = get_presences_for_users(&pool, &[]).await.unwrap();
+        assert!(presences.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_nonexistent_presence() {
+        let pool = setup_db().await;
+        let p = get_presence(&pool, "nosuch").await.unwrap();
+        assert!(p.is_none());
+    }
+}

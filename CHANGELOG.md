@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Phase 8: Integrations & Bots (#56)
+- Webhook system (incoming POST endpoint + outgoing event subscriptions)
+- Bot accounts with hashed API tokens and `Authorization: Bot <token>` auth
+- Slash commands with options, autocomplete, and interaction dispatch
+- Message components (buttons, select menus, action rows)
+- OAuth2 application registration with authorization grants
+- Rich embed format for bot messages
+- IntegrationsPanel UI with Webhooks, Commands, Bots, and OAuth Apps tabs
+- Public webhook execution endpoint: `POST /api/webhooks/{id}/{token}`
+- Migration 012: bot_tokens, webhooks, webhook_events, slash_commands, interactions, oauth2_apps, oauth2_authorizations tables
+
+### Added — Phase 7: Community & Discovery (#55)
+- Invite links with configurable expiry and use limits
+- Scheduled server events with RSVP (interested/going)
+- Community settings (discovery, welcome message, rules text, category)
+- Server discovery directory with category filtering
+- Announcement channels with cross-posting via channel follows
+- Server templates (snapshot and create-from-template)
+- CommunityPanel UI with Invites, Events, Settings, and Discovery tabs
+- Public REST endpoints: `GET /api/invite/{code}`, `GET /api/discover`
+- Migration 011: invites, server_events, event_rsvps, channel_follows, server_templates tables
+
 ### Added — Phase 6: Moderation (#54)
 - Kick members from servers with reason tracking
 - Ban/unban members with optional message history deletion (0-7 days)
@@ -87,6 +109,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - WebSocket handler with axum router
 
 ### Fixed
+- Fix PDS blob serving by creating AT Protocol record to pin uploaded blobs (#144)
 - Fix broken PDS blob URL missing did parameter (#135)
 - Fix blank uploaded images - local message missing attachments (#126)
 - Fix missing migration 4 and add emoji picker (#125)

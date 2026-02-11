@@ -174,7 +174,11 @@ impl ServerConfig {
         }
         // Admin env overrides
         if let Ok(v) = std::env::var("ADMIN_USERS") {
-            self.admin.admin_users = v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+            self.admin.admin_users = v
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
         }
     }
 

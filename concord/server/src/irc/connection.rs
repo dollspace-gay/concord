@@ -553,10 +553,729 @@ fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> 
         | ChatEvent::ChannelFollowDelete { .. }
         | ChatEvent::TemplateList { .. }
         | ChatEvent::TemplateUpdate { .. }
-        | ChatEvent::TemplateDelete { .. } => vec![],
+        | ChatEvent::TemplateDelete { .. }
+        // Phase 8: Integrations (web-only)
+        | ChatEvent::WebhookList { .. }
+        | ChatEvent::WebhookUpdate { .. }
+        | ChatEvent::WebhookDelete { .. }
+        | ChatEvent::SlashCommandList { .. }
+        | ChatEvent::SlashCommandUpdate { .. }
+        | ChatEvent::SlashCommandDelete { .. }
+        | ChatEvent::InteractionCreate { .. }
+        | ChatEvent::InteractionResponse { .. }
+        | ChatEvent::BotTokenList { .. }
+        | ChatEvent::OAuth2AppList { .. }
+        | ChatEvent::OAuth2AppUpdate { .. } => vec![],
     }
 }
 
 fn send_line(tx: &mpsc::UnboundedSender<String>, line: &str) {
     let _ = tx.send(line.to_string());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::events::{MemberInfo, PinnedMessageInfo, ThreadInfo};
+    use chrono::Utc;
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    /// Create a minimal ChatEngine with no database for unit tests.
+    fn test_engine() -> Arc<ChatEngine> {
+        Arc::new(ChatEngine::new(None))
+    }
+
+    // ── Message event ──
+
+    #[test]
+    fn test_message_event_to_channel() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::Message {
+                id: Uuid::new_v4(),
+                server_id: Some(DEFAULT_SERVER_ID.to_string()),
+                from: "alice".into(),
+                target: "#general".into(),
+                content: "Hello world".into(),
+                timestamp: Utc::now(),
+                avatar_url: None,
+                reply_to: None,
+                attachments: None,
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("PRIVMSG #general :Hello world"));
+        assert!(lines[0].starts_with(":alice!"));
+    }
+
+    #[test]
+    fn test_message_event_dm() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "bob",
+            &ChatEvent::Message {
+                id: Uuid::new_v4(),
+                server_id: None,
+                from: "alice".into(),
+                target: "bob".into(),
+                content: "Hey there".into(),
+                timestamp: Utc::now(),
+                avatar_url: None,
+                reply_to: None,
+                attachments: None,
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("PRIVMSG bob :Hey there"));
+    }
+
+    // ── Join/Part/Quit/Nick events ──
+
+    #[test]
+    fn test_join_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::Join {
+                nickname: "alice".into(),
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                avatar_url: None,
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("JOIN #general"));
+        assert!(lines[0].starts_with(":alice!"));
+    }
+
+    #[test]
+    fn test_part_event_with_reason() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::Part {
+                nickname: "bob".into(),
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                reason: Some("goodbye".into()),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("PART #general"));
+        assert!(lines[0].contains("goodbye"));
+    }
+
+    #[test]
+    fn test_part_event_no_reason() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::Part {
+                nickname: "bob".into(),
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                reason: None,
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("PART #general"));
+    }
+
+    #[test]
+    fn test_quit_event_with_reason() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::Quit {
+                nickname: "alice".into(),
+                reason: Some("Leaving".into()),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("QUIT"));
+        assert!(lines[0].contains("Leaving"));
+    }
+
+    #[test]
+    fn test_quit_event_no_reason() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::Quit {
+                nickname: "alice".into(),
+                reason: None,
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("QUIT"));
+    }
+
+    #[test]
+    fn test_nick_change_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::NickChange {
+                old_nick: "alice".into(),
+                new_nick: "alice_".into(),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("NICK"));
+        assert!(lines[0].contains("alice_"));
+    }
+
+    // ── Topic events ──
+
+    #[test]
+    fn test_topic_change_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::TopicChange {
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                set_by: "alice".into(),
+                topic: "New topic".into(),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("TOPIC #general"));
+        assert!(lines[0].contains("New topic"));
+    }
+
+    #[test]
+    fn test_topic_event_with_content() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::Topic {
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#dev".into(),
+                topic: "Development chat".into(),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("#dev"));
+        assert!(lines[0].contains("Development chat"));
+    }
+
+    #[test]
+    fn test_topic_event_empty() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::Topic {
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#dev".into(),
+                topic: "".into(),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        // Empty topic produces RPL_NOTOPIC
+        assert!(lines[0].contains("331"));
+    }
+
+    // ── Names event ──
+
+    #[test]
+    fn test_names_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::Names {
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                members: vec![
+                    MemberInfo {
+                        nickname: "alice".into(),
+                        avatar_url: None,
+                        status: None,
+                        custom_status: None,
+                        status_emoji: None,
+                        user_id: None,
+                    },
+                    MemberInfo {
+                        nickname: "bob".into(),
+                        avatar_url: None,
+                        status: None,
+                        custom_status: None,
+                        status_emoji: None,
+                        user_id: None,
+                    },
+                ],
+            },
+        );
+        // Names produces RPL_NAMREPLY + RPL_ENDOFNAMES
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains("353"));
+        assert!(lines[0].contains("alice"));
+        assert!(lines[0].contains("bob"));
+        assert!(lines[1].contains("366"));
+    }
+
+    // ── ServerNotice / Error events ──
+
+    #[test]
+    fn test_server_notice_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::ServerNotice {
+                message: "Welcome to Concord".into(),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("NOTICE viewer :Welcome to Concord"));
+    }
+
+    #[test]
+    fn test_error_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::Error {
+                code: "NOT_FOUND".into(),
+                message: "Channel not found".into(),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("NOTICE viewer"));
+        assert!(lines[0].contains("[NOT_FOUND]"));
+        assert!(lines[0].contains("Channel not found"));
+    }
+
+    // ── MessageEdit / MessageDelete events ──
+
+    #[test]
+    fn test_message_edit_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::MessageEdit {
+                id: Uuid::new_v4(),
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                content: "edited content".into(),
+                edited_at: Utc::now(),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("NOTICE viewer"));
+        assert!(lines[0].contains("edited"));
+        assert!(lines[0].contains("#general"));
+    }
+
+    #[test]
+    fn test_message_delete_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::MessageDelete {
+                id: Uuid::new_v4(),
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("NOTICE viewer"));
+        assert!(lines[0].contains("deleted"));
+        assert!(lines[0].contains("#general"));
+    }
+
+    // ── Reaction events ──
+
+    #[test]
+    fn test_reaction_add_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::ReactionAdd {
+                message_id: Uuid::new_v4(),
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                user_id: "uid1".into(),
+                nickname: "alice".into(),
+                emoji: "\u{1f44d}".into(),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("alice"));
+        assert!(lines[0].contains("\u{1f44d}"));
+        assert!(lines[0].contains("#general"));
+    }
+
+    #[test]
+    fn test_reaction_remove_event_is_empty() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::ReactionRemove {
+                message_id: Uuid::new_v4(),
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                user_id: "uid1".into(),
+                nickname: "alice".into(),
+                emoji: "\u{1f44d}".into(),
+            },
+        );
+        assert!(lines.is_empty());
+    }
+
+    // ── Events that produce no IRC output ──
+
+    #[test]
+    fn test_typing_start_is_silent() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::TypingStart {
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                nickname: "alice".into(),
+            },
+        );
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn test_message_embed_is_silent() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::MessageEmbed {
+                message_id: Uuid::new_v4(),
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                embeds: vec![],
+            },
+        );
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn test_channel_list_is_silent() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::ChannelList {
+                server_id: DEFAULT_SERVER_ID.into(),
+                channels: vec![],
+            },
+        );
+        assert!(lines.is_empty());
+    }
+
+    // ── Phase 5: Pin/Thread events ──
+
+    #[test]
+    fn test_message_pin_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::MessagePin {
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                pin: PinnedMessageInfo {
+                    id: "pin-1".into(),
+                    message_id: "msg-1".into(),
+                    channel_id: "ch-1".into(),
+                    pinned_by: "alice".into(),
+                    pinned_at: "2025-01-01".into(),
+                    from: "bob".into(),
+                    content: "Important msg".into(),
+                    timestamp: "2025-01-01".into(),
+                },
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("alice"));
+        assert!(lines[0].contains("pinned"));
+        assert!(lines[0].contains("bob"));
+    }
+
+    #[test]
+    fn test_message_unpin_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::MessageUnpin {
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                message_id: "msg-1".into(),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("unpinned"));
+    }
+
+    #[test]
+    fn test_thread_create_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::ThreadCreate {
+                server_id: DEFAULT_SERVER_ID.into(),
+                parent_channel: "#general".into(),
+                thread: ThreadInfo {
+                    id: "thread-1".into(),
+                    name: "Discussion".into(),
+                    channel_type: "public_thread".into(),
+                    parent_message_id: None,
+                    archived: false,
+                    auto_archive_minutes: 1440,
+                    message_count: 0,
+                    created_at: "2025-01-01".into(),
+                },
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("Discussion"));
+        assert!(lines[0].contains("thread"));
+    }
+
+    #[test]
+    fn test_thread_update_archived() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::ThreadUpdate {
+                server_id: DEFAULT_SERVER_ID.into(),
+                thread: ThreadInfo {
+                    id: "thread-1".into(),
+                    name: "Old thread".into(),
+                    channel_type: "public_thread".into(),
+                    parent_message_id: None,
+                    archived: true,
+                    auto_archive_minutes: 1440,
+                    message_count: 5,
+                    created_at: "2025-01-01".into(),
+                },
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("archived"));
+        assert!(lines[0].contains("Old thread"));
+    }
+
+    #[test]
+    fn test_thread_update_unarchived() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::ThreadUpdate {
+                server_id: DEFAULT_SERVER_ID.into(),
+                thread: ThreadInfo {
+                    id: "thread-1".into(),
+                    name: "Revived thread".into(),
+                    channel_type: "public_thread".into(),
+                    parent_message_id: None,
+                    archived: false,
+                    auto_archive_minutes: 1440,
+                    message_count: 10,
+                    created_at: "2025-01-01".into(),
+                },
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("unarchived"));
+    }
+
+    // ── Phase 6: Moderation events ──
+
+    #[test]
+    fn test_member_kick_event_with_reason() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::MemberKick {
+                server_id: DEFAULT_SERVER_ID.into(),
+                user_id: "uid1".into(),
+                kicked_by: "admin".into(),
+                reason: Some("Rule violation".into()),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("admin"));
+        assert!(lines[0].contains("kicked"));
+        assert!(lines[0].contains("Rule violation"));
+    }
+
+    #[test]
+    fn test_member_kick_event_no_reason() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::MemberKick {
+                server_id: DEFAULT_SERVER_ID.into(),
+                user_id: "uid1".into(),
+                kicked_by: "admin".into(),
+                reason: None,
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("No reason given"));
+    }
+
+    #[test]
+    fn test_member_ban_event() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::MemberBan {
+                server_id: DEFAULT_SERVER_ID.into(),
+                user_id: "uid1".into(),
+                banned_by: "admin".into(),
+                reason: Some("Spam".into()),
+            },
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("banned"));
+        assert!(lines[0].contains("Spam"));
+    }
+
+    #[test]
+    fn test_member_unban_is_silent() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::MemberUnban {
+                server_id: DEFAULT_SERVER_ID.into(),
+                user_id: "uid1".into(),
+            },
+        );
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn test_slow_mode_update_is_silent() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::SlowModeUpdate {
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                seconds: 5,
+            },
+        );
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn test_bulk_message_delete_is_silent() {
+        let engine = test_engine();
+        let lines = event_to_irc_lines(
+            &engine,
+            "viewer",
+            &ChatEvent::BulkMessageDelete {
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                message_ids: vec!["msg-1".into(), "msg-2".into()],
+            },
+        );
+        assert!(lines.is_empty());
+    }
+
+    // ── WebSocket-only events produce no IRC output ──
+
+    #[test]
+    fn test_ws_only_events_are_silent() {
+        let engine = test_engine();
+
+        let ws_events: Vec<ChatEvent> = vec![
+            ChatEvent::History {
+                server_id: DEFAULT_SERVER_ID.into(),
+                channel: "#general".into(),
+                messages: vec![],
+                has_more: false,
+            },
+            ChatEvent::ServerList { servers: vec![] },
+            ChatEvent::RoleList {
+                server_id: DEFAULT_SERVER_ID.into(),
+                roles: vec![],
+            },
+            ChatEvent::CategoryList {
+                server_id: DEFAULT_SERVER_ID.into(),
+                categories: vec![],
+            },
+            ChatEvent::PresenceList {
+                server_id: DEFAULT_SERVER_ID.into(),
+                presences: vec![],
+            },
+            ChatEvent::BookmarkList { bookmarks: vec![] },
+            ChatEvent::InviteList {
+                server_id: DEFAULT_SERVER_ID.into(),
+                invites: vec![],
+            },
+            ChatEvent::TemplateList {
+                server_id: DEFAULT_SERVER_ID.into(),
+                templates: vec![],
+            },
+            ChatEvent::WebhookList {
+                server_id: DEFAULT_SERVER_ID.into(),
+                webhooks: vec![],
+            },
+        ];
+
+        for event in &ws_events {
+            let lines = event_to_irc_lines(&engine, "viewer", event);
+            assert!(
+                lines.is_empty(),
+                "Expected no IRC output for {:?} but got {:?}",
+                std::mem::discriminant(event),
+                lines
+            );
+        }
+    }
+
+    // ── send_line helper test ──
+
+    #[test]
+    fn test_send_line_sends_to_channel() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+        send_line(&tx, "PRIVMSG #test :Hello");
+        let received = rx.try_recv().unwrap();
+        assert_eq!(received, "PRIVMSG #test :Hello");
+    }
+
+    #[test]
+    fn test_send_line_closed_channel_does_not_panic() {
+        let (tx, rx) = mpsc::unbounded_channel::<String>();
+        drop(rx); // Close the receiver
+        // Should not panic
+        send_line(&tx, "PRIVMSG #test :Hello");
+    }
 }

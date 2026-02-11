@@ -51,13 +51,11 @@ pub async fn update_event_status(
     event_id: &str,
     status: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "UPDATE server_events SET status = ?, updated_at = datetime('now') WHERE id = ?",
-    )
-    .bind(status)
-    .bind(event_id)
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE server_events SET status = ?, updated_at = datetime('now') WHERE id = ?")
+        .bind(status)
+        .bind(event_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -117,4 +115,171 @@ pub async fn get_rsvp_count(pool: &SqlitePool, event_id: &str) -> Result<i64, sq
         .bind(event_id)
         .fetch_one(pool)
         .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::pool::{create_pool, run_migrations};
+    use crate::db::queries::servers;
+    use crate::db::queries::users::{self, CreateOAuthUser};
+
+    async fn setup_db() -> SqlitePool {
+        let pool = create_pool("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        pool
+    }
+
+    async fn setup_server(pool: &SqlitePool) {
+        users::create_with_oauth(
+            pool,
+            &CreateOAuthUser {
+                user_id: "u1",
+                username: "alice",
+                email: None,
+                avatar_url: None,
+                oauth_id: "oauth-u1",
+                provider: "github",
+                provider_id: "gh-u1",
+            },
+        )
+        .await
+        .unwrap();
+        servers::create_server(pool, "s1", "Test", "u1", None)
+            .await
+            .unwrap();
+    }
+
+    fn event_params<'a>(id: &'a str) -> CreateServerEventParams<'a> {
+        CreateServerEventParams {
+            id,
+            server_id: "s1",
+            name: "Game Night",
+            description: Some("Let's play!"),
+            channel_id: None,
+            start_time: "2027-01-15T20:00:00Z",
+            end_time: Some("2027-01-15T23:00:00Z"),
+            image_url: None,
+            created_by: "u1",
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_and_get_event() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        create_event(&pool, &event_params("e1")).await.unwrap();
+
+        let ev = get_event(&pool, "e1").await.unwrap();
+        assert!(ev.is_some());
+        let e = ev.unwrap();
+        assert_eq!(e.name, "Game Night");
+        assert_eq!(e.status, "scheduled");
+    }
+
+    #[tokio::test]
+    async fn test_list_server_events() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        create_event(&pool, &event_params("e1")).await.unwrap();
+        create_event(
+            &pool,
+            &CreateServerEventParams {
+                id: "e2",
+                server_id: "s1",
+                name: "Movie Night",
+                description: None,
+                channel_id: None,
+                start_time: "2027-02-01T20:00:00Z",
+                end_time: None,
+                image_url: None,
+                created_by: "u1",
+            },
+        )
+        .await
+        .unwrap();
+
+        let events = list_server_events(&pool, "s1").await.unwrap();
+        assert_eq!(events.len(), 2);
+        // Ordered by start_time ASC
+        assert_eq!(events[0].name, "Game Night");
+        assert_eq!(events[1].name, "Movie Night");
+    }
+
+    #[tokio::test]
+    async fn test_update_event_status() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+        create_event(&pool, &event_params("e1")).await.unwrap();
+
+        update_event_status(&pool, "e1", "active").await.unwrap();
+
+        let ev = get_event(&pool, "e1").await.unwrap().unwrap();
+        assert_eq!(ev.status, "active");
+    }
+
+    #[tokio::test]
+    async fn test_delete_event() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+        create_event(&pool, &event_params("e1")).await.unwrap();
+
+        delete_event(&pool, "e1").await.unwrap();
+
+        let ev = get_event(&pool, "e1").await.unwrap();
+        assert!(ev.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_rsvp_operations() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+        create_event(&pool, &event_params("e1")).await.unwrap();
+
+        // Create second user
+        users::create_with_oauth(
+            &pool,
+            &CreateOAuthUser {
+                user_id: "u2",
+                username: "bob",
+                email: None,
+                avatar_url: None,
+                oauth_id: "oauth-u2",
+                provider: "github",
+                provider_id: "gh-u2",
+            },
+        )
+        .await
+        .unwrap();
+
+        set_rsvp(&pool, "e1", "u1", "going").await.unwrap();
+        set_rsvp(&pool, "e1", "u2", "interested").await.unwrap();
+
+        let rsvps = get_rsvps(&pool, "e1").await.unwrap();
+        assert_eq!(rsvps.len(), 2);
+
+        let count = get_rsvp_count(&pool, "e1").await.unwrap();
+        assert_eq!(count, 2);
+
+        // Update RSVP (upsert)
+        set_rsvp(&pool, "e1", "u2", "going").await.unwrap();
+        let rsvps = get_rsvps(&pool, "e1").await.unwrap();
+        assert_eq!(rsvps.len(), 2);
+        let u2_rsvp = rsvps.iter().find(|r| r.user_id == "u2").unwrap();
+        assert_eq!(u2_rsvp.status, "going");
+
+        // Remove RSVP
+        remove_rsvp(&pool, "e1", "u1").await.unwrap();
+        let count = get_rsvp_count(&pool, "e1").await.unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_nonexistent_event() {
+        let pool = setup_db().await;
+        let ev = get_event(&pool, "nosuch").await.unwrap();
+        assert!(ev.is_none());
+    }
 }

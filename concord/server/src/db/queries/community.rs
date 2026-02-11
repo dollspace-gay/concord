@@ -54,13 +54,11 @@ pub async fn accept_rules(
     server_id: &str,
     user_id: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "UPDATE server_members SET rules_accepted = 1 WHERE server_id = ? AND user_id = ?",
-    )
-    .bind(server_id)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE server_members SET rules_accepted = 1 WHERE server_id = ? AND user_id = ?")
+        .bind(server_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -130,10 +128,7 @@ pub async fn list_channel_follows(
 }
 
 /// Delete a channel follow.
-pub async fn delete_channel_follow(
-    pool: &SqlitePool,
-    follow_id: &str,
-) -> Result<(), sqlx::Error> {
+pub async fn delete_channel_follow(pool: &SqlitePool, follow_id: &str) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM channel_follows WHERE id = ?")
         .bind(follow_id)
         .execute(pool)
@@ -209,4 +204,237 @@ pub async fn increment_template_use(
         .execute(pool)
         .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::pool::{create_pool, run_migrations};
+    use crate::db::queries::channels;
+    use crate::db::queries::servers;
+    use crate::db::queries::users::{self, CreateOAuthUser};
+
+    async fn setup_db() -> SqlitePool {
+        let pool = create_pool("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        pool
+    }
+
+    async fn setup_server(pool: &SqlitePool) {
+        users::create_with_oauth(
+            pool,
+            &CreateOAuthUser {
+                user_id: "u1",
+                username: "alice",
+                email: None,
+                avatar_url: None,
+                oauth_id: "oauth-u1",
+                provider: "github",
+                provider_id: "gh-u1",
+            },
+        )
+        .await
+        .unwrap();
+        servers::create_server(pool, "s1", "Test", "u1", None)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_update_and_list_discoverable() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        // Initially not discoverable
+        let discoverable = list_discoverable_servers(&pool, None).await.unwrap();
+        assert!(discoverable.is_empty());
+
+        // Make server discoverable
+        update_server_community(
+            &pool,
+            "s1",
+            Some("A great server"),
+            true,
+            None,
+            None,
+            Some("gaming"),
+        )
+        .await
+        .unwrap();
+
+        let discoverable = list_discoverable_servers(&pool, None).await.unwrap();
+        assert_eq!(discoverable.len(), 1);
+        assert_eq!(
+            discoverable[0].description,
+            Some("A great server".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_discoverable_with_category_filter() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+        // Create second server
+        servers::create_server(&pool, "s2", "Server 2", "u1", None)
+            .await
+            .unwrap();
+
+        update_server_community(&pool, "s1", None, true, None, None, Some("gaming"))
+            .await
+            .unwrap();
+        update_server_community(&pool, "s2", None, true, None, None, Some("music"))
+            .await
+            .unwrap();
+
+        let gaming = list_discoverable_servers(&pool, Some("gaming"))
+            .await
+            .unwrap();
+        assert_eq!(gaming.len(), 1);
+        assert_eq!(gaming[0].id, "s1");
+
+        let music = list_discoverable_servers(&pool, Some("music"))
+            .await
+            .unwrap();
+        assert_eq!(music.len(), 1);
+        assert_eq!(music[0].id, "s2");
+    }
+
+    #[tokio::test]
+    async fn test_accept_rules() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        update_server_community(&pool, "s1", None, false, None, Some("Be nice"), None)
+            .await
+            .unwrap();
+
+        assert!(!has_accepted_rules(&pool, "s1", "u1").await.unwrap());
+
+        accept_rules(&pool, "s1", "u1").await.unwrap();
+
+        assert!(has_accepted_rules(&pool, "s1", "u1").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_announcement_channel_and_follows() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+        channels::ensure_channel(&pool, "c1", "s1", "#announcements")
+            .await
+            .unwrap();
+        channels::ensure_channel(&pool, "c2", "s1", "#mirror")
+            .await
+            .unwrap();
+
+        set_announcement_channel(&pool, "c1", true).await.unwrap();
+
+        let chan = channels::get_channel(&pool, "c1").await.unwrap().unwrap();
+        assert_eq!(chan.is_announcement, 1);
+
+        // Create a follow
+        create_channel_follow(&pool, "cf1", "c1", "c2", "u1")
+            .await
+            .unwrap();
+
+        let follows = list_channel_follows(&pool, "c1").await.unwrap();
+        assert_eq!(follows.len(), 1);
+        assert_eq!(follows[0].target_channel_id, "c2");
+
+        // Delete follow
+        delete_channel_follow(&pool, "cf1").await.unwrap();
+        let follows = list_channel_follows(&pool, "c1").await.unwrap();
+        assert!(follows.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_template_crud() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        create_template(
+            &pool,
+            "tmpl1",
+            "Basic Server",
+            Some("A starter template"),
+            "s1",
+            "u1",
+            "{\"channels\":[]}",
+        )
+        .await
+        .unwrap();
+
+        let tmpl = get_template(&pool, "tmpl1").await.unwrap();
+        assert!(tmpl.is_some());
+        let t = tmpl.unwrap();
+        assert_eq!(t.name, "Basic Server");
+        assert_eq!(t.use_count, 0);
+
+        // Increment use count
+        increment_template_use(&pool, "tmpl1").await.unwrap();
+        increment_template_use(&pool, "tmpl1").await.unwrap();
+
+        let t = get_template(&pool, "tmpl1").await.unwrap().unwrap();
+        assert_eq!(t.use_count, 2);
+    }
+
+    #[tokio::test]
+    async fn test_list_templates() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        create_template(&pool, "tmpl1", "Template 1", None, "s1", "u1", "{}")
+            .await
+            .unwrap();
+        create_template(&pool, "tmpl2", "Template 2", None, "s1", "u1", "{}")
+            .await
+            .unwrap();
+
+        let templates = list_templates(&pool, "s1").await.unwrap();
+        assert_eq!(templates.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_delete_template() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+        create_template(&pool, "tmpl1", "Template", None, "s1", "u1", "{}")
+            .await
+            .unwrap();
+
+        delete_template(&pool, "tmpl1").await.unwrap();
+
+        let tmpl = get_template(&pool, "tmpl1").await.unwrap();
+        assert!(tmpl.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_community_settings_full() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        update_server_community(
+            &pool,
+            "s1",
+            Some("Best community"),
+            true,
+            Some("Welcome to our server!"),
+            Some("1. Be respectful\n2. No spam"),
+            Some("community"),
+        )
+        .await
+        .unwrap();
+
+        let server = servers::get_server(&pool, "s1").await.unwrap().unwrap();
+        assert_eq!(server.description, Some("Best community".to_string()));
+        assert_eq!(server.is_discoverable, 1);
+        assert_eq!(
+            server.welcome_message,
+            Some("Welcome to our server!".to_string())
+        );
+        assert_eq!(
+            server.rules_text,
+            Some("1. Be respectful\n2. No spam".to_string())
+        );
+        assert_eq!(server.category, Some("community".to_string()));
+    }
 }

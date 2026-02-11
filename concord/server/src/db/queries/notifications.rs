@@ -47,3 +47,179 @@ pub async fn get_notification_settings(
     .fetch_all(pool)
     .await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::pool::{create_pool, run_migrations};
+    use crate::db::queries::servers;
+    use crate::db::queries::users::{self, CreateOAuthUser};
+
+    async fn setup_db() -> SqlitePool {
+        let pool = create_pool("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        pool
+    }
+
+    async fn setup_server(pool: &SqlitePool) {
+        users::create_with_oauth(
+            pool,
+            &CreateOAuthUser {
+                user_id: "u1",
+                username: "alice",
+                email: None,
+                avatar_url: None,
+                oauth_id: "oauth-u1",
+                provider: "github",
+                provider_id: "gh-u1",
+            },
+        )
+        .await
+        .unwrap();
+        servers::create_server(pool, "s1", "Test", "u1", None)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_upsert_and_get_server_level_settings() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        upsert_notification_setting(
+            &pool,
+            &UpsertNotificationParams {
+                id: "ns1",
+                user_id: "u1",
+                server_id: Some("s1"),
+                channel_id: None,
+                level: "mentions",
+                suppress_everyone: true,
+                suppress_roles: false,
+                muted: false,
+                mute_until: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        let settings = get_notification_settings(&pool, "u1", "s1").await.unwrap();
+        assert_eq!(settings.len(), 1);
+        assert_eq!(settings[0].level, "mentions");
+        assert_eq!(settings[0].suppress_everyone, 1);
+        assert_eq!(settings[0].suppress_roles, 0);
+        assert!(settings[0].channel_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_upsert_updates_existing() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        // Use a channel_id so the UNIQUE index can detect duplicates
+        // (SQLite treats NULL as distinct in UNIQUE constraints)
+        crate::db::queries::channels::ensure_channel(&pool, "c1", "s1", "#general")
+            .await
+            .unwrap();
+
+        upsert_notification_setting(
+            &pool,
+            &UpsertNotificationParams {
+                id: "ns1",
+                user_id: "u1",
+                server_id: Some("s1"),
+                channel_id: Some("c1"),
+                level: "all",
+                suppress_everyone: false,
+                suppress_roles: false,
+                muted: false,
+                mute_until: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        upsert_notification_setting(
+            &pool,
+            &UpsertNotificationParams {
+                id: "ns2",
+                user_id: "u1",
+                server_id: Some("s1"),
+                channel_id: Some("c1"),
+                level: "none",
+                suppress_everyone: true,
+                suppress_roles: true,
+                muted: true,
+                mute_until: Some("2027-01-01T00:00:00Z"),
+            },
+        )
+        .await
+        .unwrap();
+
+        let settings = get_notification_settings(&pool, "u1", "s1").await.unwrap();
+        assert_eq!(settings.len(), 1);
+        assert_eq!(settings[0].level, "none");
+        assert_eq!(settings[0].muted, 1);
+    }
+
+    #[tokio::test]
+    async fn test_channel_level_settings() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        crate::db::queries::channels::ensure_channel(&pool, "c1", "s1", "#general")
+            .await
+            .unwrap();
+
+        // Server-level setting
+        upsert_notification_setting(
+            &pool,
+            &UpsertNotificationParams {
+                id: "ns1",
+                user_id: "u1",
+                server_id: Some("s1"),
+                channel_id: None,
+                level: "all",
+                suppress_everyone: false,
+                suppress_roles: false,
+                muted: false,
+                mute_until: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        // Channel-level setting
+        upsert_notification_setting(
+            &pool,
+            &UpsertNotificationParams {
+                id: "ns2",
+                user_id: "u1",
+                server_id: Some("s1"),
+                channel_id: Some("c1"),
+                level: "mentions",
+                suppress_everyone: false,
+                suppress_roles: false,
+                muted: true,
+                mute_until: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        let settings = get_notification_settings(&pool, "u1", "s1").await.unwrap();
+        assert_eq!(settings.len(), 2);
+        // Server-level (channel_id NULL) should come first
+        assert!(settings[0].channel_id.is_none());
+        assert!(settings[1].channel_id.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_empty_settings() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        let settings = get_notification_settings(&pool, "u1", "s1").await.unwrap();
+        assert!(settings.is_empty());
+    }
+}

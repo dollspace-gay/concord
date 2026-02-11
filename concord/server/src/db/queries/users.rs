@@ -228,16 +228,18 @@ pub async fn get_atproto_credentials(
     .bind(user_id)
     .fetch_optional(pool)
     .await?;
-    Ok(row.map(|(did, access_token, refresh_token, dpop_private_key, pds_url, token_expires_at)| {
-        AtprotoCredentials {
-            did,
-            access_token,
-            refresh_token,
-            dpop_private_key,
-            pds_url,
-            token_expires_at,
-        }
-    }))
+    Ok(row.map(
+        |(did, access_token, refresh_token, dpop_private_key, pds_url, token_expires_at)| {
+            AtprotoCredentials {
+                did,
+                access_token,
+                refresh_token,
+                dpop_private_key,
+                pds_url,
+                token_expires_at,
+            }
+        },
+    ))
 }
 
 /// Update last_used timestamp for an IRC token.
@@ -254,4 +256,217 @@ pub async fn touch_irc_token(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::pool::{create_pool, run_migrations};
+
+    async fn setup_db() -> SqlitePool {
+        let pool = create_pool("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        pool
+    }
+
+    async fn create_test_user(pool: &SqlitePool, id: &str, username: &str) {
+        create_with_oauth(
+            pool,
+            &CreateOAuthUser {
+                user_id: id,
+                username,
+                email: Some("test@example.com"),
+                avatar_url: None,
+                oauth_id: &format!("oauth-{id}"),
+                provider: "github",
+                provider_id: &format!("gh-{id}"),
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_create_and_get_user() {
+        let pool = setup_db().await;
+        create_test_user(&pool, "u1", "alice").await;
+
+        let user = get_user(&pool, "u1").await.unwrap();
+        assert!(user.is_some());
+        let (id, username, email, _avatar) = user.unwrap();
+        assert_eq!(id, "u1");
+        assert_eq!(username, "alice");
+        assert_eq!(email, Some("test@example.com".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_find_by_oauth() {
+        let pool = setup_db().await;
+        create_test_user(&pool, "u1", "alice").await;
+
+        let found = find_by_oauth(&pool, "github", "gh-u1").await.unwrap();
+        assert!(found.is_some());
+        let (uid, uname) = found.unwrap();
+        assert_eq!(uid, "u1");
+        assert_eq!(uname, "alice");
+
+        // Non-existent provider/id returns None
+        let not_found = find_by_oauth(&pool, "google", "gh-u1").await.unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_user_by_nickname() {
+        let pool = setup_db().await;
+        create_test_user(&pool, "u1", "alice").await;
+
+        // Should find by username
+        let found = get_user_by_nickname(&pool, "alice").await.unwrap();
+        assert!(found.is_some());
+        let (uid, uname, _email, _avatar, provider, _pid) = found.unwrap();
+        assert_eq!(uid, "u1");
+        assert_eq!(uname, "alice");
+        assert_eq!(provider, Some("github".to_string()));
+
+        // Non-existent nickname returns None
+        let not_found = get_user_by_nickname(&pool, "nonexistent").await.unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_nonexistent_user() {
+        let pool = setup_db().await;
+        let user = get_user(&pool, "no-such-id").await.unwrap();
+        assert!(user.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_irc_token_crud() {
+        let pool = setup_db().await;
+        create_test_user(&pool, "u1", "alice").await;
+
+        // Create token
+        create_irc_token(&pool, "t1", "u1", "hash123", Some("My IRC"))
+            .await
+            .unwrap();
+
+        // List tokens
+        let tokens = list_irc_tokens(&pool, "u1").await.unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].0, "t1");
+        assert_eq!(tokens[0].1, Some("My IRC".to_string()));
+
+        // Get all token hashes
+        let all = get_all_irc_token_hashes(&pool).await.unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].0, "u1");
+        assert_eq!(all[0].1, "alice");
+        assert_eq!(all[0].2, "hash123");
+
+        // Touch token
+        touch_irc_token(&pool, "u1", "hash123").await.unwrap();
+        let tokens_after = list_irc_tokens(&pool, "u1").await.unwrap();
+        assert!(tokens_after[0].2.is_some()); // last_used should be set
+
+        // Delete token
+        let deleted = delete_irc_token(&pool, "t1", "u1").await.unwrap();
+        assert!(deleted);
+
+        let tokens_after_delete = list_irc_tokens(&pool, "u1").await.unwrap();
+        assert!(tokens_after_delete.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_delete_irc_token_wrong_user() {
+        let pool = setup_db().await;
+        create_test_user(&pool, "u1", "alice").await;
+        create_test_user(&pool, "u2", "bob").await;
+
+        create_irc_token(&pool, "t1", "u1", "hash123", None)
+            .await
+            .unwrap();
+
+        // Try to delete u1's token as u2 -- should fail
+        let deleted = delete_irc_token(&pool, "t1", "u2").await.unwrap();
+        assert!(!deleted);
+
+        // Token should still exist
+        let tokens = list_irc_tokens(&pool, "u1").await.unwrap();
+        assert_eq!(tokens.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_irc_tokens() {
+        let pool = setup_db().await;
+        create_test_user(&pool, "u1", "alice").await;
+
+        create_irc_token(&pool, "t1", "u1", "hash1", Some("Token 1"))
+            .await
+            .unwrap();
+        create_irc_token(&pool, "t2", "u1", "hash2", Some("Token 2"))
+            .await
+            .unwrap();
+
+        let tokens = list_irc_tokens(&pool, "u1").await.unwrap();
+        assert_eq!(tokens.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_atproto_credentials() {
+        let pool = setup_db().await;
+        // Create user with atproto provider
+        create_with_oauth(
+            &pool,
+            &CreateOAuthUser {
+                user_id: "u1",
+                username: "alice",
+                email: None,
+                avatar_url: None,
+                oauth_id: "oauth-at1",
+                provider: "atproto",
+                provider_id: "did:plc:123",
+            },
+        )
+        .await
+        .unwrap();
+
+        // Initially no credentials
+        let creds = get_atproto_credentials(&pool, "u1").await.unwrap();
+        assert!(creds.is_none());
+
+        // Store credentials
+        store_atproto_credentials(
+            &pool,
+            "u1",
+            "access-tok",
+            "refresh-tok",
+            "dpop-key",
+            "https://pds.example.com",
+            "2026-12-31T00:00:00Z",
+        )
+        .await
+        .unwrap();
+
+        // Retrieve credentials
+        let creds = get_atproto_credentials(&pool, "u1").await.unwrap();
+        assert!(creds.is_some());
+        let c = creds.unwrap();
+        assert_eq!(c.did, "did:plc:123");
+        assert_eq!(c.access_token, "access-tok");
+        assert_eq!(c.pds_url, "https://pds.example.com");
+    }
+
+    #[tokio::test]
+    async fn test_irc_token_no_label() {
+        let pool = setup_db().await;
+        create_test_user(&pool, "u1", "alice").await;
+
+        create_irc_token(&pool, "t1", "u1", "hash123", None)
+            .await
+            .unwrap();
+
+        let tokens = list_irc_tokens(&pool, "u1").await.unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(tokens[0].1.is_none()); // label should be None
+    }
 }

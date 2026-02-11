@@ -120,8 +120,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Custom emoji
         .route(
             "/api/servers/{id}/emoji",
-            axum::routing::get(rest_api::list_server_emoji)
-                .post(rest_api::create_server_emoji),
+            axum::routing::get(rest_api::list_server_emoji).post(rest_api::create_server_emoji),
         )
         .route(
             "/api/servers/{id}/emoji/{emoji_id}",
@@ -137,10 +136,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             axum::routing::patch(rest_api::update_profile),
         )
         // Search
-        .route(
-            "/api/search",
-            axum::routing::get(rest_api::search_messages),
-        )
+        .route("/api/search", axum::routing::get(rest_api::search_messages))
         // Invite preview (public)
         .route(
             "/api/invite/{code}",
@@ -150,6 +146,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/api/discover",
             axum::routing::get(rest_api::discover_servers),
+        )
+        // Webhook incoming execution (public, token in URL)
+        .route(
+            "/api/webhooks/{id}/{token}",
+            axum::routing::post(rest_api::execute_webhook),
         )
         // Static files with SPA fallback — unmatched routes serve index.html
         .fallback_service(ServeDir::new("static").fallback(ServeFile::new("static/index.html")))

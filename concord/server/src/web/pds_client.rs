@@ -2,7 +2,7 @@ use anyhow::{Context, Result, anyhow};
 use atproto_identity::key::KeyData;
 use atproto_oauth::dpop::request_dpop;
 use atproto_oauth::jwk;
-use atproto_oauth::jwt::{self, Claims, JoseClaims, Header};
+use atproto_oauth::jwt::{self, Claims, Header, JoseClaims};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use tracing::{info, warn};
@@ -60,24 +60,44 @@ pub async fn upload_blob_to_pds(
 
     let wrapped_jwk: jwk::WrappedJsonWebKey = serde_json::from_str(&creds.dpop_private_key)
         .context("Failed to deserialize stored DPoP key from JWK")?;
-    let dpop_key = jwk::to_key_data(&wrapped_jwk)
-        .map_err(|e| anyhow!("Invalid stored DPoP JWK: {e:?}"))?;
+    let dpop_key =
+        jwk::to_key_data(&wrapped_jwk).map_err(|e| anyhow!("Invalid stored DPoP JWK: {e:?}"))?;
 
     let pds_url = &creds.pds_url;
     let upload_url = format!("{}/xrpc/com.atproto.repo.uploadBlob", pds_url);
 
     // Try upload, refreshing token once if expired
-    let (blob_resp, token_used) = match do_upload(&dpop_key, &creds.access_token, &upload_url, &file_bytes, content_type).await {
+    let (blob_resp, token_used) = match do_upload(
+        &dpop_key,
+        &creds.access_token,
+        &upload_url,
+        &file_bytes,
+        content_type,
+    )
+    .await
+    {
         Ok(resp) => (resp, creds.access_token.clone()),
         Err(e) => {
             warn!(error = %e, "PDS upload failed, attempting token refresh");
             let new_token = refresh_access_token(
-                pool, user_id, &creds, &dpop_key, signing_key, client_id, redirect_uri,
+                pool,
+                user_id,
+                &creds,
+                &dpop_key,
+                signing_key,
+                client_id,
+                redirect_uri,
             )
             .await?;
-            let resp = do_upload(&dpop_key, &new_token, &upload_url, &file_bytes, content_type)
-                .await
-                .context("PDS upload failed after token refresh")?;
+            let resp = do_upload(
+                &dpop_key,
+                &new_token,
+                &upload_url,
+                &file_bytes,
+                content_type,
+            )
+            .await
+            .context("PDS upload failed after token refresh")?;
             (resp, new_token)
         }
     };
@@ -88,8 +108,16 @@ pub async fn upload_blob_to_pds(
     // Without this, the PDS will not serve the blob via com.atproto.sync.getBlob.
     let file_size = file_bytes.len();
     if let Err(e) = pin_blob_with_record(
-        &dpop_key, &token_used, pds_url, &creds.did, &blob_ref.cid, content_type, file_size,
-    ).await {
+        &dpop_key,
+        &token_used,
+        pds_url,
+        &creds.did,
+        &blob_ref.cid,
+        content_type,
+        file_size,
+    )
+    .await
+    {
         warn!(error = %e, "Failed to pin blob with createRecord (blob may not be servable)");
     }
 
@@ -104,9 +132,8 @@ async fn do_upload(
     file_bytes: &[u8],
     content_type: &str,
 ) -> Result<UploadBlobResponse> {
-    let (dpop_token, _header, _claims) =
-        request_dpop(dpop_key, "POST", upload_url, access_token)
-            .context("Failed to create DPoP proof")?;
+    let (dpop_token, _header, _claims) = request_dpop(dpop_key, "POST", upload_url, access_token)
+        .context("Failed to create DPoP proof")?;
 
     let http_client = reqwest::Client::new();
 
@@ -122,9 +149,20 @@ async fn do_upload(
 
     // Handle DPoP nonce challenge: if server returns 401 with DPoP-Nonce header, retry
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED
-        && let Some(nonce) = resp.headers().get("DPoP-Nonce").and_then(|v| v.to_str().ok())
+        && let Some(nonce) = resp
+            .headers()
+            .get("DPoP-Nonce")
+            .and_then(|v| v.to_str().ok())
     {
-        return do_upload_with_nonce(dpop_key, access_token, upload_url, file_bytes, content_type, nonce).await;
+        return do_upload_with_nonce(
+            dpop_key,
+            access_token,
+            upload_url,
+            file_bytes,
+            content_type,
+            nonce,
+        )
+        .await;
     }
 
     if !resp.status().is_success() {
@@ -156,9 +194,8 @@ async fn do_upload_with_nonce(
     claims
         .private
         .insert("nonce".to_string(), nonce.to_string().into());
-    let dpop_token_with_nonce =
-        jwt::mint(dpop_key, &header, &claims)
-            .map_err(|e| anyhow!("Failed to mint DPoP with nonce: {e}"))?;
+    let dpop_token_with_nonce = jwt::mint(dpop_key, &header, &claims)
+        .map_err(|e| anyhow!("Failed to mint DPoP with nonce: {e}"))?;
 
     let http_client = reqwest::Client::new();
 
@@ -175,7 +212,11 @@ async fn do_upload_with_nonce(
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        return Err(anyhow!("PDS upload returned {} (nonce retry): {}", status, body));
+        return Err(anyhow!(
+            "PDS upload returned {} (nonce retry): {}",
+            status,
+            body
+        ));
     }
 
     resp.json::<UploadBlobResponse>()
@@ -269,12 +310,11 @@ async fn pin_blob_with_record(
         },
     };
 
-    let body_json = serde_json::to_string(&body)
-        .context("Failed to serialize createRecord body")?;
+    let body_json =
+        serde_json::to_string(&body).context("Failed to serialize createRecord body")?;
 
-    let (dpop_token, _header, _claims) =
-        request_dpop(dpop_key, "POST", &create_url, access_token)
-            .context("Failed to create DPoP proof for createRecord")?;
+    let (dpop_token, _header, _claims) = request_dpop(dpop_key, "POST", &create_url, access_token)
+        .context("Failed to create DPoP proof for createRecord")?;
 
     let http_client = reqwest::Client::new();
 
@@ -290,7 +330,10 @@ async fn pin_blob_with_record(
 
     // Handle DPoP nonce challenge
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED
-        && let Some(nonce) = resp.headers().get("DPoP-Nonce").and_then(|v| v.to_str().ok())
+        && let Some(nonce) = resp
+            .headers()
+            .get("DPoP-Nonce")
+            .and_then(|v| v.to_str().ok())
     {
         let (_dpop_token2, header2, mut claims2) =
             request_dpop(dpop_key, "POST", &create_url, access_token)
@@ -314,7 +357,11 @@ async fn pin_blob_with_record(
         if !resp2.status().is_success() {
             let status = resp2.status();
             let body = resp2.text().await.unwrap_or_default();
-            return Err(anyhow!("createRecord returned {} (nonce retry): {}", status, body));
+            return Err(anyhow!(
+                "createRecord returned {} (nonce retry): {}",
+                status,
+                body
+            ));
         }
         return Ok(());
     }
@@ -329,11 +376,7 @@ async fn pin_blob_with_record(
 }
 
 /// Build a private_key_jwt client assertion for the given token endpoint.
-fn build_client_assertion(
-    signing_key: &KeyData,
-    client_id: &str,
-    issuer: &str,
-) -> Result<String> {
+fn build_client_assertion(signing_key: &KeyData, client_id: &str, issuer: &str) -> Result<String> {
     let header: Header = signing_key
         .clone()
         .try_into()
@@ -409,7 +452,10 @@ async fn refresh_access_token(
     // Handle DPoP nonce challenge on token endpoint
     if (resp.status() == reqwest::StatusCode::BAD_REQUEST
         || resp.status() == reqwest::StatusCode::UNAUTHORIZED)
-        && let Some(nonce) = resp.headers().get("DPoP-Nonce").and_then(|v| v.to_str().ok())
+        && let Some(nonce) = resp
+            .headers()
+            .get("DPoP-Nonce")
+            .and_then(|v| v.to_str().ok())
     {
         let nonce_params = RefreshNonceParams {
             http_client: &http_client,
@@ -451,9 +497,8 @@ async fn refresh_with_nonce(
     claims
         .private
         .insert("nonce".to_string(), p.nonce.to_string().into());
-    let dpop_token_with_nonce =
-        jwt::mint(p.dpop_key, &header, &claims)
-            .map_err(|e| anyhow!("Failed to mint DPoP with nonce: {e}"))?;
+    let dpop_token_with_nonce = jwt::mint(p.dpop_key, &header, &claims)
+        .map_err(|e| anyhow!("Failed to mint DPoP with nonce: {e}"))?;
 
     let resp = p
         .http_client

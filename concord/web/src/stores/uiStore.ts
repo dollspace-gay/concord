@@ -26,6 +26,7 @@ interface UiState {
   showBookmarks: boolean;
   showModerationPanel: boolean;
   showCommunityPanel: boolean;
+  showIntegrationsPanel: boolean;
 
   setActiveServer: (serverId: string | null) => void;
   setActiveChannel: (channel: string | null) => void;
@@ -46,6 +47,7 @@ interface UiState {
   setShowBookmarks: (show: boolean) => void;
   setShowModerationPanel: (show: boolean) => void;
   setShowCommunityPanel: (show: boolean) => void;
+  setShowIntegrationsPanel: (show: boolean) => void;
 }
 
 function loadFolders(): ServerFolder[] {
@@ -77,6 +79,7 @@ export const useUiStore = create<UiState>((set) => ({
   showBookmarks: false,
   showModerationPanel: false,
   showCommunityPanel: false,
+  showIntegrationsPanel: false,
 
   setActiveServer: (serverId) => set({ activeServer: serverId, activeChannel: null }),
   setActiveChannel: (channel) => set({ activeChannel: channel }),
@@ -135,4 +138,5 @@ export const useUiStore = create<UiState>((set) => ({
   setShowBookmarks: (show) => set({ showBookmarks: show }),
   setShowModerationPanel: (show) => set({ showModerationPanel: show }),
   setShowCommunityPanel: (show) => set({ showCommunityPanel: show }),
+  setShowIntegrationsPanel: (show) => set({ showIntegrationsPanel: show }),
 }));

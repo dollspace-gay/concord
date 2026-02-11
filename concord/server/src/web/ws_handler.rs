@@ -425,6 +425,83 @@ enum ClientMessage {
         server_id: String,
         template_id: String,
     },
+    // ── Phase 8: Integrations & Bots ──
+    CreateWebhook {
+        server_id: String,
+        channel_id: String,
+        name: String,
+        webhook_type: String,
+        url: Option<String>,
+    },
+    ListWebhooks {
+        server_id: String,
+    },
+    UpdateWebhook {
+        webhook_id: String,
+        name: String,
+        avatar_url: Option<String>,
+        channel_id: String,
+    },
+    DeleteWebhook {
+        webhook_id: String,
+    },
+    CreateBot {
+        username: String,
+        avatar_url: Option<String>,
+    },
+    CreateBotToken {
+        bot_user_id: String,
+        name: String,
+        scopes: Option<String>,
+    },
+    ListBotTokens {
+        bot_user_id: String,
+    },
+    DeleteBotToken {
+        token_id: String,
+    },
+    AddBotToServer {
+        server_id: String,
+        bot_user_id: String,
+    },
+    RemoveBotFromServer {
+        server_id: String,
+        bot_user_id: String,
+    },
+    RegisterSlashCommand {
+        server_id: String,
+        name: String,
+        description: String,
+        options_json: Option<String>,
+    },
+    ListSlashCommands {
+        server_id: String,
+    },
+    DeleteSlashCommand {
+        command_id: String,
+    },
+    InvokeSlashCommand {
+        server_id: String,
+        channel: String,
+        command_name: String,
+        args_json: Option<String>,
+    },
+    RespondToInteraction {
+        interaction_id: String,
+        content: Option<String>,
+        embeds_json: Option<String>,
+        components_json: Option<String>,
+        ephemeral: Option<bool>,
+    },
+    CreateOAuth2App {
+        name: String,
+        description: Option<String>,
+        redirect_uris: Vec<String>,
+    },
+    ListOAuth2Apps,
+    DeleteOAuth2App {
+        app_id: String,
+    },
 }
 
 fn default_server_id() -> String {
@@ -824,10 +901,7 @@ async fn handle_client_message(
             match engine.get_unread_counts(session_id, &server_id).await {
                 Ok(counts) => {
                     if let Some(session) = engine.get_session(session_id) {
-                        let _ = session.send(ChatEvent::UnreadCounts {
-                            server_id,
-                            counts,
-                        });
+                        let _ = session.send(ChatEvent::UnreadCounts { server_id, counts });
                     }
                     Ok(())
                 }
@@ -835,17 +909,15 @@ async fn handle_client_message(
             }
         }
         // ── Roles ──
-        ClientMessage::ListRoles { server_id } => {
-            match engine.list_roles(&server_id).await {
-                Ok(roles) => {
-                    if let Some(session) = engine.get_session(session_id) {
-                        let _ = session.send(ChatEvent::RoleList { server_id, roles });
-                    }
-                    Ok(())
+        ClientMessage::ListRoles { server_id } => match engine.list_roles(&server_id).await {
+            Ok(roles) => {
+                if let Some(session) = engine.get_session(session_id) {
+                    let _ = session.send(ChatEvent::RoleList { server_id, roles });
                 }
-                Err(e) => Err(e),
+                Ok(())
             }
-        }
+            Err(e) => Err(e),
+        },
         ClientMessage::CreateRole {
             server_id,
             name,
@@ -868,10 +940,7 @@ async fn handle_client_message(
                 {
                     Ok(role) => {
                         if let Some(session) = engine.get_session(session_id) {
-                            let _ = session.send(ChatEvent::RoleUpdate {
-                                server_id,
-                                role,
-                            });
+                            let _ = session.send(ChatEvent::RoleUpdate { server_id, role });
                         }
                         Ok(())
                     }
@@ -902,10 +971,7 @@ async fn handle_client_message(
                 {
                     Ok(role) => {
                         if let Some(session) = engine.get_session(session_id) {
-                            let _ = session.send(ChatEvent::RoleUpdate {
-                                server_id,
-                                role,
-                            });
+                            let _ = session.send(ChatEvent::RoleUpdate { server_id, role });
                         }
                         Ok(())
                     }
@@ -914,10 +980,7 @@ async fn handle_client_message(
                 Err(e) => Err(e),
             }
         }
-        ClientMessage::DeleteRole {
-            server_id,
-            role_id,
-        } => {
+        ClientMessage::DeleteRole { server_id, role_id } => {
             match engine
                 .require_permission(
                     session_id,
@@ -930,10 +993,7 @@ async fn handle_client_message(
                 Ok(_) => match engine.delete_role(&role_id).await {
                     Ok(()) => {
                         if let Some(session) = engine.get_session(session_id) {
-                            let _ = session.send(ChatEvent::RoleDelete {
-                                server_id,
-                                role_id,
-                            });
+                            let _ = session.send(ChatEvent::RoleDelete { server_id, role_id });
                         }
                         Ok(())
                     }
@@ -1135,7 +1195,12 @@ async fn handle_client_message(
             status_emoji,
         } => {
             engine
-                .set_presence(session_id, &status, custom_status.as_deref(), status_emoji.as_deref())
+                .set_presence(
+                    session_id,
+                    &status,
+                    custom_status.as_deref(),
+                    status_emoji.as_deref(),
+                )
                 .await
         }
         ClientMessage::GetPresences { server_id } => {
@@ -1153,7 +1218,10 @@ async fn handle_client_message(
             }
         }
         // ── Phase 4: Server Nicknames ──
-        ClientMessage::SetServerNickname { server_id, nickname } => {
+        ClientMessage::SetServerNickname {
+            server_id,
+            nickname,
+        } => {
             engine
                 .set_server_nickname(session_id, &server_id, nickname.as_deref())
                 .await
@@ -1211,7 +1279,10 @@ async fn handle_client_message(
                 .await
         }
         ClientMessage::GetNotificationSettings { server_id } => {
-            match engine.get_notification_settings(session_id, &server_id).await {
+            match engine
+                .get_notification_settings(session_id, &server_id)
+                .await
+            {
                 Ok(settings) => {
                     if let Some(session) = engine.get_session(session_id) {
                         let _ = session.send(ChatEvent::NotificationSettings {
@@ -1255,10 +1326,7 @@ async fn handle_client_message(
                 .unpin_message(session_id, &server_id, &channel, &message_id)
                 .await
         }
-        ClientMessage::GetPinnedMessages {
-            server_id,
-            channel,
-        } => {
+        ClientMessage::GetPinnedMessages { server_id, channel } => {
             engine
                 .get_pinned_messages(session_id, &server_id, &channel)
                 .await
@@ -1272,7 +1340,14 @@ async fn handle_client_message(
             is_private,
         } => {
             engine
-                .create_thread(session_id, &server_id, &parent_channel, &name, &message_id, is_private)
+                .create_thread(
+                    session_id,
+                    &server_id,
+                    &parent_channel,
+                    &name,
+                    &message_id,
+                    is_private,
+                )
                 .await
         }
         ClientMessage::ArchiveThread {
@@ -1283,13 +1358,8 @@ async fn handle_client_message(
                 .archive_thread(session_id, &server_id, &thread_id)
                 .await
         }
-        ClientMessage::ListThreads {
-            server_id,
-            channel,
-        } => {
-            engine
-                .list_threads(session_id, &server_id, &channel)
-                .await
+        ClientMessage::ListThreads { server_id, channel } => {
+            engine.list_threads(session_id, &server_id, &channel).await
         }
         // ── Phase 5: Bookmarks ──
         ClientMessage::AddBookmark { message_id, note } => {
@@ -1318,20 +1388,19 @@ async fn handle_client_message(
             delete_message_days,
         } => {
             engine
-                .ban_member(session_id, &server_id, &user_id, reason.as_deref(), delete_message_days)
+                .ban_member(
+                    session_id,
+                    &server_id,
+                    &user_id,
+                    reason.as_deref(),
+                    delete_message_days,
+                )
                 .await
         }
-        ClientMessage::UnbanMember {
-            server_id,
-            user_id,
-        } => {
-            engine
-                .unban_member(session_id, &server_id, &user_id)
-                .await
+        ClientMessage::UnbanMember { server_id, user_id } => {
+            engine.unban_member(session_id, &server_id, &user_id).await
         }
-        ClientMessage::ListBans { server_id } => {
-            engine.list_bans(session_id, &server_id).await
-        }
+        ClientMessage::ListBans { server_id } => engine.list_bans(session_id, &server_id).await,
         ClientMessage::TimeoutMember {
             server_id,
             user_id,
@@ -1339,7 +1408,13 @@ async fn handle_client_message(
             reason,
         } => {
             engine
-                .timeout_member(session_id, &server_id, &user_id, timeout_until.as_deref(), reason.as_deref())
+                .timeout_member(
+                    session_id,
+                    &server_id,
+                    &user_id,
+                    timeout_until.as_deref(),
+                    reason.as_deref(),
+                )
                 .await
         }
         ClientMessage::SetSlowMode {
@@ -1377,7 +1452,13 @@ async fn handle_client_message(
         } => {
             let limit = limit.unwrap_or(50);
             engine
-                .get_audit_log(session_id, &server_id, action_type.as_deref(), limit, before.as_deref())
+                .get_audit_log(
+                    session_id,
+                    &server_id,
+                    action_type.as_deref(),
+                    limit,
+                    before.as_deref(),
+                )
                 .await
         }
         // ── Phase 6: AutoMod ──
@@ -1391,15 +1472,18 @@ async fn handle_client_message(
         } => {
             let rule_id_placeholder = ""; // id generated inside engine
             engine
-                .create_automod_rule(session_id, &crate::db::models::CreateAutomodRuleParams {
-                    id: rule_id_placeholder,
-                    server_id: &server_id,
-                    name: &name,
-                    rule_type: &rule_type,
-                    config: &config,
-                    action_type: &action_type,
-                    timeout_duration_seconds,
-                })
+                .create_automod_rule(
+                    session_id,
+                    &crate::db::models::CreateAutomodRuleParams {
+                        id: rule_id_placeholder,
+                        server_id: &server_id,
+                        name: &name,
+                        rule_type: &rule_type,
+                        config: &config,
+                        action_type: &action_type,
+                        timeout_duration_seconds,
+                    },
+                )
                 .await
         }
         ClientMessage::UpdateAutomodRule {
@@ -1412,21 +1496,21 @@ async fn handle_client_message(
             timeout_duration_seconds,
         } => {
             engine
-                .update_automod_rule(session_id, &crate::db::models::UpdateAutomodRuleParams {
-                    rule_id: &rule_id,
-                    server_id: &server_id,
-                    name: &name,
-                    enabled,
-                    config: &config,
-                    action_type: &action_type,
-                    timeout_duration_seconds,
-                })
+                .update_automod_rule(
+                    session_id,
+                    &crate::db::models::UpdateAutomodRuleParams {
+                        rule_id: &rule_id,
+                        server_id: &server_id,
+                        name: &name,
+                        enabled,
+                        config: &config,
+                        action_type: &action_type,
+                        timeout_duration_seconds,
+                    },
+                )
                 .await
         }
-        ClientMessage::DeleteAutomodRule {
-            server_id,
-            rule_id,
-        } => {
+        ClientMessage::DeleteAutomodRule { server_id, rule_id } => {
             engine
                 .delete_automod_rule(session_id, &server_id, &rule_id)
                 .await
@@ -1435,74 +1519,135 @@ async fn handle_client_message(
             engine.list_automod_rules(session_id, &server_id).await
         }
         // ── Phase 7: Community & Discovery ──
-        ClientMessage::CreateInvite { server_id, max_uses, expires_at, channel_id } => {
-            engine.create_invite(session_id, &server_id, max_uses, expires_at.as_deref(), channel_id.as_deref()).await
+        ClientMessage::CreateInvite {
+            server_id,
+            max_uses,
+            expires_at,
+            channel_id,
+        } => {
+            engine
+                .create_invite(
+                    session_id,
+                    &server_id,
+                    max_uses,
+                    expires_at.as_deref(),
+                    channel_id.as_deref(),
+                )
+                .await
         }
         ClientMessage::ListInvites { server_id } => {
             engine.list_invites(session_id, &server_id).await
         }
-        ClientMessage::DeleteInvite { server_id, invite_id } => {
-            engine.delete_invite(session_id, &server_id, &invite_id).await
+        ClientMessage::DeleteInvite {
+            server_id,
+            invite_id,
+        } => {
+            engine
+                .delete_invite(session_id, &server_id, &invite_id)
+                .await
         }
-        ClientMessage::UseInvite { code } => {
-            engine.use_invite(session_id, &code).await
+        ClientMessage::UseInvite { code } => engine.use_invite(session_id, &code).await,
+        ClientMessage::CreateEvent {
+            server_id,
+            name,
+            description,
+            channel_id,
+            start_time,
+            end_time,
+            image_url,
+        } => {
+            engine
+                .create_event(
+                    session_id,
+                    &crate::db::models::CreateServerEventParams {
+                        id: "",
+                        server_id: &server_id,
+                        name: &name,
+                        description: description.as_deref(),
+                        channel_id: channel_id.as_deref(),
+                        start_time: &start_time,
+                        end_time: end_time.as_deref(),
+                        image_url: image_url.as_deref(),
+                        created_by: "",
+                    },
+                )
+                .await
         }
-        ClientMessage::CreateEvent { server_id, name, description, channel_id, start_time, end_time, image_url } => {
-            engine.create_event(session_id, &crate::db::models::CreateServerEventParams {
-                id: "",
-                server_id: &server_id,
-                name: &name,
-                description: description.as_deref(),
-                channel_id: channel_id.as_deref(),
-                start_time: &start_time,
-                end_time: end_time.as_deref(),
-                image_url: image_url.as_deref(),
-                created_by: "",
-            }).await
+        ClientMessage::ListEvents { server_id } => engine.list_events(session_id, &server_id).await,
+        ClientMessage::UpdateEventStatus {
+            server_id,
+            event_id,
+            status,
+        } => {
+            engine
+                .update_event_status(session_id, &server_id, &event_id, &status)
+                .await
         }
-        ClientMessage::ListEvents { server_id } => {
-            engine.list_events(session_id, &server_id).await
+        ClientMessage::DeleteEvent {
+            server_id,
+            event_id,
+        } => engine.delete_event(session_id, &server_id, &event_id).await,
+        ClientMessage::SetRsvp {
+            server_id,
+            event_id,
+            status,
+        } => {
+            engine
+                .set_rsvp(session_id, &server_id, &event_id, &status)
+                .await
         }
-        ClientMessage::UpdateEventStatus { server_id, event_id, status } => {
-            engine.update_event_status(session_id, &server_id, &event_id, &status).await
-        }
-        ClientMessage::DeleteEvent { server_id, event_id } => {
-            engine.delete_event(session_id, &server_id, &event_id).await
-        }
-        ClientMessage::SetRsvp { server_id, event_id, status } => {
-            engine.set_rsvp(session_id, &server_id, &event_id, &status).await
-        }
-        ClientMessage::RemoveRsvp { server_id, event_id } => {
-            engine.remove_rsvp(session_id, &server_id, &event_id).await
-        }
-        ClientMessage::ListRsvps { event_id } => {
-            engine.list_rsvps(session_id, &event_id).await
-        }
-        ClientMessage::UpdateCommunitySettings { server_id, description, is_discoverable, welcome_message, rules_text, category } => {
-            engine.update_community_settings(
-                session_id,
-                &server_id,
-                description.as_deref(),
-                is_discoverable,
-                welcome_message.as_deref(),
-                rules_text.as_deref(),
-                category.as_deref(),
-            ).await
+        ClientMessage::RemoveRsvp {
+            server_id,
+            event_id,
+        } => engine.remove_rsvp(session_id, &server_id, &event_id).await,
+        ClientMessage::ListRsvps { event_id } => engine.list_rsvps(session_id, &event_id).await,
+        ClientMessage::UpdateCommunitySettings {
+            server_id,
+            description,
+            is_discoverable,
+            welcome_message,
+            rules_text,
+            category,
+        } => {
+            engine
+                .update_community_settings(
+                    session_id,
+                    &server_id,
+                    description.as_deref(),
+                    is_discoverable,
+                    welcome_message.as_deref(),
+                    rules_text.as_deref(),
+                    category.as_deref(),
+                )
+                .await
         }
         ClientMessage::GetCommunitySettings { server_id } => {
             engine.get_community_settings(session_id, &server_id).await
         }
         ClientMessage::DiscoverServers { category } => {
-            engine.discover_servers(session_id, category.as_deref()).await
+            engine
+                .discover_servers(session_id, category.as_deref())
+                .await
         }
         ClientMessage::AcceptRules { server_id } => {
             engine.accept_rules(session_id, &server_id).await
         }
-        ClientMessage::SetAnnouncementChannel { server_id, channel, is_announcement } => {
-            engine.set_announcement_channel(session_id, &server_id, &channel, is_announcement).await
+        ClientMessage::SetAnnouncementChannel {
+            server_id,
+            channel,
+            is_announcement,
+        } => {
+            engine
+                .set_announcement_channel(session_id, &server_id, &channel, is_announcement)
+                .await
         }
-        ClientMessage::FollowChannel { source_channel_id, target_channel_id } => {
-            engine.follow_channel(session_id, &source_channel_id, &target_channel_id).await
+        ClientMessage::FollowChannel {
+            source_channel_id,
+            target_channel_id,
+        } => {
+            engine
+                .follow_channel(session_id, &source_channel_id, &target_channel_id)
+                .await
         }
         ClientMessage::UnfollowChannel { follow_id } => {
             engine.unfollow_channel(session_id, &follow_id).await
@@ -1510,14 +1655,174 @@ async fn handle_client_message(
         ClientMessage::ListChannelFollows { channel_id } => {
             engine.list_channel_follows(session_id, &channel_id).await
         }
-        ClientMessage::CreateTemplate { server_id, name, description } => {
-            engine.create_template(session_id, &server_id, &name, description.as_deref()).await
+        ClientMessage::CreateTemplate {
+            server_id,
+            name,
+            description,
+        } => {
+            engine
+                .create_template(session_id, &server_id, &name, description.as_deref())
+                .await
         }
         ClientMessage::ListTemplates { server_id } => {
             engine.list_templates(session_id, &server_id).await
         }
-        ClientMessage::DeleteTemplate { server_id, template_id } => {
-            engine.delete_template(session_id, &server_id, &template_id).await
+        ClientMessage::DeleteTemplate {
+            server_id,
+            template_id,
+        } => {
+            engine
+                .delete_template(session_id, &server_id, &template_id)
+                .await
+        }
+        // ── Phase 8: Integrations & Bots ──
+        ClientMessage::CreateWebhook {
+            server_id,
+            channel_id,
+            name,
+            webhook_type,
+            url,
+        } => {
+            engine
+                .create_webhook(
+                    session_id,
+                    &server_id,
+                    &channel_id,
+                    &name,
+                    &webhook_type,
+                    url.as_deref(),
+                )
+                .await
+        }
+        ClientMessage::ListWebhooks { server_id } => {
+            engine.list_webhooks(session_id, &server_id).await
+        }
+        ClientMessage::UpdateWebhook {
+            webhook_id,
+            name,
+            avatar_url,
+            channel_id,
+        } => {
+            engine
+                .update_webhook(
+                    session_id,
+                    &webhook_id,
+                    &name,
+                    avatar_url.as_deref(),
+                    &channel_id,
+                )
+                .await
+        }
+        ClientMessage::DeleteWebhook { webhook_id } => {
+            engine.delete_webhook(session_id, &webhook_id).await
+        }
+        ClientMessage::CreateBot {
+            username,
+            avatar_url,
+        } => {
+            engine
+                .create_bot(session_id, &username, avatar_url.as_deref())
+                .await
+        }
+        ClientMessage::CreateBotToken {
+            bot_user_id,
+            name,
+            scopes,
+        } => {
+            engine
+                .create_bot_token(session_id, &bot_user_id, &name, scopes.as_deref())
+                .await
+        }
+        ClientMessage::ListBotTokens { bot_user_id } => {
+            engine.list_bot_tokens(session_id, &bot_user_id).await
+        }
+        ClientMessage::DeleteBotToken { token_id } => {
+            engine.delete_bot_token(session_id, &token_id).await
+        }
+        ClientMessage::AddBotToServer {
+            server_id,
+            bot_user_id,
+        } => {
+            engine
+                .add_bot_to_server(session_id, &server_id, &bot_user_id)
+                .await
+        }
+        ClientMessage::RemoveBotFromServer {
+            server_id,
+            bot_user_id,
+        } => {
+            engine
+                .remove_bot_from_server(session_id, &server_id, &bot_user_id)
+                .await
+        }
+        ClientMessage::RegisterSlashCommand {
+            server_id,
+            name,
+            description,
+            options_json,
+        } => {
+            engine
+                .register_slash_command(
+                    session_id,
+                    &server_id,
+                    &name,
+                    &description,
+                    options_json.as_deref(),
+                )
+                .await
+        }
+        ClientMessage::ListSlashCommands { server_id } => {
+            engine.list_slash_commands(session_id, &server_id).await
+        }
+        ClientMessage::DeleteSlashCommand { command_id } => {
+            engine.delete_slash_command(session_id, &command_id).await
+        }
+        ClientMessage::InvokeSlashCommand {
+            server_id,
+            channel,
+            command_name,
+            args_json,
+        } => {
+            engine
+                .invoke_slash_command(
+                    session_id,
+                    &server_id,
+                    &channel,
+                    &command_name,
+                    args_json.as_deref(),
+                )
+                .await
+        }
+        ClientMessage::RespondToInteraction {
+            interaction_id,
+            content,
+            embeds_json,
+            components_json,
+            ephemeral,
+        } => {
+            engine
+                .respond_to_interaction(
+                    session_id,
+                    &interaction_id,
+                    content.as_deref(),
+                    embeds_json.as_deref(),
+                    components_json.as_deref(),
+                    ephemeral.unwrap_or(false),
+                )
+                .await
+        }
+        ClientMessage::CreateOAuth2App {
+            name,
+            description,
+            redirect_uris,
+        } => {
+            engine
+                .create_oauth2_app(session_id, &name, description.as_deref(), &redirect_uris)
+                .await
+        }
+        ClientMessage::ListOAuth2Apps => engine.list_oauth2_apps(session_id).await,
+        ClientMessage::DeleteOAuth2App { app_id } => {
+            engine.delete_oauth2_app(session_id, &app_id).await
         }
     };
 
@@ -1537,5 +1842,1348 @@ fn send_error(
             code: code.into(),
             message: message.into(),
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper to deserialize a JSON string into a ClientMessage.
+    fn parse_msg(json: &str) -> Result<ClientMessage, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    // ── Core messaging ──
+
+    #[test]
+    fn test_send_message_basic() {
+        let msg: ClientMessage = parse_msg(
+            r##"{"type": "send_message", "channel": "#general", "content": "Hello world"}"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::SendMessage {
+                server_id,
+                channel,
+                content,
+                reply_to,
+                attachment_ids,
+            } => {
+                assert_eq!(server_id, DEFAULT_SERVER_ID);
+                assert_eq!(channel, "#general");
+                assert_eq!(content, "Hello world");
+                assert!(reply_to.is_none());
+                assert!(attachment_ids.is_none());
+            }
+            _ => panic!("Expected SendMessage"),
+        }
+    }
+
+    #[test]
+    fn test_send_message_with_reply_and_attachments() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "send_message",
+            "server_id": "srv-1",
+            "channel": "#dev",
+            "content": "See attached",
+            "reply_to": "msg-123",
+            "attachment_ids": ["att-1", "att-2"]
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::SendMessage {
+                server_id,
+                reply_to,
+                attachment_ids,
+                ..
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(reply_to, Some("msg-123".into()));
+                assert_eq!(attachment_ids, Some(vec!["att-1".into(), "att-2".into()]));
+            }
+            _ => panic!("Expected SendMessage"),
+        }
+    }
+
+    #[test]
+    fn test_join_channel() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "join_channel",
+            "server_id": "srv-1",
+            "channel": "#random"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::JoinChannel { server_id, channel } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(channel, "#random");
+            }
+            _ => panic!("Expected JoinChannel"),
+        }
+    }
+
+    #[test]
+    fn test_join_channel_default_server() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "join_channel",
+            "channel": "#random"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::JoinChannel { server_id, .. } => {
+                assert_eq!(server_id, DEFAULT_SERVER_ID);
+            }
+            _ => panic!("Expected JoinChannel"),
+        }
+    }
+
+    #[test]
+    fn test_part_channel() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "part_channel",
+            "server_id": "srv-1",
+            "channel": "#random",
+            "reason": "Going offline"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::PartChannel {
+                server_id,
+                channel,
+                reason,
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(channel, "#random");
+                assert_eq!(reason, Some("Going offline".into()));
+            }
+            _ => panic!("Expected PartChannel"),
+        }
+    }
+
+    #[test]
+    fn test_set_topic() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "set_topic",
+            "server_id": "srv-1",
+            "channel": "#general",
+            "topic": "New topic"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::SetTopic { topic, .. } => {
+                assert_eq!(topic, "New topic");
+            }
+            _ => panic!("Expected SetTopic"),
+        }
+    }
+
+    #[test]
+    fn test_fetch_history() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "fetch_history",
+            "server_id": "srv-1",
+            "channel": "#general",
+            "before": "2025-01-01T00:00:00Z",
+            "limit": 25
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::FetchHistory { before, limit, .. } => {
+                assert_eq!(before, Some("2025-01-01T00:00:00Z".into()));
+                assert_eq!(limit, Some(25));
+            }
+            _ => panic!("Expected FetchHistory"),
+        }
+    }
+
+    #[test]
+    fn test_fetch_history_defaults() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "fetch_history",
+            "channel": "#general"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::FetchHistory {
+                server_id,
+                before,
+                limit,
+                ..
+            } => {
+                assert_eq!(server_id, DEFAULT_SERVER_ID);
+                assert!(before.is_none());
+                assert!(limit.is_none());
+            }
+            _ => panic!("Expected FetchHistory"),
+        }
+    }
+
+    #[test]
+    fn test_list_channels() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "list_channels",
+            "server_id": "srv-1"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::ListChannels { server_id } => {
+                assert_eq!(server_id, "srv-1");
+            }
+            _ => panic!("Expected ListChannels"),
+        }
+    }
+
+    #[test]
+    fn test_list_servers() {
+        let msg: ClientMessage = parse_msg(r##"{"type": "list_servers"}"##).unwrap();
+        assert!(matches!(msg, ClientMessage::ListServers));
+    }
+
+    // ── Server management ──
+
+    #[test]
+    fn test_create_server() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_server",
+            "name": "My Server",
+            "icon_url": "https://example.com/icon.png"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateServer { name, icon_url } => {
+                assert_eq!(name, "My Server");
+                assert_eq!(icon_url, Some("https://example.com/icon.png".into()));
+            }
+            _ => panic!("Expected CreateServer"),
+        }
+    }
+
+    #[test]
+    fn test_create_server_no_icon() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_server",
+            "name": "My Server"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateServer { name, icon_url } => {
+                assert_eq!(name, "My Server");
+                assert!(icon_url.is_none());
+            }
+            _ => panic!("Expected CreateServer"),
+        }
+    }
+
+    #[test]
+    fn test_join_server() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "join_server",
+            "server_id": "srv-1"
+        }"##,
+        )
+        .unwrap();
+        assert!(matches!(msg, ClientMessage::JoinServer { server_id } if server_id == "srv-1"));
+    }
+
+    #[test]
+    fn test_leave_server() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "leave_server",
+            "server_id": "srv-1"
+        }"##,
+        )
+        .unwrap();
+        assert!(matches!(msg, ClientMessage::LeaveServer { server_id } if server_id == "srv-1"));
+    }
+
+    #[test]
+    fn test_delete_server() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "delete_server",
+            "server_id": "srv-1"
+        }"##,
+        )
+        .unwrap();
+        assert!(matches!(msg, ClientMessage::DeleteServer { server_id } if server_id == "srv-1"));
+    }
+
+    #[test]
+    fn test_create_channel() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_channel",
+            "server_id": "srv-1",
+            "name": "new-channel"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateChannel { server_id, name } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(name, "new-channel");
+            }
+            _ => panic!("Expected CreateChannel"),
+        }
+    }
+
+    #[test]
+    fn test_delete_channel() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "delete_channel",
+            "server_id": "srv-1",
+            "channel": "#old"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::DeleteChannel { server_id, channel } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(channel, "#old");
+            }
+            _ => panic!("Expected DeleteChannel"),
+        }
+    }
+
+    // ── Message actions ──
+
+    #[test]
+    fn test_edit_message() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "edit_message",
+            "message_id": "msg-1",
+            "content": "edited content"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::EditMessage {
+                message_id,
+                content,
+            } => {
+                assert_eq!(message_id, "msg-1");
+                assert_eq!(content, "edited content");
+            }
+            _ => panic!("Expected EditMessage"),
+        }
+    }
+
+    #[test]
+    fn test_delete_message() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "delete_message",
+            "message_id": "msg-1"
+        }"##,
+        )
+        .unwrap();
+        assert!(
+            matches!(msg, ClientMessage::DeleteMessage { message_id } if message_id == "msg-1")
+        );
+    }
+
+    #[test]
+    fn test_add_reaction() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "add_reaction",
+            "message_id": "msg-1",
+            "emoji": "\ud83d\udc4d"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::AddReaction { message_id, emoji } => {
+                assert_eq!(message_id, "msg-1");
+                assert_eq!(emoji, "\u{1f44d}");
+            }
+            _ => panic!("Expected AddReaction"),
+        }
+    }
+
+    #[test]
+    fn test_remove_reaction() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "remove_reaction",
+            "message_id": "msg-1",
+            "emoji": "\ud83d\udc4d"
+        }"##,
+        )
+        .unwrap();
+        assert!(matches!(msg, ClientMessage::RemoveReaction { .. }));
+    }
+
+    #[test]
+    fn test_typing() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "typing",
+            "channel": "#general"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::Typing { server_id, channel } => {
+                assert_eq!(server_id, DEFAULT_SERVER_ID);
+                assert_eq!(channel, "#general");
+            }
+            _ => panic!("Expected Typing"),
+        }
+    }
+
+    #[test]
+    fn test_mark_read() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "mark_read",
+            "server_id": "srv-1",
+            "channel": "#general",
+            "message_id": "msg-42"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::MarkRead {
+                server_id,
+                channel,
+                message_id,
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(channel, "#general");
+                assert_eq!(message_id, "msg-42");
+            }
+            _ => panic!("Expected MarkRead"),
+        }
+    }
+
+    // ── Roles ──
+
+    #[test]
+    fn test_list_roles() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "list_roles",
+            "server_id": "srv-1"
+        }"##,
+        )
+        .unwrap();
+        assert!(matches!(msg, ClientMessage::ListRoles { server_id } if server_id == "srv-1"));
+    }
+
+    #[test]
+    fn test_create_role() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_role",
+            "server_id": "srv-1",
+            "name": "Moderator",
+            "color": "#ff0000",
+            "permissions": 42
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateRole {
+                server_id,
+                name,
+                color,
+                permissions,
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(name, "Moderator");
+                assert_eq!(color, Some("#ff0000".into()));
+                assert_eq!(permissions, Some(42));
+            }
+            _ => panic!("Expected CreateRole"),
+        }
+    }
+
+    #[test]
+    fn test_create_role_defaults() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_role",
+            "server_id": "srv-1",
+            "name": "Basic"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateRole {
+                color, permissions, ..
+            } => {
+                assert!(color.is_none());
+                assert!(permissions.is_none());
+            }
+            _ => panic!("Expected CreateRole"),
+        }
+    }
+
+    // ── Categories ──
+
+    #[test]
+    fn test_create_category() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_category",
+            "server_id": "srv-1",
+            "name": "Text Channels"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateCategory { server_id, name } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(name, "Text Channels");
+            }
+            _ => panic!("Expected CreateCategory"),
+        }
+    }
+
+    // ── Presence ──
+
+    #[test]
+    fn test_set_presence() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "set_presence",
+            "status": "dnd",
+            "custom_status": "In a meeting",
+            "status_emoji": "\ud83d\udcbc"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::SetPresence {
+                status,
+                custom_status,
+                status_emoji,
+            } => {
+                assert_eq!(status, "dnd");
+                assert_eq!(custom_status, Some("In a meeting".into()));
+                assert_eq!(status_emoji, Some("\u{1f4bc}".into()));
+            }
+            _ => panic!("Expected SetPresence"),
+        }
+    }
+
+    // ── Phase 5: Threads ──
+
+    #[test]
+    fn test_create_thread() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_thread",
+            "server_id": "srv-1",
+            "parent_channel": "#general",
+            "name": "Discussion",
+            "message_id": "msg-1",
+            "is_private": true
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateThread {
+                server_id,
+                parent_channel,
+                name,
+                message_id,
+                is_private,
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(parent_channel, "#general");
+                assert_eq!(name, "Discussion");
+                assert_eq!(message_id, "msg-1");
+                assert!(is_private);
+            }
+            _ => panic!("Expected CreateThread"),
+        }
+    }
+
+    #[test]
+    fn test_create_thread_defaults() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_thread",
+            "server_id": "srv-1",
+            "parent_channel": "#general",
+            "name": "Public Thread",
+            "message_id": "msg-2"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateThread { is_private, .. } => {
+                assert!(!is_private);
+            }
+            _ => panic!("Expected CreateThread"),
+        }
+    }
+
+    // ── Phase 5: Bookmarks ──
+
+    #[test]
+    fn test_add_bookmark() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "add_bookmark",
+            "message_id": "msg-1",
+            "note": "Important info"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::AddBookmark { message_id, note } => {
+                assert_eq!(message_id, "msg-1");
+                assert_eq!(note, Some("Important info".into()));
+            }
+            _ => panic!("Expected AddBookmark"),
+        }
+    }
+
+    #[test]
+    fn test_list_bookmarks() {
+        let msg: ClientMessage = parse_msg(r##"{"type": "list_bookmarks"}"##).unwrap();
+        assert!(matches!(msg, ClientMessage::ListBookmarks));
+    }
+
+    // ── Phase 6: Moderation ──
+
+    #[test]
+    fn test_kick_member() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "kick_member",
+            "server_id": "srv-1",
+            "user_id": "user-1",
+            "reason": "Spamming"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::KickMember {
+                server_id,
+                user_id,
+                reason,
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(user_id, "user-1");
+                assert_eq!(reason, Some("Spamming".into()));
+            }
+            _ => panic!("Expected KickMember"),
+        }
+    }
+
+    #[test]
+    fn test_ban_member() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "ban_member",
+            "server_id": "srv-1",
+            "user_id": "user-1",
+            "reason": "Harassment",
+            "delete_message_days": 7
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::BanMember {
+                server_id,
+                user_id,
+                reason,
+                delete_message_days,
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(user_id, "user-1");
+                assert_eq!(reason, Some("Harassment".into()));
+                assert_eq!(delete_message_days, 7);
+            }
+            _ => panic!("Expected BanMember"),
+        }
+    }
+
+    #[test]
+    fn test_ban_member_defaults() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "ban_member",
+            "server_id": "srv-1",
+            "user_id": "user-1"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::BanMember {
+                delete_message_days,
+                reason,
+                ..
+            } => {
+                assert_eq!(delete_message_days, 0);
+                assert!(reason.is_none());
+            }
+            _ => panic!("Expected BanMember"),
+        }
+    }
+
+    #[test]
+    fn test_set_slow_mode() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "set_slow_mode",
+            "server_id": "srv-1",
+            "channel": "#general",
+            "seconds": 10
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::SetSlowMode { seconds, .. } => {
+                assert_eq!(seconds, 10);
+            }
+            _ => panic!("Expected SetSlowMode"),
+        }
+    }
+
+    #[test]
+    fn test_bulk_delete() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "bulk_delete_messages",
+            "server_id": "srv-1",
+            "channel": "#general",
+            "message_ids": ["m1", "m2", "m3"]
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::BulkDeleteMessages { message_ids, .. } => {
+                assert_eq!(message_ids.len(), 3);
+            }
+            _ => panic!("Expected BulkDeleteMessages"),
+        }
+    }
+
+    // ── Phase 7: Community ──
+
+    #[test]
+    fn test_create_invite() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_invite",
+            "server_id": "srv-1",
+            "max_uses": 10,
+            "expires_at": "2026-12-31T23:59:59Z"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateInvite {
+                server_id,
+                max_uses,
+                expires_at,
+                channel_id,
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(max_uses, Some(10));
+                assert_eq!(expires_at, Some("2026-12-31T23:59:59Z".into()));
+                assert!(channel_id.is_none());
+            }
+            _ => panic!("Expected CreateInvite"),
+        }
+    }
+
+    #[test]
+    fn test_use_invite() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "use_invite",
+            "code": "abc123"
+        }"##,
+        )
+        .unwrap();
+        assert!(matches!(msg, ClientMessage::UseInvite { code } if code == "abc123"));
+    }
+
+    #[test]
+    fn test_create_event() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_event",
+            "server_id": "srv-1",
+            "name": "Game Night",
+            "description": "Playing board games",
+            "start_time": "2026-03-01T19:00:00Z"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateEvent {
+                name,
+                description,
+                start_time,
+                end_time,
+                ..
+            } => {
+                assert_eq!(name, "Game Night");
+                assert_eq!(description, Some("Playing board games".into()));
+                assert_eq!(start_time, "2026-03-01T19:00:00Z");
+                assert!(end_time.is_none());
+            }
+            _ => panic!("Expected CreateEvent"),
+        }
+    }
+
+    #[test]
+    fn test_discover_servers() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "discover_servers",
+            "category": "gaming"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::DiscoverServers { category } => {
+                assert_eq!(category, Some("gaming".into()));
+            }
+            _ => panic!("Expected DiscoverServers"),
+        }
+    }
+
+    // ── Phase 8: Integrations & Bots ──
+
+    #[test]
+    fn test_create_webhook() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_webhook",
+            "server_id": "srv-1",
+            "channel_id": "ch-1",
+            "name": "GitHub Notifications",
+            "webhook_type": "incoming",
+            "url": "https://example.com/hook"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateWebhook {
+                server_id,
+                channel_id,
+                name,
+                webhook_type,
+                url,
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(channel_id, "ch-1");
+                assert_eq!(name, "GitHub Notifications");
+                assert_eq!(webhook_type, "incoming");
+                assert_eq!(url, Some("https://example.com/hook".into()));
+            }
+            _ => panic!("Expected CreateWebhook"),
+        }
+    }
+
+    #[test]
+    fn test_create_bot() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_bot",
+            "username": "mybot",
+            "avatar_url": "https://example.com/bot.png"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateBot {
+                username,
+                avatar_url,
+            } => {
+                assert_eq!(username, "mybot");
+                assert_eq!(avatar_url, Some("https://example.com/bot.png".into()));
+            }
+            _ => panic!("Expected CreateBot"),
+        }
+    }
+
+    #[test]
+    fn test_create_bot_token() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_bot_token",
+            "bot_user_id": "bot-1",
+            "name": "production",
+            "scopes": "read,write"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateBotToken {
+                bot_user_id,
+                name,
+                scopes,
+            } => {
+                assert_eq!(bot_user_id, "bot-1");
+                assert_eq!(name, "production");
+                assert_eq!(scopes, Some("read,write".into()));
+            }
+            _ => panic!("Expected CreateBotToken"),
+        }
+    }
+
+    #[test]
+    fn test_register_slash_command() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "register_slash_command",
+            "server_id": "srv-1",
+            "name": "ping",
+            "description": "Check if bot is alive",
+            "options_json": "[{\"name\":\"target\",\"type\":\"string\"}]"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::RegisterSlashCommand {
+                server_id,
+                name,
+                description,
+                options_json,
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(name, "ping");
+                assert_eq!(description, "Check if bot is alive");
+                assert!(options_json.is_some());
+            }
+            _ => panic!("Expected RegisterSlashCommand"),
+        }
+    }
+
+    #[test]
+    fn test_invoke_slash_command() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "invoke_slash_command",
+            "server_id": "srv-1",
+            "channel": "#general",
+            "command_name": "ping"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::InvokeSlashCommand {
+                command_name,
+                args_json,
+                ..
+            } => {
+                assert_eq!(command_name, "ping");
+                assert!(args_json.is_none());
+            }
+            _ => panic!("Expected InvokeSlashCommand"),
+        }
+    }
+
+    #[test]
+    fn test_respond_to_interaction() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "respond_to_interaction",
+            "interaction_id": "int-1",
+            "content": "Pong!",
+            "ephemeral": true
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::RespondToInteraction {
+                interaction_id,
+                content,
+                ephemeral,
+                ..
+            } => {
+                assert_eq!(interaction_id, "int-1");
+                assert_eq!(content, Some("Pong!".into()));
+                assert_eq!(ephemeral, Some(true));
+            }
+            _ => panic!("Expected RespondToInteraction"),
+        }
+    }
+
+    #[test]
+    fn test_create_oauth2_app() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_o_auth2_app",
+            "name": "My App",
+            "description": "A cool app",
+            "redirect_uris": ["https://example.com/callback"]
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateOAuth2App {
+                name,
+                description,
+                redirect_uris,
+            } => {
+                assert_eq!(name, "My App");
+                assert_eq!(description, Some("A cool app".into()));
+                assert_eq!(redirect_uris, vec!["https://example.com/callback"]);
+            }
+            _ => panic!("Expected CreateOAuth2App"),
+        }
+    }
+
+    #[test]
+    fn test_list_oauth2_apps() {
+        let msg: ClientMessage = parse_msg(r##"{"type": "list_o_auth2_apps"}"##).unwrap();
+        assert!(matches!(msg, ClientMessage::ListOAuth2Apps));
+    }
+
+    // ── Malformed JSON handling ──
+
+    #[test]
+    fn test_malformed_json_completely_invalid() {
+        assert!(parse_msg("not json at all").is_err());
+    }
+
+    #[test]
+    fn test_malformed_json_missing_type() {
+        assert!(parse_msg(r##"{"channel": "#general"}"##).is_err());
+    }
+
+    #[test]
+    fn test_malformed_json_unknown_type() {
+        assert!(parse_msg(r##"{"type": "unknown_command"}"##).is_err());
+    }
+
+    #[test]
+    fn test_malformed_json_missing_required_field() {
+        // SendMessage requires channel and content
+        assert!(parse_msg(r##"{"type": "send_message"}"##).is_err());
+    }
+
+    #[test]
+    fn test_malformed_json_wrong_field_type() {
+        // limit should be a number, not a string
+        assert!(
+            parse_msg(
+                r##"{
+            "type": "fetch_history",
+            "channel": "#general",
+            "limit": "not a number"
+        }"##
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn test_extra_fields_ignored() {
+        // Extra fields should be silently ignored by serde
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "list_servers",
+            "unknown_field": "should be ignored",
+            "another_extra": 42
+        }"##,
+        )
+        .unwrap();
+        assert!(matches!(msg, ClientMessage::ListServers));
+    }
+
+    #[test]
+    fn test_empty_json_object() {
+        assert!(parse_msg("{}").is_err());
+    }
+
+    #[test]
+    fn test_null_type() {
+        assert!(parse_msg(r##"{"type": null}"##).is_err());
+    }
+
+    // ── Default server_id function ──
+
+    #[test]
+    fn test_default_server_id() {
+        assert_eq!(default_server_id(), DEFAULT_SERVER_ID);
+    }
+
+    // ── Additional moderation commands ──
+
+    #[test]
+    fn test_set_nsfw() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "set_nsfw",
+            "server_id": "srv-1",
+            "channel": "#mature",
+            "is_nsfw": true
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::SetNsfw { is_nsfw, .. } => {
+                assert!(is_nsfw);
+            }
+            _ => panic!("Expected SetNsfw"),
+        }
+    }
+
+    #[test]
+    fn test_get_audit_log() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "get_audit_log",
+            "server_id": "srv-1",
+            "action_type": "ban",
+            "limit": 25
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::GetAuditLog {
+                server_id,
+                action_type,
+                limit,
+                before,
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(action_type, Some("ban".into()));
+                assert_eq!(limit, Some(25));
+                assert!(before.is_none());
+            }
+            _ => panic!("Expected GetAuditLog"),
+        }
+    }
+
+    #[test]
+    fn test_create_automod_rule() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_automod_rule",
+            "server_id": "srv-1",
+            "name": "No Spam",
+            "rule_type": "keyword",
+            "config": "{\"keywords\":[\"spam\"]}",
+            "action_type": "delete"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateAutomodRule {
+                name,
+                rule_type,
+                action_type,
+                timeout_duration_seconds,
+                ..
+            } => {
+                assert_eq!(name, "No Spam");
+                assert_eq!(rule_type, "keyword");
+                assert_eq!(action_type, "delete");
+                assert!(timeout_duration_seconds.is_none());
+            }
+            _ => panic!("Expected CreateAutomodRule"),
+        }
+    }
+
+    // ── Community features ──
+
+    #[test]
+    fn test_update_community_settings() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "update_community_settings",
+            "server_id": "srv-1",
+            "description": "A cool server",
+            "is_discoverable": true,
+            "welcome_message": "Welcome!",
+            "rules_text": "Be nice",
+            "category": "gaming"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::UpdateCommunitySettings {
+                is_discoverable,
+                category,
+                ..
+            } => {
+                assert!(is_discoverable);
+                assert_eq!(category, Some("gaming".into()));
+            }
+            _ => panic!("Expected UpdateCommunitySettings"),
+        }
+    }
+
+    #[test]
+    fn test_follow_channel() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "follow_channel",
+            "source_channel_id": "ch-1",
+            "target_channel_id": "ch-2"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::FollowChannel {
+                source_channel_id,
+                target_channel_id,
+            } => {
+                assert_eq!(source_channel_id, "ch-1");
+                assert_eq!(target_channel_id, "ch-2");
+            }
+            _ => panic!("Expected FollowChannel"),
+        }
+    }
+
+    #[test]
+    fn test_create_template() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "create_template",
+            "server_id": "srv-1",
+            "name": "Gaming Server",
+            "description": "A template for gaming servers"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::CreateTemplate {
+                name, description, ..
+            } => {
+                assert_eq!(name, "Gaming Server");
+                assert_eq!(description, Some("A template for gaming servers".into()));
+            }
+            _ => panic!("Expected CreateTemplate"),
+        }
+    }
+
+    // ── Pin/Unpin ──
+
+    #[test]
+    fn test_pin_message() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "pin_message",
+            "server_id": "srv-1",
+            "channel": "#general",
+            "message_id": "msg-1"
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::PinMessage {
+                server_id,
+                channel,
+                message_id,
+            } => {
+                assert_eq!(server_id, "srv-1");
+                assert_eq!(channel, "#general");
+                assert_eq!(message_id, "msg-1");
+            }
+            _ => panic!("Expected PinMessage"),
+        }
+    }
+
+    #[test]
+    fn test_unpin_message() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "unpin_message",
+            "server_id": "srv-1",
+            "channel": "#general",
+            "message_id": "msg-1"
+        }"##,
+        )
+        .unwrap();
+        assert!(matches!(msg, ClientMessage::UnpinMessage { .. }));
+    }
+
+    // ── Search ──
+
+    #[test]
+    fn test_search_messages() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "search_messages",
+            "server_id": "srv-1",
+            "query": "hello world",
+            "channel": "#general",
+            "limit": 10,
+            "offset": 5
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::SearchMessages {
+                query,
+                channel,
+                limit,
+                offset,
+                ..
+            } => {
+                assert_eq!(query, "hello world");
+                assert_eq!(channel, Some("#general".into()));
+                assert_eq!(limit, Some(10));
+                assert_eq!(offset, Some(5));
+            }
+            _ => panic!("Expected SearchMessages"),
+        }
+    }
+
+    // ── Notifications ──
+
+    #[test]
+    fn test_update_notification_settings() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "update_notification_settings",
+            "server_id": "srv-1",
+            "level": "mentions_only",
+            "suppress_everyone": true,
+            "muted": false
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::UpdateNotificationSettings {
+                level,
+                suppress_everyone,
+                muted,
+                ..
+            } => {
+                assert_eq!(level, "mentions_only");
+                assert_eq!(suppress_everyone, Some(true));
+                assert_eq!(muted, Some(false));
+            }
+            _ => panic!("Expected UpdateNotificationSettings"),
+        }
     }
 }

@@ -15,6 +15,7 @@ import { ThreadPanel } from '../threads/ThreadPanel';
 import { BookmarksPanel } from '../bookmarks/BookmarksPanel';
 import { ModerationPanel } from '../moderation/ModerationPanel';
 import { CommunityPanel } from '../community/CommunityPanel';
+import { IntegrationsPanel } from '../integrations/IntegrationsPanel';
 
 export function AppLayout() {
   const showMemberList = useUiStore((s) => s.showMemberList);
@@ -32,6 +33,8 @@ export function AppLayout() {
   const setShowModerationPanel = useUiStore((s) => s.setShowModerationPanel);
   const showCommunityPanel = useUiStore((s) => s.showCommunityPanel);
   const setShowCommunityPanel = useUiStore((s) => s.setShowCommunityPanel);
+  const showIntegrationsPanel = useUiStore((s) => s.showIntegrationsPanel);
+  const setShowIntegrationsPanel = useUiStore((s) => s.setShowIntegrationsPanel);
   const activeServer = useUiStore((s) => s.activeServer);
 
   return (
@@ -85,6 +88,18 @@ export function AppLayout() {
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5a17.92 17.92 0 01-8.716-2.247m0 0A8.966 8.966 0 013 12c0-1.777.514-3.434 1.401-4.83" />
+              </svg>
+            </button>
+            {/* Integrations icon button */}
+            <button
+              onClick={() => setShowIntegrationsPanel(!showIntegrationsPanel)}
+              className={`rounded p-1.5 transition-colors ${
+                showIntegrationsPanel ? 'text-text-primary' : 'text-text-muted hover:text-text-secondary'
+              }`}
+              title="Integrations"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 9.75L16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
               </svg>
             </button>
             {/* Moderation icon button */}
@@ -146,6 +161,11 @@ export function AppLayout() {
       {/* Community panel modal */}
       {showCommunityPanel && activeServer && (
         <CommunityPanel serverId={activeServer} onClose={() => setShowCommunityPanel(false)} />
+      )}
+
+      {/* Integrations panel modal */}
+      {showIntegrationsPanel && activeServer && (
+        <IntegrationsPanel serverId={activeServer} onClose={() => setShowIntegrationsPanel(false)} />
       )}
 
       {/* Quick switcher modal (Ctrl+K) */}

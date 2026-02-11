@@ -231,7 +231,11 @@ fn issue_session_cookie(auth_config: &AuthConfig, user_id: &str) -> Response {
         }
     };
 
-    let secure = if auth_config.public_url.starts_with("https") { "; Secure" } else { "" };
+    let secure = if auth_config.public_url.starts_with("https") {
+        "; Secure"
+    } else {
+        ""
+    };
     let cookie = format!(
         "concord_session={}; HttpOnly; Path=/; Max-Age={}; SameSite=Lax{}",
         jwt,

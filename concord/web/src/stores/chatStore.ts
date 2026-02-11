@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AttachmentInfo, AuditLogEntry, AutomodRuleInfo, BanInfo, BookmarkInfo, CategoryInfo, ChannelInfo, ChannelPositionInfo, EventInfo, ForumTagInfo, HistoryMessage, InviteInfo, MemberInfo, PinnedMessageInfo, PresenceInfo, ReplyInfo, RoleInfo, SearchResultMessage, ServerCommunityInfo, ServerEvent, ServerInfo, TemplateInfo, ThreadInfo, UserProfileInfo } from '../api/types';
+import type { AttachmentInfo, AuditLogEntry, AutomodRuleInfo, BanInfo, BookmarkInfo, BotTokenInfo, CategoryInfo, ChannelInfo, ChannelPositionInfo, EventInfo, ForumTagInfo, HistoryMessage, InviteInfo, MemberInfo, OAuth2AppInfo, PinnedMessageInfo, PresenceInfo, ReplyInfo, RoleInfo, SearchResultMessage, ServerCommunityInfo, ServerEvent, ServerInfo, SlashCommandInfo, TemplateInfo, ThreadInfo, UserProfileInfo, WebhookInfo } from '../api/types';
 import { listServerEmoji } from '../api/client';
 import { channelKey } from '../api/types';
 import { WebSocketManager } from '../api/websocket';
@@ -29,6 +29,10 @@ const EMPTY_EVENTS: Record<string, EventInfo[]> = {};
 const EMPTY_COMMUNITY: Record<string, ServerCommunityInfo> = {};
 const EMPTY_DISCOVER: ServerCommunityInfo[] = [];
 const EMPTY_TEMPLATES: Record<string, TemplateInfo[]> = {};
+const EMPTY_WEBHOOKS: Record<string, WebhookInfo[]> = {};
+const EMPTY_SLASH_COMMANDS: Record<string, SlashCommandInfo[]> = {};
+const EMPTY_BOT_TOKENS: BotTokenInfo[] = [];
+const EMPTY_OAUTH2_APPS: OAuth2AppInfo[] = [];
 
 interface ChatState {
   connected: boolean;
@@ -84,6 +88,14 @@ interface ChatState {
   discoverableServers: ServerCommunityInfo[];
   /** server_id -> templates */
   templates: Record<string, TemplateInfo[]>;
+  /** server_id -> webhooks */
+  webhooks: Record<string, WebhookInfo[]>;
+  /** server_id -> slash commands */
+  slashCommands: Record<string, SlashCommandInfo[]>;
+  /** Bot tokens (for current user's bots) */
+  botTokens: BotTokenInfo[];
+  /** OAuth2 apps (for current user) */
+  oauth2Apps: OAuth2AppInfo[];
   ws: WebSocketManager | null;
 
   connect: (nickname: string) => void;
@@ -177,6 +189,24 @@ interface ChatState {
   createTemplate: (serverId: string, name: string, description?: string) => void;
   listTemplates: (serverId: string) => void;
   deleteTemplate: (serverId: string, templateId: string) => void;
+  // ── Phase 8: Integrations & Bots ──
+  createWebhook: (serverId: string, channelId: string, name: string, webhookType: string, url?: string) => void;
+  listWebhooks: (serverId: string) => void;
+  updateWebhook: (webhookId: string, name: string, avatarUrl?: string) => void;
+  deleteWebhook: (webhookId: string) => void;
+  createBot: (username: string) => void;
+  createBotToken: (botUserId: string, name?: string, scopes?: string) => void;
+  listBotTokens: (botUserId: string) => void;
+  deleteBotToken: (tokenId: string) => void;
+  addBotToServer: (botUserId: string, serverId: string) => void;
+  removeBotFromServer: (botUserId: string, serverId: string) => void;
+  registerSlashCommand: (serverId: string, name: string, description: string, optionsJson?: string) => void;
+  listSlashCommands: (serverId: string) => void;
+  deleteSlashCommand: (commandId: string) => void;
+  invokeSlashCommand: (serverId: string, channelId: string, commandName: string, argsJson?: string) => void;
+  createOAuth2App: (name: string, description: string, redirectUris: string, scopes?: string) => void;
+  listOAuth2Apps: () => void;
+  deleteOAuth2App: (appId: string) => void;
 }
 
 /** Cache an avatar_url for a nickname if present. */
@@ -219,6 +249,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   communitySettings: EMPTY_COMMUNITY,
   discoverableServers: EMPTY_DISCOVER,
   templates: EMPTY_TEMPLATES,
+  webhooks: EMPTY_WEBHOOKS,
+  slashCommands: EMPTY_SLASH_COMMANDS,
+  botTokens: EMPTY_BOT_TOKENS,
+  oauth2Apps: EMPTY_OAUTH2_APPS,
   ws: null,
 
   connect: (nickname: string) => {
@@ -280,6 +314,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       communitySettings: EMPTY_COMMUNITY,
       discoverableServers: EMPTY_DISCOVER,
       templates: EMPTY_TEMPLATES,
+      webhooks: EMPTY_WEBHOOKS,
+      slashCommands: EMPTY_SLASH_COMMANDS,
+      botTokens: EMPTY_BOT_TOKENS,
+      oauth2Apps: EMPTY_OAUTH2_APPS,
     });
   },
 
@@ -978,6 +1016,55 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set({ templates: { ...get().templates, [event.server_id]: (get().templates[event.server_id] || []).filter(t => t.id !== event.template_id) } });
         break;
 
+      // ── Phase 8: Integrations & Bots ──
+      case 'webhook_list':
+        set({ webhooks: { ...get().webhooks, [event.server_id]: event.webhooks } });
+        break;
+      case 'webhook_update': {
+        const existing = get().webhooks[event.server_id] || [];
+        const idx = existing.findIndex(w => w.id === event.webhook.id);
+        const updated = idx >= 0 ? [...existing.slice(0, idx), event.webhook, ...existing.slice(idx + 1)] : [...existing, event.webhook];
+        set({ webhooks: { ...get().webhooks, [event.server_id]: updated } });
+        break;
+      }
+      case 'webhook_delete':
+        set({ webhooks: { ...get().webhooks, [event.server_id]: (get().webhooks[event.server_id] || []).filter(w => w.id !== event.webhook_id) } });
+        break;
+      case 'slash_command_list':
+        set({ slashCommands: { ...get().slashCommands, [event.server_id]: event.commands } });
+        break;
+      case 'slash_command_update': {
+        const existing = get().slashCommands[event.server_id] || [];
+        const idx = existing.findIndex(c => c.id === event.command.id);
+        const updated = idx >= 0 ? [...existing.slice(0, idx), event.command, ...existing.slice(idx + 1)] : [...existing, event.command];
+        set({ slashCommands: { ...get().slashCommands, [event.server_id]: updated } });
+        break;
+      }
+      case 'slash_command_delete':
+        set({ slashCommands: { ...get().slashCommands, [event.server_id]: (get().slashCommands[event.server_id] || []).filter(c => c.id !== event.command_id) } });
+        break;
+      case 'interaction_create':
+        // Interactions are ephemeral — log for debugging
+        console.log('Interaction created:', event.interaction);
+        break;
+      case 'interaction_response':
+        // Interaction responses are handled as messages by the server
+        console.log('Interaction response:', event.interaction_id);
+        break;
+      case 'bot_token_list':
+        set({ botTokens: event.tokens });
+        break;
+      case 'oauth2_app_list':
+        set({ oauth2Apps: event.apps });
+        break;
+      case 'oauth2_app_update': {
+        const existing = get().oauth2Apps;
+        const idx = existing.findIndex(a => a.id === event.app.id);
+        const updated = idx >= 0 ? [...existing.slice(0, idx), event.app, ...existing.slice(idx + 1)] : [...existing, event.app];
+        set({ oauth2Apps: updated });
+        break;
+      }
+
       case 'error': {
         console.error(`Server error [${event.code}]: ${event.message}`);
         break;
@@ -1353,5 +1440,57 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
   deleteTemplate: (serverId, templateId) => {
     get().ws?.send({ type: 'delete_template', server_id: serverId, template_id: templateId });
+  },
+  // ── Phase 8: Integrations & Bots ──
+  createWebhook: (serverId, channelId, name, webhookType, url) => {
+    get().ws?.send({ type: 'create_webhook', server_id: serverId, channel_id: channelId, name, webhook_type: webhookType, url });
+  },
+  listWebhooks: (serverId) => {
+    get().ws?.send({ type: 'list_webhooks', server_id: serverId });
+  },
+  updateWebhook: (webhookId, name, avatarUrl) => {
+    get().ws?.send({ type: 'update_webhook', webhook_id: webhookId, name, avatar_url: avatarUrl });
+  },
+  deleteWebhook: (webhookId) => {
+    get().ws?.send({ type: 'delete_webhook', webhook_id: webhookId });
+  },
+  createBot: (username) => {
+    get().ws?.send({ type: 'create_bot', username });
+  },
+  createBotToken: (botUserId, name, scopes) => {
+    get().ws?.send({ type: 'create_bot_token', bot_user_id: botUserId, name, scopes });
+  },
+  listBotTokens: (botUserId) => {
+    get().ws?.send({ type: 'list_bot_tokens', bot_user_id: botUserId });
+  },
+  deleteBotToken: (tokenId) => {
+    get().ws?.send({ type: 'delete_bot_token', token_id: tokenId });
+  },
+  addBotToServer: (botUserId, serverId) => {
+    get().ws?.send({ type: 'add_bot_to_server', bot_user_id: botUserId, server_id: serverId });
+  },
+  removeBotFromServer: (botUserId, serverId) => {
+    get().ws?.send({ type: 'remove_bot_from_server', bot_user_id: botUserId, server_id: serverId });
+  },
+  registerSlashCommand: (serverId, name, description, optionsJson) => {
+    get().ws?.send({ type: 'register_slash_command', server_id: serverId, name, description, options_json: optionsJson });
+  },
+  listSlashCommands: (serverId) => {
+    get().ws?.send({ type: 'list_slash_commands', server_id: serverId });
+  },
+  deleteSlashCommand: (commandId) => {
+    get().ws?.send({ type: 'delete_slash_command', command_id: commandId });
+  },
+  invokeSlashCommand: (serverId, channelId, commandName, argsJson) => {
+    get().ws?.send({ type: 'invoke_slash_command', server_id: serverId, channel_id: channelId, command_name: commandName, args_json: argsJson });
+  },
+  createOAuth2App: (name, description, redirectUris, scopes) => {
+    get().ws?.send({ type: 'create_oauth2_app', name, description, redirect_uris: redirectUris, scopes });
+  },
+  listOAuth2Apps: () => {
+    get().ws?.send({ type: 'list_oauth2_apps' });
+  },
+  deleteOAuth2App: (appId) => {
+    get().ws?.send({ type: 'delete_oauth2_app', app_id: appId });
   },
 }));

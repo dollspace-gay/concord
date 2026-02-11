@@ -47,14 +47,13 @@ impl AtprotoOAuth {
         const KEY_NAME: &str = "atproto_signing_key";
 
         // Try to load existing key from server_config
-        let existing: Option<String> = sqlx::query_scalar(
-            "SELECT value FROM server_config WHERE key = ?",
-        )
-        .bind(KEY_NAME)
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten();
+        let existing: Option<String> =
+            sqlx::query_scalar("SELECT value FROM server_config WHERE key = ?")
+                .bind(KEY_NAME)
+                .fetch_optional(pool)
+                .await
+                .ok()
+                .flatten();
 
         let signing_key = if let Some(ref jwk_json) = existing {
             if let Ok(wrapped) = serde_json::from_str::<jwk::WrappedJsonWebKey>(jwk_json) {
@@ -403,8 +402,8 @@ pub async fn atproto_callback(
             String::new()
         }
     };
-    let expires_at = (Utc::now() + chrono::Duration::seconds(token_response.expires_in as i64))
-        .to_rfc3339();
+    let expires_at =
+        (Utc::now() + chrono::Duration::seconds(token_response.expires_in as i64)).to_rfc3339();
     if let Err(e) = users::store_atproto_credentials(
         &state.db,
         &user_id,
@@ -549,7 +548,11 @@ fn issue_session_cookie(auth_config: &AuthConfig, user_id: &str) -> Response {
         }
     };
 
-    let secure = if auth_config.public_url.starts_with("https") { "; Secure" } else { "" };
+    let secure = if auth_config.public_url.starts_with("https") {
+        "; Secure"
+    } else {
+        ""
+    };
     let cookie = format!(
         "concord_session={}; HttpOnly; Path=/; Max-Age={}; SameSite=Lax{}",
         jwt,

@@ -11,7 +11,10 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::auth::token::{generate_irc_token, hash_irc_token, verify_irc_token};
-use crate::db::queries::{attachments, bots, community, emoji, invites, roles, servers, users};
+use crate::db::queries::{
+    atproto as atproto_queries, attachments, bots, community, emoji, invites, messages, profiles,
+    roles, servers, users,
+};
 use crate::engine::events::HistoryMessage;
 use crate::engine::permissions::{Permissions, compute_effective_permissions};
 use sqlx;
@@ -48,7 +51,12 @@ async fn check_server_permission(
         .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Database error"))?;
     let role_perms: Vec<(String, Permissions)> = user_roles
         .iter()
-        .map(|r| (r.id.clone(), Permissions::from_bits_truncate(r.permissions as u64)))
+        .map(|r| {
+            (
+                r.id.clone(),
+                Permissions::from_bits_truncate(r.permissions as u64),
+            )
+        })
         .collect();
 
     let effective = compute_effective_permissions(base, &role_perms, &[], "", user_id, false);
@@ -729,7 +737,11 @@ pub async fn get_upload(
 
     // SSRF protection: verify blob URL doesn't point to private/internal IPs
     if !crate::engine::embeds::is_safe_url(blob_url).await {
-        return (StatusCode::FORBIDDEN, "Blob URL points to a restricted address").into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            "Blob URL points to a restricted address",
+        )
+            .into_response();
     }
 
     info!(attachment_id = %attachment_id, blob_url = %blob_url, "Proxying PDS blob");
@@ -827,9 +839,13 @@ pub async fn create_server_emoji(
     user: AuthUser,
     Json(body): Json<CreateEmojiRequest>,
 ) -> impl IntoResponse {
-    if let Err(resp) =
-        check_server_permission(&state.db, &server_id, &user.user_id, Permissions::MANAGE_SERVER)
-            .await
+    if let Err(resp) = check_server_permission(
+        &state.db,
+        &server_id,
+        &user.user_id,
+        Permissions::MANAGE_SERVER,
+    )
+    .await
     {
         return resp.into_response();
     }
@@ -882,9 +898,13 @@ pub async fn delete_server_emoji(
     Path((server_id, emoji_id)): Path<(String, String)>,
     user: AuthUser,
 ) -> impl IntoResponse {
-    if let Err(resp) =
-        check_server_permission(&state.db, &server_id, &user.user_id, Permissions::MANAGE_SERVER)
-            .await
+    if let Err(resp) = check_server_permission(
+        &state.db,
+        &server_id,
+        &user.user_id,
+        Permissions::MANAGE_SERVER,
+    )
+    .await
     {
         return resp.into_response();
     }
@@ -922,7 +942,7 @@ pub async fn get_user_full_profile(
         }
     };
 
-    let profile = crate::db::queries::profiles::get_profile(&state.db, &user.0)
+    let profile = profiles::get_profile(&state.db, &user.0)
         .await
         .unwrap_or(None);
 
@@ -950,7 +970,7 @@ pub async fn update_profile(
     auth: AuthUser,
     Json(body): Json<UpdateProfileRequest>,
 ) -> impl IntoResponse {
-    match crate::db::queries::profiles::upsert_profile(
+    match profiles::upsert_profile(
         &state.db,
         &auth.user_id,
         body.bio.as_deref(),
@@ -1171,6 +1191,280 @@ pub async fn execute_webhook(
                 )
                     .into_response()
             }
+        }
+    }
+}
+
+// ── Bluesky Profile Sync ──────────────────────────────────────
+
+/// POST /api/bluesky/sync-profile — fetch and store the user's Bluesky profile.
+pub async fn sync_bluesky_profile(
+    State(state): State<Arc<AppState>>,
+    auth: AuthUser,
+) -> impl IntoResponse {
+    // user_id IS the DID (since migration 014)
+    let did = auth.user_id.clone();
+
+    // Fetch public profile from Bluesky
+    let http_client = reqwest::Client::new();
+    let profile = match super::atproto::fetch_full_bsky_profile(&http_client, &did).await {
+        Some(p) => p,
+        None => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({"error": "Could not fetch Bluesky profile"})),
+            )
+                .into_response();
+        }
+    };
+
+    // Store sync data
+    if let Err(e) =
+        atproto_queries::store_bsky_profile_sync(&atproto_queries::StoreBskyProfileParams {
+            pool: &state.db,
+            user_id: &auth.user_id,
+            handle: &profile.handle,
+            display_name: profile.display_name.as_deref(),
+            description: profile.description.as_deref(),
+            banner_url: profile.banner.as_deref(),
+            followers_count: profile.followers_count,
+            follows_count: profile.follows_count,
+        })
+        .await
+    {
+        error!(error = %e, "Failed to store profile sync");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to save profile data"})),
+        )
+            .into_response();
+    }
+
+    // Also update the user's avatar and bio from Bluesky data
+    if let Some(ref avatar) = profile.avatar {
+        let _ = sqlx::query("UPDATE users SET avatar_url = ? WHERE id = ?")
+            .bind(avatar)
+            .bind(&auth.user_id)
+            .execute(&state.db)
+            .await;
+    }
+    if let Some(ref description) = profile.description {
+        let _ = profiles::upsert_profile(
+            &state.db,
+            &auth.user_id,
+            Some(description),
+            None,
+            profile.banner.as_deref(),
+        )
+        .await;
+    }
+
+    Json(serde_json::json!({
+        "did": profile.did,
+        "handle": profile.handle,
+        "display_name": profile.display_name,
+        "description": profile.description,
+        "avatar": profile.avatar,
+        "banner": profile.banner,
+        "followers_count": profile.followers_count,
+        "follows_count": profile.follows_count,
+        "posts_count": profile.posts_count,
+    }))
+    .into_response()
+}
+
+/// GET /api/users/{id}/bluesky — get Bluesky identity info for a user.
+pub async fn get_bluesky_identity(
+    State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+) -> impl IntoResponse {
+    match atproto_queries::get_bsky_profile_sync(&state.db, &user_id).await {
+        Ok(Some(sync)) => Json(serde_json::json!({
+            "did": sync.did,
+            "bsky_handle": sync.bsky_handle,
+            "display_name": sync.bsky_display_name,
+            "description": sync.bsky_description,
+            "banner_url": sync.bsky_banner_url,
+            "followers_count": sync.bsky_followers_count,
+            "follows_count": sync.bsky_follows_count,
+            "last_sync": sync.last_profile_sync,
+        }))
+        .into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "No Bluesky account found for user"})),
+        )
+            .into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to fetch Bluesky identity");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database error"})),
+            )
+                .into_response()
+        }
+    }
+}
+
+/// POST /api/messages/{id}/share-bluesky — share a message to Bluesky.
+pub async fn share_to_bluesky(
+    State(state): State<Arc<AppState>>,
+    auth: AuthUser,
+    Path(message_id): Path<String>,
+) -> impl IntoResponse {
+    info!(user_id = %auth.user_id, message_id = %message_id, "share_to_bluesky request received");
+    // Check if already shared
+    match atproto_queries::get_shared_post(&state.db, &message_id, &auth.user_id).await {
+        Ok(Some(uri)) => {
+            return Json(serde_json::json!({
+                "success": true,
+                "already_shared": true,
+                "post_uri": uri,
+            }))
+            .into_response();
+        }
+        Ok(None) => {}
+        Err(e) => {
+            error!(error = %e, "Failed to check shared post");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    }
+
+    // Get the message content
+    let msg = match messages::get_message_by_id(&state.db, &message_id).await {
+        Ok(Some(m)) => m,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Message not found"})),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to fetch message");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
+
+    // Verify the user owns this message
+    if msg.sender_id != auth.user_id {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error": "You can only share your own messages"})),
+        )
+            .into_response();
+    }
+
+    // Truncate to 300 graphemes for Bluesky's limit
+    let text: String = msg.content.chars().take(300).collect();
+
+    // Create the Bluesky post via PDS
+    let public_url = &state.auth_config.public_url;
+    let client_id = format!("{}/api/auth/atproto/v2/client-metadata.json", public_url);
+    let redirect_uri = format!("{}/api/auth/atproto/callback", public_url);
+
+    let post_record = serde_json::json!({
+        "$type": "app.bsky.feed.post",
+        "text": text,
+        "createdAt": chrono::Utc::now().to_rfc3339(),
+    });
+
+    match crate::web::pds_client::create_record(
+        &state.db,
+        &auth.user_id,
+        "app.bsky.feed.post",
+        &post_record,
+        &state.atproto.signing_key,
+        &client_id,
+        &redirect_uri,
+    )
+    .await
+    {
+        Ok(resp) => {
+            // Record the share
+            let share_id = Uuid::new_v4().to_string();
+            let _ = atproto_queries::insert_shared_post(
+                &state.db,
+                &share_id,
+                &message_id,
+                &auth.user_id,
+                &resp.uri,
+                &resp.cid,
+            )
+            .await;
+
+            Json(serde_json::json!({
+                "success": true,
+                "post_uri": resp.uri,
+                "cid": resp.cid,
+            }))
+            .into_response()
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to share to Bluesky");
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({"error": "Failed to share to Bluesky"})),
+            )
+                .into_response()
+        }
+    }
+}
+
+// ── AT Protocol Record Sync Settings ──────────────────────────────────────
+
+/// GET /api/settings/atproto-sync — get the user's AT Protocol record sync setting.
+pub async fn get_atproto_sync_setting(
+    State(state): State<Arc<AppState>>,
+    auth: AuthUser,
+) -> impl IntoResponse {
+    match crate::web::atproto_records::is_sync_enabled(&state.db, &auth.user_id).await {
+        Ok(enabled) => Json(serde_json::json!({ "atproto_sync_enabled": enabled })).into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to get atproto sync setting");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database error"})),
+            )
+                .into_response()
+        }
+    }
+}
+
+/// PATCH /api/settings/atproto-sync — toggle AT Protocol record sync.
+pub async fn update_atproto_sync_setting(
+    State(state): State<Arc<AppState>>,
+    auth: AuthUser,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let enabled = match body.get("enabled").and_then(|v| v.as_bool()) {
+        Some(v) => v,
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "Missing 'enabled' boolean field"})),
+            )
+                .into_response();
+        }
+    };
+
+    match crate::web::atproto_records::set_sync_enabled(&state.db, &auth.user_id, enabled).await {
+        Ok(()) => Json(serde_json::json!({ "atproto_sync_enabled": enabled })).into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to update atproto sync setting");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database error"})),
+            )
+                .into_response()
         }
     }
 }

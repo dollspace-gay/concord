@@ -118,6 +118,11 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         (10, include_str!("../../migrations/010_moderation.sql")),
         (11, include_str!("../../migrations/011_community.sql")),
         (12, include_str!("../../migrations/012_integrations.sql")),
+        (
+            13,
+            include_str!("../../migrations/013_atproto_integration.sql"),
+        ),
+        (14, include_str!("../../migrations/014_user_id_to_did.sql")),
     ];
 
     for &(version, sql) in migrations {
@@ -259,7 +264,7 @@ END;";
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count, 12);
+        assert_eq!(count, 14);
 
         // Running again should not duplicate (INSERT OR IGNORE)
         run_migrations(&pool).await.unwrap();
@@ -268,7 +273,7 @@ END;";
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count_after, 12, "No duplicate version rows after re-run");
+        assert_eq!(count_after, 14, "No duplicate version rows after re-run");
     }
 
     #[tokio::test]
@@ -320,7 +325,7 @@ END;";
                 .fetch_all(&pool)
                 .await
                 .unwrap();
-        let expected: Vec<i64> = (1..=12).collect();
+        let expected: Vec<i64> = (1..=14).collect();
         assert_eq!(
             versions, expected,
             "Migration versions should be 1 through 12"

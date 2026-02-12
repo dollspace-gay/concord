@@ -94,7 +94,7 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(max_version, 12, "All 12 migrations should be recorded");
+        assert_eq!(max_version, 14, "All 14 migrations should be recorded");
     }
 
     #[tokio::test]
@@ -109,7 +109,7 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count, 12, "No duplicate migration entries after re-run");
+        assert_eq!(count, 14, "No duplicate migration entries after re-run");
     }
 
     #[tokio::test]
@@ -276,7 +276,15 @@ mod tests {
 
         // Send a message
         engine
-            .send_message(sid, &server_id, "#general", "Hello World!", None, None)
+            .send_message(
+                sid,
+                &server_id,
+                "#general",
+                "Hello World!",
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         // The sender should NOT receive their own message via the channel broadcast
@@ -916,14 +924,16 @@ mod tests {
         );
 
         // Filter by category
-        let found_tech = queries::community::list_discoverable_servers(&pool, Some("technology"), 100, 0)
-            .await
-            .unwrap();
+        let found_tech =
+            queries::community::list_discoverable_servers(&pool, Some("technology"), 100, 0)
+                .await
+                .unwrap();
         assert_eq!(found_tech.len(), 1);
 
-        let found_gaming = queries::community::list_discoverable_servers(&pool, Some("gaming"), 100, 0)
-            .await
-            .unwrap();
+        let found_gaming =
+            queries::community::list_discoverable_servers(&pool, Some("gaming"), 100, 0)
+                .await
+                .unwrap();
         assert!(found_gaming.is_empty());
     }
 
@@ -1695,7 +1705,15 @@ mod tests {
 
         // Send a message
         engine
-            .send_message(sid1, &server_id, "#general", "Test message", None, None)
+            .send_message(
+                sid1,
+                &server_id,
+                "#general",
+                "Test message",
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         let event = rx2.try_recv().unwrap();
@@ -2785,7 +2803,15 @@ mod tests {
 
         // Alice sends a message
         engine
-            .send_message(sid1, &server_id, "#general", "Hello everyone!", None, None)
+            .send_message(
+                sid1,
+                &server_id,
+                "#general",
+                "Hello everyone!",
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         // Bob and Charlie should receive it, but not Alice
@@ -2802,7 +2828,9 @@ mod tests {
             }
         }
 
-        // Alice should not receive her own message
+        // Alice should not receive her own message (only a MessageAck)
+        let ack = rx1.try_recv().unwrap();
+        assert!(matches!(ack, ChatEvent::MessageAck { .. }));
         assert!(rx1.try_recv().is_err());
     }
 }

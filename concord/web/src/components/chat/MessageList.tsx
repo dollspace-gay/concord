@@ -117,6 +117,7 @@ function MessageItem({ message }: { message: HistoryMessage }) {
   const pinMessage = useChatStore((s) => s.pinMessage);
   const addBookmark = useChatStore((s) => s.addBookmark);
   const createThread = useChatStore((s) => s.createThread);
+  const shareToBlueskyAction = useChatStore((s) => s.shareToBluesky);
   const activeServer = useUiStore((s) => s.activeServer);
   const activeChannel = useUiStore((s) => s.activeChannel);
   const avatarUrl = avatars[message.from];
@@ -185,6 +186,20 @@ function MessageItem({ message }: { message: HistoryMessage }) {
       createThread(activeServer, activeChannel, threadName, message.id);
     }
     setShowActions(false);
+  };
+
+  const [shareStatus, setShareStatus] = useState<'idle' | 'sharing' | 'shared' | 'error'>('idle');
+  const handleShareToBluesky = async () => {
+    setShareStatus('sharing');
+    try {
+      await shareToBlueskyAction(message.id);
+      setShareStatus('shared');
+      setTimeout(() => setShareStatus('idle'), 2000);
+    } catch (e) {
+      console.error('Share to Bluesky failed:', e);
+      setShareStatus('error');
+      setTimeout(() => setShareStatus('idle'), 3000);
+    }
   };
 
   return (
@@ -315,6 +330,16 @@ function MessageItem({ message }: { message: HistoryMessage }) {
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+            </svg>
+          </button>
+          <button
+            onClick={handleShareToBluesky}
+            className={`px-1.5 py-0.5 text-sm hover:bg-bg-hover ${shareStatus === 'shared' ? 'text-green-400' : shareStatus === 'error' ? 'text-red-400' : 'text-text-muted hover:text-blue-400'}`}
+            title={shareStatus === 'shared' ? 'Shared!' : shareStatus === 'error' ? 'Failed to share' : shareStatus === 'sharing' ? 'Sharing...' : 'Share to Bluesky'}
+            disabled={shareStatus === 'sharing'}
+          >
+            <svg className="h-4 w-4" viewBox="0 0 600 530" fill="currentColor">
+              <path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.3797-3.6904-10.832-3.7077-7.8964-0.0174-2.9357-1.1937 0.51669-3.7077 7.8964-13.72 40.255-67.233 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.4491-163.25-81.433-5.9562-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z" />
             </svg>
           </button>
           <button

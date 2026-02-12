@@ -35,7 +35,9 @@ async fn main() {
             .map(char::from)
             .collect();
         config.auth.jwt_secret = secret;
-        warn!("JWT secret is the default or empty — generated a random ephemeral secret. Sessions will NOT persist across restarts. Set jwt_secret in concord.toml or JWT_SECRET env var for production.");
+        warn!(
+            "JWT secret is the default or empty — generated a random ephemeral secret. Sessions will NOT persist across restarts. Set jwt_secret in concord.toml or JWT_SECRET env var for production."
+        );
     }
 
     // Initialize database
@@ -89,17 +91,18 @@ async fn main() {
 
     // Build optional TLS acceptor for IRC
     let irc_tls_acceptor = match (&config.server.irc_tls_cert, &config.server.irc_tls_key) {
-        (Some(cert_path), Some(key_path)) => {
-            match load_irc_tls_config(cert_path, key_path) {
-                Ok(acceptor) => {
-                    info!("IRC TLS configured with cert={}, key={}", cert_path, key_path);
-                    Some(acceptor)
-                }
-                Err(e) => {
-                    panic!("Failed to load IRC TLS config: {e}");
-                }
+        (Some(cert_path), Some(key_path)) => match load_irc_tls_config(cert_path, key_path) {
+            Ok(acceptor) => {
+                info!(
+                    "IRC TLS configured with cert={}, key={}",
+                    cert_path, key_path
+                );
+                Some(acceptor)
             }
-        }
+            Err(e) => {
+                panic!("Failed to load IRC TLS config: {e}");
+            }
+        },
         (Some(_), None) | (None, Some(_)) => {
             panic!("Both irc_tls_cert and irc_tls_key must be set for IRC TLS");
         }
@@ -112,7 +115,14 @@ async fn main() {
     let irc_addr = config.server.irc_address.clone();
     let irc_cancel = cancel.clone();
     tokio::spawn(async move {
-        start_irc_listener(&irc_addr, irc_engine, irc_pool, irc_cancel, irc_tls_acceptor).await;
+        start_irc_listener(
+            &irc_addr,
+            irc_engine,
+            irc_pool,
+            irc_cancel,
+            irc_tls_acceptor,
+        )
+        .await;
     });
 
     let max_file_size = config.storage.max_file_size_mb * 1024 * 1024;
@@ -173,8 +183,8 @@ fn load_irc_tls_config(
         return Err("No certificates found in cert file".into());
     }
 
-    let key = private_key(&mut BufReader::new(key_file))?
-        .ok_or("No private key found in key file")?;
+    let key =
+        private_key(&mut BufReader::new(key_file))?.ok_or("No private key found in key file")?;
 
     let config = ServerConfig::builder()
         .with_no_client_auth()

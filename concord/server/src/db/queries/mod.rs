@@ -1,3 +1,4 @@
+pub mod atproto;
 pub mod attachments;
 pub mod audit_log;
 pub mod automod;

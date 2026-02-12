@@ -28,7 +28,8 @@ pub fn validate_server_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Validate a nickname. Must be 1-32 chars, alphanumeric + underscore/hyphen.
+/// Validate a nickname. Must be 1-32 chars, alphanumeric + underscore/hyphen/dot.
+/// Dots are allowed to support Bluesky handles (e.g., `dollspace.gay`).
 pub fn validate_nickname(nick: &str) -> Result<(), String> {
     if nick.is_empty() {
         return Err("Nickname cannot be empty".into());
@@ -41,9 +42,11 @@ pub fn validate_nickname(nick: &str) -> Result<(), String> {
     }
     if !nick
         .chars()
-        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
     {
-        return Err("Nickname can only contain letters, numbers, underscores, and hyphens".into());
+        return Err(
+            "Nickname can only contain letters, numbers, underscores, hyphens, and dots".into(),
+        );
     }
     Ok(())
 }
@@ -108,6 +111,8 @@ mod tests {
         assert!(validate_nickname("alice").is_ok());
         assert!(validate_nickname("bob_123").is_ok());
         assert!(validate_nickname("user-name").is_ok());
+        assert!(validate_nickname("dollspace.gay").is_ok()); // Bluesky handle
+        assert!(validate_nickname("user.name.bsky.social").is_ok());
     }
 
     #[test]
@@ -353,7 +358,10 @@ mod tests {
 
     #[test]
     fn test_sanitize_html_escapes_tags() {
-        assert_eq!(sanitize_html("<script>alert('xss')</script>"), "&lt;script&gt;alert('xss')&lt;/script&gt;");
+        assert_eq!(
+            sanitize_html("<script>alert('xss')</script>"),
+            "&lt;script&gt;alert('xss')&lt;/script&gt;"
+        );
     }
 
     #[test]
@@ -368,11 +376,17 @@ mod tests {
 
     #[test]
     fn test_sanitize_html_preserves_markdown() {
-        assert_eq!(sanitize_html("**bold** _italic_ `code`"), "**bold** _italic_ `code`");
+        assert_eq!(
+            sanitize_html("**bold** _italic_ `code`"),
+            "**bold** _italic_ `code`"
+        );
     }
 
     #[test]
     fn test_sanitize_html_mixed_content() {
-        assert_eq!(sanitize_html("Hello <b>world</b> & friends"), "Hello &lt;b&gt;world&lt;/b&gt; &amp; friends");
+        assert_eq!(
+            sanitize_html("Hello <b>world</b> & friends"),
+            "Hello &lt;b&gt;world&lt;/b&gt; &amp; friends"
+        );
     }
 }

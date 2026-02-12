@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { AttachmentInfo, AuditLogEntry, AutomodRuleInfo, BanInfo, BookmarkInfo, BotTokenInfo, CategoryInfo, ChannelInfo, ChannelPositionInfo, EventInfo, ForumTagInfo, HistoryMessage, InviteInfo, MemberInfo, OAuth2AppInfo, PinnedMessageInfo, PresenceInfo, ReplyInfo, RoleInfo, SearchResultMessage, ServerCommunityInfo, ServerEvent, ServerInfo, SlashCommandInfo, TemplateInfo, ThreadInfo, UserProfileInfo, WebhookInfo } from '../api/types';
-import { listServerEmoji, createServerEmoji, deleteServerEmoji } from '../api/client';
+import type { AttachmentInfo, AuditLogEntry, AutomodRuleInfo, BanInfo, BlueskyIdentityInfo, BlueskyShareResult, BookmarkInfo, BotTokenInfo, CategoryInfo, ChannelInfo, ChannelPositionInfo, EventInfo, ForumTagInfo, HistoryMessage, InviteInfo, MemberInfo, OAuth2AppInfo, PinnedMessageInfo, PresenceInfo, ReplyInfo, RoleInfo, SearchResultMessage, ServerCommunityInfo, ServerEvent, ServerInfo, SlashCommandInfo, TemplateInfo, ThreadInfo, UserProfileInfo, WebhookInfo } from '../api/types';
+import { listServerEmoji, createServerEmoji, deleteServerEmoji, syncBlueskyProfile, getBlueskyIdentity, shareToBluesky, getAtprotoSyncSetting, updateAtprotoSyncSetting } from '../api/client';
 import { channelKey } from '../api/types';
 import { WebSocketManager } from '../api/websocket';
 
@@ -33,6 +33,7 @@ const EMPTY_WEBHOOKS: Record<string, WebhookInfo[]> = {};
 const EMPTY_SLASH_COMMANDS: Record<string, SlashCommandInfo[]> = {};
 const EMPTY_BOT_TOKENS: BotTokenInfo[] = [];
 const EMPTY_OAUTH2_APPS: OAuth2AppInfo[] = [];
+const EMPTY_BLUESKY_IDENTITIES: Record<string, BlueskyIdentityInfo> = {};
 
 interface ChatState {
   connected: boolean;
@@ -96,6 +97,10 @@ interface ChatState {
   botTokens: BotTokenInfo[];
   /** OAuth2 apps (for current user) */
   oauth2Apps: OAuth2AppInfo[];
+  /** user_id -> Bluesky identity info (cached) */
+  blueskyIdentities: Record<string, BlueskyIdentityInfo>;
+  /** Whether current user has AT Protocol record sync enabled */
+  atprotoSyncEnabled: boolean;
   ws: WebSocketManager | null;
 
   connect: (nickname: string) => void;
@@ -210,6 +215,12 @@ interface ChatState {
   createOAuth2App: (name: string, description: string, redirectUris: string, scopes?: string) => void;
   listOAuth2Apps: () => void;
   deleteOAuth2App: (appId: string) => void;
+  // ── Phase 9: AT Protocol Deep Integration ──
+  syncBlueskyProfile: () => Promise<void>;
+  fetchBlueskyIdentity: (userId: string) => void;
+  shareToBluesky: (messageId: string) => Promise<BlueskyShareResult>;
+  fetchAtprotoSyncSetting: () => void;
+  setAtprotoSyncEnabled: (enabled: boolean) => Promise<void>;
 }
 
 /** Cache an avatar_url for a nickname if present. */
@@ -256,6 +267,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   slashCommands: EMPTY_SLASH_COMMANDS,
   botTokens: EMPTY_BOT_TOKENS,
   oauth2Apps: EMPTY_OAUTH2_APPS,
+  blueskyIdentities: EMPTY_BLUESKY_IDENTITIES,
+  atprotoSyncEnabled: false,
   ws: null,
 
   connect: (nickname: string) => {
@@ -321,6 +334,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       slashCommands: EMPTY_SLASH_COMMANDS,
       botTokens: EMPTY_BOT_TOKENS,
       oauth2Apps: EMPTY_OAUTH2_APPS,
+      blueskyIdentities: EMPTY_BLUESKY_IDENTITIES,
+      atprotoSyncEnabled: false,
     });
   },
 
@@ -376,6 +391,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
             [key]: (s.messages[key] || []).filter((m) => m.id !== event.id),
           },
         }));
+        break;
+      }
+
+      case 'message_ack': {
+        // Server sends back the real message ID + nonce — update the optimistic local message
+        const ackKey = channelKey(event.server_id, event.channel);
+        if (!event.nonce) break;
+        set((s) => {
+          const msgs = s.messages[ackKey];
+          if (!msgs) return {};
+          // Find the optimistic message by its nonce (used as the temporary ID)
+          const idx = msgs.findIndex((m) => m.id === event.nonce);
+          if (idx === -1) return {};
+          const updated = [...msgs];
+          updated[idx] = { ...updated[idx], id: event.id };
+          return { messages: { ...s.messages, [ackKey]: updated } };
+        });
         break;
       }
 
@@ -1082,8 +1114,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const key = channelKey(serverId, channel);
 
     // Add message locally (server excludes sender from broadcast)
+    // Use the same nonce as local ID so the server ack can update it
+    const nonce = crypto.randomUUID();
     const msg: HistoryMessage = {
-      id: crypto.randomUUID(),
+      id: nonce,
       from: nickname,
       content,
       timestamp: new Date().toISOString(),
@@ -1105,6 +1139,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       content,
       reply_to: replyingTo?.id,
       attachment_ids: attachments?.map((a) => a.id),
+      nonce,
     });
   },
 
@@ -1509,5 +1544,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
   deleteOAuth2App: (appId) => {
     get().ws?.send({ type: 'delete_oauth2_app', app_id: appId });
+  },
+  // ── Phase 9: AT Protocol Deep Integration ──
+  syncBlueskyProfile: async () => {
+    await syncBlueskyProfile();
+  },
+  fetchBlueskyIdentity: (userId) => {
+    getBlueskyIdentity(userId)
+      .then((identity) => {
+        set((s) => ({
+          blueskyIdentities: { ...s.blueskyIdentities, [userId]: identity },
+        }));
+      })
+      .catch(() => { /* user may not have Bluesky linked */ });
+  },
+  shareToBluesky: async (messageId) => {
+    return await shareToBluesky(messageId);
+  },
+  fetchAtprotoSyncSetting: () => {
+    getAtprotoSyncSetting()
+      .then((r) => set({ atprotoSyncEnabled: r.atproto_sync_enabled }))
+      .catch(() => { /* not authenticated or no AT Protocol account */ });
+  },
+  setAtprotoSyncEnabled: async (enabled) => {
+    const r = await updateAtprotoSyncSetting(enabled);
+    set({ atprotoSyncEnabled: r.atproto_sync_enabled });
   },
 }));

@@ -625,9 +625,13 @@ impl ChatEngine {
                 .map_err(|e| format!("Failed to create channel: {e}"))?;
 
             if let Some(cat_id) = category_id {
-                crate::db::queries::channels::update_channel_category(pool, &channel_id, Some(cat_id))
-                    .await
-                    .map_err(|e| format!("Failed to set channel category: {e}"))?;
+                crate::db::queries::channels::update_channel_category(
+                    pool,
+                    &channel_id,
+                    Some(cat_id),
+                )
+                .await
+                .map_err(|e| format!("Failed to set channel category: {e}"))?;
             }
 
             if is_private {
@@ -714,15 +718,10 @@ impl ChatEngine {
                     })
                 });
                 if !has_view {
-                    return Err(
-                        "You do not have permission to join this private channel"
-                            .into(),
-                    );
+                    return Err("You do not have permission to join this private channel".into());
                 }
             } else {
-                return Err(
-                    "Authentication required to join private channels".into(),
-                );
+                return Err("Authentication required to join private channels".into());
             }
         }
 
@@ -860,6 +859,7 @@ impl ChatEngine {
     }
 
     /// Send a message to a channel or user (DM), with optional reply and attachments.
+    #[allow(clippy::too_many_arguments)]
     pub fn send_message(
         &self,
         session_id: SessionId,
@@ -868,6 +868,7 @@ impl ChatEngine {
         content: &str,
         reply_to_id: Option<&str>,
         attachment_ids: Option<&[String]>,
+        nonce: Option<&str>,
     ) -> Result<(), String> {
         validation::validate_message(content)?;
         let content = &validation::sanitize_html(content);
@@ -892,8 +893,7 @@ impl ChatEngine {
             let timed_out = tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
                     if let Ok(Some(until)) =
-                        crate::db::queries::moderation::get_member_timeout(&pool, &srv, &uid)
-                            .await
+                        crate::db::queries::moderation::get_member_timeout(&pool, &srv, &uid).await
                         && let Ok(timeout_dt) =
                             chrono::NaiveDateTime::parse_from_str(&until, "%Y-%m-%d %H:%M:%S")
                     {
@@ -924,14 +924,11 @@ impl ChatEngine {
                                 &pool, &ch.id, &nick,
                             )
                             .await
-                        && let Ok(last_dt) = chrono::NaiveDateTime::parse_from_str(
-                            &last,
-                            "%Y-%m-%d %H:%M:%S",
-                        )
+                        && let Ok(last_dt) =
+                            chrono::NaiveDateTime::parse_from_str(&last, "%Y-%m-%d %H:%M:%S")
                     {
                         let last_utc = last_dt.and_utc();
-                        let cooldown =
-                            chrono::Duration::seconds(ch.slowmode_seconds as i64);
+                        let cooldown = chrono::Duration::seconds(ch.slowmode_seconds as i64);
                         if chrono::Utc::now() - last_utc < cooldown {
                             return Some(format!(
                                 "Slow mode: wait {} seconds between messages",
@@ -961,12 +958,17 @@ impl ChatEngine {
                         let triggered = match rule.rule_type.as_str() {
                             "keyword" => {
                                 // Config: {"words":["bad","spam"]}
-                                if let Ok(config) = serde_json::from_str::<serde_json::Value>(&rule.config) {
-                                    if let Some(words) = config.get("words").and_then(|w| w.as_array()) {
+                                if let Ok(config) =
+                                    serde_json::from_str::<serde_json::Value>(&rule.config)
+                                {
+                                    if let Some(words) =
+                                        config.get("words").and_then(|w| w.as_array())
+                                    {
                                         let lower = content_clone.to_lowercase();
                                         words.iter().any(|w| {
-                                            w.as_str()
-                                                .is_some_and(|kw| lower.contains(&kw.to_lowercase()))
+                                            w.as_str().is_some_and(|kw| {
+                                                lower.contains(&kw.to_lowercase())
+                                            })
                                         })
                                     } else {
                                         false
@@ -977,11 +979,14 @@ impl ChatEngine {
                             }
                             "mention_spam" => {
                                 // Config: {"max_mentions":5}
-                                if let Ok(config) = serde_json::from_str::<serde_json::Value>(&rule.config) {
+                                if let Ok(config) =
+                                    serde_json::from_str::<serde_json::Value>(&rule.config)
+                                {
                                     let max = config
                                         .get("max_mentions")
                                         .and_then(|m| m.as_i64())
-                                        .unwrap_or(5) as usize;
+                                        .unwrap_or(5)
+                                        as usize;
                                     let mention_count = content_clone.matches('@').count();
                                     mention_count > max
                                 } else {
@@ -990,7 +995,9 @@ impl ChatEngine {
                             }
                             "link_filter" => {
                                 // Config: {"block_all":true}
-                                if let Ok(config) = serde_json::from_str::<serde_json::Value>(&rule.config) {
+                                if let Ok(config) =
+                                    serde_json::from_str::<serde_json::Value>(&rule.config)
+                                {
                                     let block_all = config
                                         .get("block_all")
                                         .and_then(|b| b.as_bool())
@@ -1008,10 +1015,7 @@ impl ChatEngine {
                             _ => false,
                         };
                         if triggered {
-                            return Some(format!(
-                                "Message blocked by automod rule: {}",
-                                rule.name
-                            ));
+                            return Some(format!("Message blocked by automod rule: {}", rule.name));
                         }
                     }
                     None
@@ -1131,7 +1135,7 @@ impl ChatEngine {
                         id: &id,
                         server_id: &srv,
                         channel_id: &ch,
-                        sender_id: &sid,
+                        sender_id: &uid,
                         sender_nick: &nick,
                         content: &msg,
                         reply_to_id: reply_id.as_deref(),
@@ -1155,6 +1159,16 @@ impl ChatEngine {
             }
 
             self.broadcast_to_channel(&channel_id, &event, Some(session_id));
+
+            // Send MessageAck back to the sender with the server-generated message ID
+            if let Some(sender_session) = self.sessions.get(&session_id) {
+                let _ = sender_session.send(ChatEvent::MessageAck {
+                    id: msg_id,
+                    server_id: server_id.to_string(),
+                    channel: target.to_string(),
+                    nonce: nonce.map(|s| s.to_string()),
+                });
+            }
 
             // Async link embed unfurling — extract URLs and resolve OG metadata
             let urls = super::embeds::extract_urls(content);
@@ -1251,6 +1265,16 @@ impl ChatEngine {
 
             if let Some(target_session) = self.sessions.get(target_session_id.value()) {
                 let _ = target_session.send(event);
+            }
+
+            // Send MessageAck back to the DM sender
+            if let Some(sender_session) = self.sessions.get(&session_id) {
+                let _ = sender_session.send(ChatEvent::MessageAck {
+                    id: msg_id,
+                    server_id: String::new(),
+                    channel: target.to_string(),
+                    nonce: nonce.map(|s| s.to_string()),
+                });
             }
         }
 
@@ -1524,7 +1548,10 @@ impl ChatEngine {
             .ok_or("Message not found")?;
 
         // Only the sender can edit their own messages (require user_id match, not nickname)
-        let sender_id = session.user_id.as_deref().ok_or("Authentication required to edit messages")?;
+        let sender_id = session
+            .user_id
+            .as_deref()
+            .ok_or("Authentication required to edit messages")?;
         if msg.sender_id != sender_id {
             return Err("You can only edit your own messages".into());
         }
@@ -1576,7 +1603,10 @@ impl ChatEngine {
             .map_err(|e| format!("DB error: {e}"))?
             .ok_or("Message not found")?;
 
-        let sender_id = session.user_id.as_deref().ok_or("Authentication required to delete messages")?;
+        let sender_id = session
+            .user_id
+            .as_deref()
+            .ok_or("Authentication required to delete messages")?;
         let is_sender = msg.sender_id == sender_id;
 
         if !is_sender {
@@ -4229,10 +4259,9 @@ impl ChatEngine {
             return Err("No database configured".into());
         };
 
-        let rows =
-            crate::db::queries::community::list_discoverable_servers(pool, category, 100, 0)
-                .await
-                .map_err(|e| format!("Failed to list discoverable servers: {e}"))?;
+        let rows = crate::db::queries::community::list_discoverable_servers(pool, category, 100, 0)
+            .await
+            .map_err(|e| format!("Failed to list discoverable servers: {e}"))?;
 
         let servers: Vec<ServerCommunityInfo> = rows
             .into_iter()
@@ -5607,6 +5636,7 @@ mod tests {
                 "Hello from Alice!",
                 None,
                 None,
+                None,
             )
             .unwrap();
 
@@ -5619,6 +5649,9 @@ mod tests {
             _ => panic!("Expected Message event, got {:?}", event),
         }
 
+        // Sender receives a MessageAck (not the Message itself)
+        let ack = rx1.try_recv().unwrap();
+        assert!(matches!(ack, ChatEvent::MessageAck { .. }));
         assert!(rx1.try_recv().is_err());
     }
 
@@ -5695,7 +5728,7 @@ mod tests {
             .unwrap();
 
         engine
-            .send_message(sid1, DEFAULT_SERVER_ID, "bob", "Hey Bob!", None, None)
+            .send_message(sid1, DEFAULT_SERVER_ID, "bob", "Hey Bob!", None, None, None)
             .unwrap();
 
         let event = rx2.try_recv().unwrap();
@@ -5777,7 +5810,7 @@ mod tests {
         engine.join_channel(sid2, &server_b, "#general").unwrap();
 
         // Alice is not in server_b's #general — should fail
-        let result = engine.send_message(sid, &server_b, "#general", "Hello", None, None);
+        let result = engine.send_message(sid, &server_b, "#general", "Hello", None, None, None);
         assert!(result.is_err());
     }
 
@@ -5872,8 +5905,15 @@ mod tests {
         let (sid, _rx) = engine
             .connect(None, "alice".into(), Protocol::WebSocket, None)
             .unwrap();
-        let result =
-            engine.send_message(sid, DEFAULT_SERVER_ID, "#nonexistent", "hello", None, None);
+        let result = engine.send_message(
+            sid,
+            DEFAULT_SERVER_ID,
+            "#nonexistent",
+            "hello",
+            None,
+            None,
+            None,
+        );
         assert!(result.is_err());
     }
 
@@ -5881,7 +5921,8 @@ mod tests {
     async fn test_send_message_with_invalid_session() {
         let engine = setup_engine();
         let fake = Uuid::new_v4();
-        let result = engine.send_message(fake, DEFAULT_SERVER_ID, "#general", "hi", None, None);
+        let result =
+            engine.send_message(fake, DEFAULT_SERVER_ID, "#general", "hi", None, None, None);
         assert!(result.is_err());
     }
 
@@ -5972,9 +6013,19 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         engine
-            .send_message(sid, DEFAULT_SERVER_ID, "#general", "hello", None, None)
+            .send_message(
+                sid,
+                DEFAULT_SERVER_ID,
+                "#general",
+                "hello",
+                None,
+                None,
+                None,
+            )
             .unwrap();
-        // Message should NOT be echoed back to the sender
+        // Message should NOT be echoed back to the sender (only a MessageAck)
+        let event = rx.try_recv().unwrap();
+        assert!(matches!(event, ChatEvent::MessageAck { .. }));
         assert!(rx.try_recv().is_err());
     }
 
@@ -5987,7 +6038,7 @@ mod tests {
         engine
             .join_channel(sid, DEFAULT_SERVER_ID, "#general")
             .unwrap();
-        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "#general", "", None, None);
+        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "#general", "", None, None, None);
         assert!(result.is_err());
     }
 
@@ -6000,7 +6051,8 @@ mod tests {
         engine
             .join_channel(sid, DEFAULT_SERVER_ID, "#general")
             .unwrap();
-        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "#general", "   ", None, None);
+        let result =
+            engine.send_message(sid, DEFAULT_SERVER_ID, "#general", "   ", None, None, None);
         assert!(result.is_err());
     }
 
@@ -6014,7 +6066,15 @@ mod tests {
             .join_channel(sid, DEFAULT_SERVER_ID, "#general")
             .unwrap();
         let long_msg = "x".repeat(2001);
-        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "#general", &long_msg, None, None);
+        let result = engine.send_message(
+            sid,
+            DEFAULT_SERVER_ID,
+            "#general",
+            &long_msg,
+            None,
+            None,
+            None,
+        );
         assert!(result.is_err());
     }
 
@@ -6028,7 +6088,15 @@ mod tests {
             .join_channel(sid, DEFAULT_SERVER_ID, "#general")
             .unwrap();
         let max_msg = "x".repeat(2000);
-        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "#general", &max_msg, None, None);
+        let result = engine.send_message(
+            sid,
+            DEFAULT_SERVER_ID,
+            "#general",
+            &max_msg,
+            None,
+            None,
+            None,
+        );
         assert!(result.is_ok());
     }
 
@@ -6195,6 +6263,7 @@ mod tests {
                 "hello general",
                 None,
                 None,
+                None,
             )
             .unwrap();
         assert!(rx_bob.try_recv().is_err());
@@ -6278,7 +6347,8 @@ mod tests {
         let (sid, _rx) = engine
             .connect(None, "alice".into(), Protocol::WebSocket, None)
             .unwrap();
-        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "nobody", "hello", None, None);
+        let result =
+            engine.send_message(sid, DEFAULT_SERVER_ID, "nobody", "hello", None, None, None);
         // DMs to non-existent users fail because there's no channel and no user session
         assert!(result.is_err());
     }
@@ -6307,12 +6377,21 @@ mod tests {
                 &format!("msg {i}"),
                 None,
                 None,
+                None,
             );
             assert!(result.is_ok(), "Message {i} should succeed");
         }
 
         // 11th should be rate-limited
-        let result = engine.send_message(sid, DEFAULT_SERVER_ID, "#general", "msg 10", None, None);
+        let result = engine.send_message(
+            sid,
+            DEFAULT_SERVER_ID,
+            "#general",
+            "msg 10",
+            None,
+            None,
+            None,
+        );
         assert!(result.is_err());
     }
 

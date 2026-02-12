@@ -383,6 +383,24 @@ export interface SelectOption {
   default?: boolean;
 }
 
+// ── Phase 9: AT Protocol Deep Integration ─────────────
+
+export interface BlueskyIdentityInfo {
+  did: string;
+  bsky_handle: string | null;
+  display_name: string | null;
+  description: string | null;
+  avatar_url: string | null;
+  banner_url: string | null;
+  followers_count: number | null;
+  follows_count: number | null;
+  last_profile_sync: string | null;
+}
+
+export interface BlueskyShareResult {
+  post_uri: string;
+}
+
 // ── Permission bitfield constants ──────────────────────
 export const Permissions = {
   VIEW_CHANNELS:        1 << 0,
@@ -440,6 +458,7 @@ export type ServerEvent =
   | { type: 'message'; id: string; server_id?: string; from: string; target: string; content: string; timestamp: string; avatar_url?: string; reply_to?: ReplyInfo | null; attachments?: AttachmentInfo[] | null }
   | { type: 'message_edit'; id: string; server_id: string; channel: string; content: string; edited_at: string }
   | { type: 'message_delete'; id: string; server_id: string; channel: string }
+  | { type: 'message_ack'; id: string; server_id: string; channel: string; nonce?: string }
   | { type: 'message_embed'; message_id: string; server_id: string; channel: string; embeds: EmbedInfo[] }
   | { type: 'reaction_add'; message_id: string; server_id: string; channel: string; user_id: string; nickname: string; emoji: string }
   | { type: 'reaction_remove'; message_id: string; server_id: string; channel: string; user_id: string; nickname: string; emoji: string }
@@ -524,7 +543,7 @@ export type ServerEvent =
 
 // Client → Server commands
 export type ClientCommand =
-  | { type: 'send_message'; server_id: string; channel: string; content: string; reply_to?: string; attachment_ids?: string[] }
+  | { type: 'send_message'; server_id: string; channel: string; content: string; reply_to?: string; attachment_ids?: string[]; nonce?: string }
   | { type: 'edit_message'; message_id: string; content: string }
   | { type: 'delete_message'; message_id: string }
   | { type: 'add_reaction'; message_id: string; emoji: string }

@@ -1,4 +1,4 @@
-import type { AttachmentInfo, AuthStatus, ChannelInfo, CreateTokenResponse, HistoryResponse, IrcToken, PublicUserProfile, ServerInfo, UserProfile } from './types';
+import type { AttachmentInfo, AuthStatus, BlueskyIdentityInfo, BlueskyShareResult, ChannelInfo, CreateTokenResponse, HistoryResponse, IrcToken, PublicUserProfile, ServerInfo, UserProfile } from './types';
 
 const BASE = '/api';
 
@@ -98,6 +98,21 @@ export const createServerEmoji = (serverId: string, name: string, imageUrl: stri
 export const deleteServerEmoji = (serverId: string, emojiId: string) =>
   request<void>(`/servers/${encodeURIComponent(serverId)}/emoji/${encodeURIComponent(emojiId)}`, {
     method: 'DELETE',
+  });
+
+// Bluesky / AT Protocol
+export const syncBlueskyProfile = () =>
+  request<void>('/bluesky/sync-profile', { method: 'POST' });
+export const getBlueskyIdentity = (userId: string) =>
+  request<BlueskyIdentityInfo>(`/users/${encodeURIComponent(userId)}/bluesky`);
+export const shareToBluesky = (messageId: string) =>
+  request<BlueskyShareResult>(`/messages/${encodeURIComponent(messageId)}/share-bluesky`, { method: 'POST' });
+export const getAtprotoSyncSetting = () =>
+  request<{ atproto_sync_enabled: boolean }>('/settings/atproto-sync');
+export const updateAtprotoSyncSetting = (enabled: boolean) =>
+  request<{ atproto_sync_enabled: boolean }>('/settings/atproto-sync', {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled }),
   });
 
 // File uploads

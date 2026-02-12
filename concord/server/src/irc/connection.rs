@@ -71,8 +71,12 @@ enum RegState {
 
 /// Handle a single IRC client connection from accept to close.
 /// Accepts any stream implementing AsyncRead + AsyncWrite (plain TCP or TLS).
-pub async fn handle_irc_connection<S>(stream: S, peer: String, engine: Arc<ChatEngine>, db: SqlitePool)
-where
+pub async fn handle_irc_connection<S>(
+    stream: S,
+    peer: String,
+    engine: Arc<ChatEngine>,
+    db: SqlitePool,
+) where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
 {
     info!(%peer, "IRC client connected");
@@ -154,7 +158,9 @@ where
             }
         } else {
             // Not registered yet — just read lines (with timeout)
-            match tokio::time::timeout(IDLE_TIMEOUT, read_bounded_line(&mut reader, &mut line_buf)).await {
+            match tokio::time::timeout(IDLE_TIMEOUT, read_bounded_line(&mut reader, &mut line_buf))
+                .await
+            {
                 Ok(Ok(0)) | Ok(Err(_)) | Err(_) => break, // EOF, error, or timeout
                 Ok(Ok(_)) => {}
             }
@@ -444,6 +450,8 @@ fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> 
                 irc_channel
             )]
         }
+        // MessageAck is WS-only (sender-only event)
+        ChatEvent::MessageAck { .. } => vec![],
         // Reactions: send a NOTICE with the reaction info
         ChatEvent::ReactionAdd {
             server_id,
@@ -605,7 +613,9 @@ fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> 
         | ChatEvent::InteractionResponse { .. }
         | ChatEvent::BotTokenList { .. }
         | ChatEvent::OAuth2AppList { .. }
-        | ChatEvent::OAuth2AppUpdate { .. } => vec![],
+        | ChatEvent::OAuth2AppUpdate { .. }
+        | ChatEvent::BlueskyProfileSync { .. }
+        | ChatEvent::BlueskyShareResult { .. } => vec![],
     }
 }
 

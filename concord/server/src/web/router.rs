@@ -163,6 +163,25 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/api/webhooks/{id}/{token}",
             axum::routing::post(rest_api::execute_webhook),
         )
+        // Bluesky / AT Protocol integration
+        .route(
+            "/api/bluesky/sync-profile",
+            axum::routing::post(rest_api::sync_bluesky_profile),
+        )
+        .route(
+            "/api/users/{id}/bluesky",
+            axum::routing::get(rest_api::get_bluesky_identity),
+        )
+        .route(
+            "/api/messages/{id}/share-bluesky",
+            axum::routing::post(rest_api::share_to_bluesky),
+        )
+        // AT Protocol record sync settings
+        .route(
+            "/api/settings/atproto-sync",
+            axum::routing::get(rest_api::get_atproto_sync_setting)
+                .patch(rest_api::update_atproto_sync_setting),
+        )
         .layer(axum::middleware::from_fn(api_rate_limit));
 
     Router::new()

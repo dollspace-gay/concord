@@ -1,5 +1,6 @@
 pub mod app_state;
 pub mod atproto;
+pub mod atproto_records;
 pub mod auth_middleware;
 pub mod oauth;
 pub mod pds_client;

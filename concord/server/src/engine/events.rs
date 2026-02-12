@@ -46,6 +46,16 @@ pub enum ChatEvent {
         channel: String,
     },
 
+    /// Acknowledgment sent back to the sender with the server-generated message ID.
+    /// The nonce matches the client-provided value so the frontend can update the optimistic message.
+    MessageAck {
+        id: MessageId,
+        server_id: String,
+        channel: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        nonce: Option<String>,
+    },
+
     /// A reaction was added to a message.
     ReactionAdd {
         message_id: MessageId,
@@ -512,6 +522,32 @@ pub enum ChatEvent {
 
     /// OAuth2 app created/updated.
     OAuth2AppUpdate { app: OAuth2AppInfo },
+
+    /// Bluesky profile sync result.
+    BlueskyProfileSync {
+        user_id: String,
+        bsky_handle: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        display_name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        avatar_url: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        banner_url: Option<String>,
+        followers_count: i64,
+        follows_count: i64,
+    },
+
+    /// Result of sharing a message to Bluesky.
+    BlueskyShareResult {
+        message_id: String,
+        success: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        post_uri: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
 
     /// Error from the server.
     Error { code: String, message: String },
@@ -2105,5 +2141,60 @@ mod tests {
         let fields = embeds[0].fields.as_ref().unwrap();
         assert_eq!(fields.len(), 1);
         assert!(fields[0].inline);
+    }
+
+    #[test]
+    fn test_bluesky_profile_sync_roundtrip() {
+        let event = ChatEvent::BlueskyProfileSync {
+            user_id: "user1".into(),
+            bsky_handle: "alice.bsky.social".into(),
+            display_name: Some("Alice".into()),
+            description: Some("Hello world".into()),
+            avatar_url: Some("https://cdn.bsky.app/avatar.jpg".into()),
+            banner_url: None,
+            followers_count: 150,
+            follows_count: 42,
+        };
+        let restored = roundtrip(&event);
+        match restored {
+            ChatEvent::BlueskyProfileSync {
+                user_id,
+                bsky_handle,
+                display_name,
+                followers_count,
+                ..
+            } => {
+                assert_eq!(user_id, "user1");
+                assert_eq!(bsky_handle, "alice.bsky.social");
+                assert_eq!(display_name.as_deref(), Some("Alice"));
+                assert_eq!(followers_count, 150);
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_bluesky_share_result_roundtrip() {
+        let event = ChatEvent::BlueskyShareResult {
+            message_id: "msg1".into(),
+            success: true,
+            post_uri: Some("at://did:plc:abc/app.bsky.feed.post/xyz".into()),
+            error: None,
+        };
+        let restored = roundtrip(&event);
+        match restored {
+            ChatEvent::BlueskyShareResult {
+                message_id,
+                success,
+                post_uri,
+                error,
+            } => {
+                assert_eq!(message_id, "msg1");
+                assert!(success);
+                assert!(post_uri.is_some());
+                assert!(error.is_none());
+            }
+            _ => panic!("Wrong variant"),
+        }
     }
 }

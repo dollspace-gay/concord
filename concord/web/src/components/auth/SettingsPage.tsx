@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../stores/authStore';
+import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
 import * as api from '../../api/client';
 import type { IrcToken } from '../../api/types';
@@ -157,6 +158,9 @@ export function SettingsPage() {
           )}
         </section>
 
+        {/* AT Protocol Settings */}
+        <AtprotoSyncSection />
+
         {/* Logout */}
         <section>
           <button
@@ -168,5 +172,59 @@ export function SettingsPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+function AtprotoSyncSection() {
+  const atprotoSyncEnabled = useChatStore((s) => s.atprotoSyncEnabled);
+  const fetchAtprotoSyncSetting = useChatStore((s) => s.fetchAtprotoSyncSetting);
+  const setAtprotoSyncEnabled = useChatStore((s) => s.setAtprotoSyncEnabled);
+  const [toggling, setToggling] = useState(false);
+
+  useEffect(() => {
+    fetchAtprotoSyncSetting();
+  }, [fetchAtprotoSyncSetting]);
+
+  const handleToggle = async () => {
+    setToggling(true);
+    try {
+      await setAtprotoSyncEnabled(!atprotoSyncEnabled);
+    } catch (e) {
+      console.error('Failed to toggle AT Protocol sync:', e);
+    }
+    setToggling(false);
+  };
+
+  return (
+    <section className="mb-6">
+      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
+        AT Protocol
+      </h3>
+      <div className="rounded-md bg-bg-tertiary p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-text-primary">
+              Sync messages to AT Protocol
+            </p>
+            <p className="mt-1 text-xs text-text-muted">
+              Write your messages as records on your PDS for data portability.
+            </p>
+          </div>
+          <button
+            onClick={handleToggle}
+            disabled={toggling}
+            className={`relative h-6 w-11 rounded-full transition-colors ${
+              atprotoSyncEnabled ? 'bg-blue-500' : 'bg-bg-input'
+            } ${toggling ? 'opacity-50' : ''}`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                atprotoSyncEnabled ? 'translate-x-5' : ''
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }

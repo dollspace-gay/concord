@@ -187,17 +187,29 @@ fn handle_privmsg(
     if target.starts_with('#') {
         // Channel message — parse server/channel from IRC name
         let (server_id, channel_name) = parse_irc_channel(engine, target);
-        if let Err(e) =
-            engine.send_message(session_id, &server_id, &channel_name, content, None, None)
-        {
+        if let Err(e) = engine.send_message(
+            session_id,
+            &server_id,
+            &channel_name,
+            content,
+            None,
+            None,
+            None,
+        ) {
             warn!(error = %e, %target, "PRIVMSG failed");
             return vec![formatter::err_nosuchnick(nick, target)];
         }
     } else {
         // DM — use default server
-        if let Err(e) =
-            engine.send_message(session_id, DEFAULT_SERVER_ID, target, content, None, None)
-        {
+        if let Err(e) = engine.send_message(
+            session_id,
+            DEFAULT_SERVER_ID,
+            target,
+            content,
+            None,
+            None,
+            None,
+        ) {
             warn!(error = %e, %target, "PRIVMSG failed");
             return vec![formatter::err_nosuchnick(nick, target)];
         }

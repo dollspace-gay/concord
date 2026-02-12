@@ -252,7 +252,9 @@ mod tests {
         setup_server(&pool).await;
 
         // Initially not discoverable
-        let discoverable = list_discoverable_servers(&pool, None, 100, 0).await.unwrap();
+        let discoverable = list_discoverable_servers(&pool, None, 100, 0)
+            .await
+            .unwrap();
         assert!(discoverable.is_empty());
 
         // Make server discoverable
@@ -268,7 +270,9 @@ mod tests {
         .await
         .unwrap();
 
-        let discoverable = list_discoverable_servers(&pool, None, 100, 0).await.unwrap();
+        let discoverable = list_discoverable_servers(&pool, None, 100, 0)
+            .await
+            .unwrap();
         assert_eq!(discoverable.len(), 1);
         assert_eq!(
             discoverable[0].description,

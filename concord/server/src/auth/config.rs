@@ -36,11 +36,15 @@ mod tests {
         let originals: Vec<_> = keys.iter().map(|k| (*k, std::env::var(k).ok())).collect();
 
         for key in &keys {
-            unsafe { std::env::remove_var(key); }
+            unsafe {
+                std::env::remove_var(key);
+            }
         }
 
         for (k, v) in vars {
-            unsafe { std::env::set_var(k, v); }
+            unsafe {
+                std::env::set_var(k, v);
+            }
         }
 
         f();

@@ -5,7 +5,7 @@ use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Json, Redirect, Response};
 use chrono::Utc;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -262,8 +262,15 @@ pub async fn atproto_login(
 
         // Enforce max pending count
         if pending.len() >= MAX_PENDING_OAUTH {
-            warn!("Too many pending OAuth flows ({}), rejecting new request", pending.len());
-            return (StatusCode::SERVICE_UNAVAILABLE, "Too many pending login requests").into_response();
+            warn!(
+                "Too many pending OAuth flows ({}), rejecting new request",
+                pending.len()
+            );
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Too many pending login requests",
+            )
+                .into_response();
         }
 
         pending.insert(
@@ -368,25 +375,24 @@ pub async fn atproto_callback(
 
     // Fetch public profile for display name and avatar
     let (display_name, avatar_url) = fetch_bsky_profile(&http_client, &did).await;
-    let username = display_name.unwrap_or_else(|| {
-        pending
-            .handle
-            .split('.')
-            .next()
-            .unwrap_or("user")
-            .to_string()
-    });
+    // Use Bluesky handle as username (permanent DID is the user_id)
+    let username = pending.handle.clone();
 
-    // Find or create user using DID as provider_id
+    // Find or create user — DID is the user_id
     let user_id = match users::find_by_oauth(&state.db, "atproto", &did).await {
-        Ok(Some((uid, _))) => uid,
+        Ok(Some((uid, _))) => {
+            // Update username to current handle (handles can change, DIDs are permanent)
+            if let Err(e) = users::update_username(&state.db, &uid, &username).await {
+                warn!(error = %e, "Failed to update username/handle");
+            }
+            uid
+        }
         Ok(None) => {
-            let uid = Uuid::new_v4().to_string();
             let oauth_id = Uuid::new_v4().to_string();
             if let Err(e) = users::create_with_oauth(
                 &state.db,
                 &users::CreateOAuthUser {
-                    user_id: &uid,
+                    user_id: &did,
                     username: &username,
                     email: None,
                     avatar_url: avatar_url.as_deref(),
@@ -401,8 +407,8 @@ pub async fn atproto_callback(
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create user")
                     .into_response();
             }
-            info!(user_id = %uid, username = %username, did = %did, "new user registered via Bluesky");
-            uid
+            info!(user_id = %did, username = %username, "new user registered via Bluesky");
+            did.clone()
         }
         Err(e) => {
             error!(error = %e, "Database error during OAuth");
@@ -435,6 +441,21 @@ pub async fn atproto_callback(
         warn!(error = %e, "Failed to store AT Protocol credentials (non-fatal)");
     }
 
+    // Store handle on every login (ensures bsky_handle is populated for profile sync)
+    let _ = crate::db::queries::atproto::store_bsky_profile_sync(
+        &crate::db::queries::atproto::StoreBskyProfileParams {
+            pool: &state.db,
+            user_id: &user_id,
+            handle: &username,
+            display_name: display_name.as_deref(),
+            description: None,
+            banner_url: None,
+            followers_count: 0,
+            follows_count: 0,
+        },
+    )
+    .await;
+
     // Issue session cookie and redirect
     issue_session_cookie(&state.auth_config, &user_id)
 }
@@ -462,7 +483,7 @@ async fn resolve_handle_to_pds(
 /// Resolve a handle to a DID. Tries the .well-known method first, then falls
 /// back to the public Bluesky XRPC API (works for all handles including
 /// custom domains and did:web identities).
-async fn resolve_handle(http_client: &reqwest::Client, handle: &str) -> Result<String, String> {
+pub async fn resolve_handle(http_client: &reqwest::Client, handle: &str) -> Result<String, String> {
     // Try .well-known/atproto-did first (works for self-hosted PDS)
     if let Ok(did) = atproto_identity::resolve::resolve_handle_http(http_client, handle).await {
         return Ok(did);
@@ -501,7 +522,7 @@ async fn resolve_handle(http_client: &reqwest::Client, handle: &str) -> Result<S
 }
 
 /// Resolve a DID to its DID document.
-async fn resolve_did_to_doc(
+pub async fn resolve_did_to_doc(
     http_client: &reqwest::Client,
     did: &str,
 ) -> Result<atproto_identity::model::Document, String> {
@@ -549,6 +570,67 @@ async fn fetch_bsky_profile(
         },
         _ => (None, None),
     }
+}
+
+/// Full Bluesky profile data returned by `fetch_full_bsky_profile()`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlueskyProfile {
+    pub did: String,
+    pub handle: String,
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub avatar: Option<String>,
+    pub banner: Option<String>,
+    pub followers_count: i64,
+    pub follows_count: i64,
+    pub posts_count: i64,
+}
+
+/// Fetch a full public Bluesky profile via `app.bsky.actor.getProfile`.
+/// Returns `None` if the profile cannot be fetched.
+pub async fn fetch_full_bsky_profile(
+    http_client: &reqwest::Client,
+    did: &str,
+) -> Option<BlueskyProfile> {
+    #[derive(Deserialize)]
+    struct RawProfile {
+        did: String,
+        handle: String,
+        #[serde(rename = "displayName")]
+        display_name: Option<String>,
+        description: Option<String>,
+        avatar: Option<String>,
+        banner: Option<String>,
+        #[serde(rename = "followersCount", default)]
+        followers_count: i64,
+        #[serde(rename = "followsCount", default)]
+        follows_count: i64,
+        #[serde(rename = "postsCount", default)]
+        posts_count: i64,
+    }
+
+    let url = format!(
+        "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={}",
+        urlencoding::encode(did)
+    );
+
+    let resp = http_client.get(&url).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+
+    let raw: RawProfile = resp.json().await.ok()?;
+    Some(BlueskyProfile {
+        did: raw.did,
+        handle: raw.handle,
+        display_name: raw.display_name,
+        description: raw.description,
+        avatar: raw.avatar,
+        banner: raw.banner,
+        followers_count: raw.followers_count,
+        follows_count: raw.follows_count,
+        posts_count: raw.posts_count,
+    })
 }
 
 /// Create a JWT and set it as an HttpOnly cookie, then redirect to app root.

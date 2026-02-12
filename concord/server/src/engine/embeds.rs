@@ -13,9 +13,7 @@ fn is_private_ip(ip: IpAddr) -> bool {
                 || v4.is_unspecified() // 0.0.0.0
                 || v4.octets()[0] == 100 && (v4.octets()[1] & 0xC0) == 64 // 100.64.0.0/10 (CGNAT)
         }
-        IpAddr::V6(v6) => {
-            v6.is_loopback() || v6.is_unspecified()
-        }
+        IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified(),
     }
 }
 
@@ -34,7 +32,9 @@ pub(crate) async fn is_safe_url(url: &str) -> bool {
     }
 
     // Resolve DNS and check all addresses
-    let port = parsed.port().unwrap_or(if parsed.scheme() == "https" { 443 } else { 80 });
+    let port = parsed
+        .port()
+        .unwrap_or(if parsed.scheme() == "https" { 443 } else { 80 });
     let lookup = format!("{host}:{port}");
     match tokio::net::lookup_host(&lookup).await {
         Ok(addrs) => {

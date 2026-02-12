@@ -257,6 +257,26 @@ pub async fn get_atproto_credentials(
     ))
 }
 
+/// Update a user's username (e.g., when their Bluesky handle changes on re-login).
+pub async fn update_username(
+    pool: &SqlitePool,
+    user_id: &str,
+    new_username: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE users SET username = ?, updated_at = datetime('now') WHERE id = ?")
+        .bind(new_username)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    // Update primary nickname to match
+    sqlx::query("UPDATE user_nicknames SET nickname = ? WHERE user_id = ? AND is_primary = 1")
+        .bind(new_username)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 /// Update last_used timestamp for an IRC token.
 pub async fn touch_irc_token(
     pool: &SqlitePool,
@@ -483,5 +503,31 @@ mod tests {
         let tokens = list_irc_tokens(&pool, "u1").await.unwrap();
         assert_eq!(tokens.len(), 1);
         assert!(tokens[0].1.is_none()); // label should be None
+    }
+
+    #[tokio::test]
+    async fn test_update_username() {
+        let pool = setup_db().await;
+        create_test_user(&pool, "u1", "alice").await;
+
+        // Verify initial username
+        let user = get_user(&pool, "u1").await.unwrap().unwrap();
+        assert_eq!(user.1, "alice");
+
+        // Update username
+        update_username(&pool, "u1", "alice.bsky.social")
+            .await
+            .unwrap();
+
+        // Verify updated username
+        let user = get_user(&pool, "u1").await.unwrap().unwrap();
+        assert_eq!(user.1, "alice.bsky.social");
+
+        // Verify primary nickname was updated
+        let found = get_user_by_nickname(&pool, "alice.bsky.social")
+            .await
+            .unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().0, "u1");
     }
 }

@@ -100,7 +100,9 @@ impl IrcMessage {
             if i == self.params.len() - 1 && (param.contains(' ') || param.is_empty()) {
                 out.push(':');
             }
-            out.push_str(param);
+            // Strip \r\n to prevent IRC command injection via user content
+            let sanitized = param.replace(['\r', '\n'], " ");
+            out.push_str(&sanitized);
         }
 
         out

@@ -2,6 +2,20 @@ use sqlx::SqlitePool;
 
 use crate::db::models::MessageRow;
 
+/// Sanitize a search query for FTS5 MATCH by quoting each term.
+/// This prevents FTS5 operator injection (AND, OR, NOT, NEAR, *, etc.).
+fn sanitize_fts5_query(query: &str) -> String {
+    query
+        .split_whitespace()
+        .map(|term| {
+            // Escape internal double quotes and wrap each term
+            let escaped = term.replace('"', "\"\"");
+            format!("\"{escaped}\"")
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Full-text search messages within a server, optionally filtered by channel.
 pub async fn search_messages(
     pool: &SqlitePool,
@@ -11,6 +25,9 @@ pub async fn search_messages(
     limit: i64,
     offset: i64,
 ) -> Result<(Vec<MessageRow>, i64), sqlx::Error> {
+    // Sanitize the query to prevent FTS5 operator injection
+    let safe_query = sanitize_fts5_query(query);
+
     // Use FTS5 MATCH for full-text search
     let (rows, total) = if let Some(ch_id) = channel_id {
         let rows = sqlx::query_as::<_, MessageRow>(
@@ -21,7 +38,7 @@ pub async fn search_messages(
              WHERE f.content MATCH ? AND m.server_id = ? AND m.channel_id = ? AND m.deleted_at IS NULL \
              ORDER BY m.created_at DESC LIMIT ? OFFSET ?",
         )
-        .bind(query)
+        .bind(&safe_query)
         .bind(server_id)
         .bind(ch_id)
         .bind(limit)
@@ -34,7 +51,7 @@ pub async fn search_messages(
              JOIN messages_fts f ON m.rowid = f.rowid \
              WHERE f.content MATCH ? AND m.server_id = ? AND m.channel_id = ? AND m.deleted_at IS NULL",
         )
-        .bind(query)
+        .bind(&safe_query)
         .bind(server_id)
         .bind(ch_id)
         .fetch_one(pool)
@@ -50,7 +67,7 @@ pub async fn search_messages(
              WHERE f.content MATCH ? AND m.server_id = ? AND m.deleted_at IS NULL \
              ORDER BY m.created_at DESC LIMIT ? OFFSET ?",
         )
-        .bind(query)
+        .bind(&safe_query)
         .bind(server_id)
         .bind(limit)
         .bind(offset)
@@ -62,7 +79,7 @@ pub async fn search_messages(
              JOIN messages_fts f ON m.rowid = f.rowid \
              WHERE f.content MATCH ? AND m.server_id = ? AND m.deleted_at IS NULL",
         )
-        .bind(query)
+        .bind(&safe_query)
         .bind(server_id)
         .fetch_one(pool)
         .await?;

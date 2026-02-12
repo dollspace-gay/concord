@@ -52,6 +52,15 @@ pub async fn get_bot_token_by_hash(
         .await
 }
 
+/// Fetch all bot tokens for iterate-and-verify authentication.
+/// Argon2 hashes include a random salt, so we must verify the raw token
+/// against each stored hash rather than hashing and looking up.
+pub async fn get_all_bot_tokens(pool: &SqlitePool) -> Result<Vec<BotTokenRow>, sqlx::Error> {
+    sqlx::query_as::<_, BotTokenRow>("SELECT * FROM bot_tokens")
+        .fetch_all(pool)
+        .await
+}
+
 pub async fn list_bot_tokens(
     pool: &SqlitePool,
     user_id: &str,

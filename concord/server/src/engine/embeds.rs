@@ -1,4 +1,52 @@
+use std::net::IpAddr;
+
 use super::events::EmbedInfo;
+
+/// Check if an IP address is in a private/reserved range (SSRF protection).
+fn is_private_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            v4.is_loopback()          // 127.0.0.0/8
+                || v4.is_private()    // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+                || v4.is_link_local() // 169.254.0.0/16
+                || v4.is_broadcast()  // 255.255.255.255
+                || v4.is_unspecified() // 0.0.0.0
+                || v4.octets()[0] == 100 && (v4.octets()[1] & 0xC0) == 64 // 100.64.0.0/10 (CGNAT)
+        }
+        IpAddr::V6(v6) => {
+            v6.is_loopback() || v6.is_unspecified()
+        }
+    }
+}
+
+/// Resolve hostname and check that it doesn't point to a private IP (SSRF protection).
+pub(crate) async fn is_safe_url(url: &str) -> bool {
+    let Ok(parsed) = reqwest::Url::parse(url) else {
+        return false;
+    };
+    let Some(host) = parsed.host_str() else {
+        return false;
+    };
+
+    // If it's a direct IP address, check it
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return !is_private_ip(ip);
+    }
+
+    // Resolve DNS and check all addresses
+    let port = parsed.port().unwrap_or(if parsed.scheme() == "https" { 443 } else { 80 });
+    let lookup = format!("{host}:{port}");
+    match tokio::net::lookup_host(&lookup).await {
+        Ok(addrs) => {
+            let addrs: Vec<_> = addrs.collect();
+            if addrs.is_empty() {
+                return false;
+            }
+            addrs.iter().all(|addr| !is_private_ip(addr.ip()))
+        }
+        Err(_) => false,
+    }
+}
 
 /// Extract all URLs (http/https) from message content (max 5).
 pub fn extract_urls(content: &str) -> Vec<String> {
@@ -19,6 +67,11 @@ pub fn extract_urls(content: &str) -> Vec<String> {
 /// Fetch Open Graph metadata for a URL.
 /// Returns None if the fetch fails or no OG tags are found.
 pub async fn unfurl_url(client: &reqwest::Client, url: &str) -> Option<EmbedInfo> {
+    // SSRF protection: block requests to private/internal IP ranges
+    if !is_safe_url(url).await {
+        return None;
+    }
+
     let resp = client
         .get(url)
         .header("User-Agent", "ConcordBot/1.0 (link preview)")

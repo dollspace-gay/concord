@@ -1,10 +1,15 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use sqlx::SqlitePool;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::TcpStream;
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::mpsc;
 use tracing::{info, warn};
+
+/// Maximum bytes per IRC line (RFC 2812 says 512; we allow 4096 for safety).
+const MAX_LINE_LENGTH: usize = 4096;
+/// Idle timeout — disconnect clients that send nothing for 5 minutes.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
 
 use crate::auth::token::verify_irc_token;
 use crate::db::queries::users;
@@ -15,6 +20,41 @@ use crate::engine::user_session::Protocol;
 use super::commands::{self, to_irc_channel};
 use super::formatter;
 use super::parser::IrcMessage;
+
+/// Read a line from the IRC connection, capped at MAX_LINE_LENGTH bytes.
+/// Returns Ok(0) on EOF, Ok(n) on success, Err on I/O error or line too long.
+async fn read_bounded_line<R: AsyncRead + Unpin>(
+    reader: &mut BufReader<R>,
+    buf: &mut String,
+) -> std::io::Result<usize> {
+    // Fill the internal buffer and check for a newline within MAX_LINE_LENGTH
+    loop {
+        let available = reader.buffer();
+        if let Some(pos) = available.iter().position(|&b| b == b'\n') {
+            // Found newline within buffered data
+            let line_bytes = &available[..=pos];
+            let line = String::from_utf8_lossy(line_bytes).into_owned();
+            let len = line_bytes.len();
+            buf.push_str(&line);
+            reader.consume(len);
+            return Ok(len);
+        }
+        if available.len() >= MAX_LINE_LENGTH {
+            // Too long without a newline — discard and signal error
+            let discard_len = available.len();
+            reader.consume(discard_len);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "IRC line exceeds maximum length",
+            ));
+        }
+        // Need more data
+        let filled = reader.fill_buf().await?;
+        if filled.is_empty() {
+            return Ok(0); // EOF
+        }
+    }
+}
 
 /// IRC registration state machine.
 /// Clients must send NICK and USER (optionally PASS first) before they are registered.
@@ -30,15 +70,14 @@ enum RegState {
 }
 
 /// Handle a single IRC client connection from accept to close.
-pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>, db: SqlitePool) {
-    let peer = stream
-        .peer_addr()
-        .map(|a| a.to_string())
-        .unwrap_or_else(|_| "unknown".into());
-
+/// Accepts any stream implementing AsyncRead + AsyncWrite (plain TCP or TLS).
+pub async fn handle_irc_connection<S>(stream: S, peer: String, engine: Arc<ChatEngine>, db: SqlitePool)
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
     info!(%peer, "IRC client connected");
 
-    let (reader, writer) = stream.into_split();
+    let (reader, writer) = tokio::io::split(stream);
     let mut reader = BufReader::new(reader);
     let mut writer = writer;
 
@@ -62,16 +101,16 @@ pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>, d
     };
 
     let mut line_buf = String::new();
-    let mut event_rx: Option<mpsc::UnboundedReceiver<ChatEvent>> = None;
+    let mut event_rx: Option<mpsc::Receiver<ChatEvent>> = None;
 
     loop {
         // When registered, also select on engine events
         if let Some(ref mut rx) = event_rx {
             tokio::select! {
-                result = reader.read_line(&mut line_buf) => {
+                result = tokio::time::timeout(IDLE_TIMEOUT, read_bounded_line(&mut reader, &mut line_buf)) => {
                     match result {
-                        Ok(0) | Err(_) => break, // Connection closed or error
-                        Ok(_) => {}
+                        Ok(Ok(0)) | Ok(Err(_)) | Err(_) => break, // EOF, error, or timeout
+                        Ok(Ok(_)) => {}
                     }
 
                     let line = line_buf.trim_end().to_string();
@@ -114,10 +153,10 @@ pub async fn handle_irc_connection(stream: TcpStream, engine: Arc<ChatEngine>, d
                 }
             }
         } else {
-            // Not registered yet — just read lines
-            match reader.read_line(&mut line_buf).await {
-                Ok(0) | Err(_) => break,
-                Ok(_) => {}
+            // Not registered yet — just read lines (with timeout)
+            match tokio::time::timeout(IDLE_TIMEOUT, read_bounded_line(&mut reader, &mut line_buf)).await {
+                Ok(Ok(0)) | Ok(Err(_)) | Err(_) => break, // EOF, error, or timeout
+                Ok(Ok(_)) => {}
             }
 
             let line = line_buf.trim_end().to_string();
@@ -267,12 +306,13 @@ async fn validate_irc_pass(
     token: &str,
     nickname: &str,
 ) -> Result<Option<String>, String> {
-    let hashes = users::get_all_irc_token_hashes(db)
+    // Scoped lookup: only fetch tokens for this nickname (O(1) per user instead of O(n) global)
+    let hashes = users::get_irc_token_hashes_by_nick(db, nickname)
         .await
         .map_err(|e| format!("DB error: {}", e))?;
 
-    for (user_id, stored_nick, token_hash) in &hashes {
-        if stored_nick == nickname && verify_irc_token(token, token_hash) {
+    for (user_id, token_hash) in &hashes {
+        if verify_irc_token(token, token_hash) {
             // Update last_used timestamp (fire-and-forget)
             let pool = db.clone();
             let uid = user_id.clone();

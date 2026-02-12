@@ -2,22 +2,67 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
+use axum::http::HeaderValue;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
 use super::app_state::AppState;
+use super::rate_limit::{ApiRateLimiters, api_rate_limit, auth_rate_limit, ws_rate_limit};
 use super::{atproto, oauth, rest_api, ws_handler};
 
 /// Build the axum router with all HTTP and WebSocket routes.
 pub fn build_router(state: Arc<AppState>) -> Router {
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    // Restrict CORS to the configured public_url origin (or allow any for localhost dev)
+    let public_url = &state.auth_config.public_url;
+    let cors = if public_url.contains("localhost") || public_url.contains("127.0.0.1") {
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    } else {
+        let origin = public_url
+            .parse::<HeaderValue>()
+            .unwrap_or_else(|_| HeaderValue::from_static("https://localhost"));
+        CorsLayer::new()
+            .allow_origin(origin)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    };
 
-    Router::new()
-        // WebSocket
+    let rate_limiters = Arc::new(ApiRateLimiters::default());
+
+    // Auth routes — tight rate limit to prevent brute force
+    let auth_routes = Router::new()
+        .route(
+            "/api/auth/status",
+            axum::routing::get(rest_api::auth_status),
+        )
+        .route(
+            "/api/auth/atproto/client-metadata.json",
+            axum::routing::get(atproto::client_metadata),
+        )
+        .route(
+            "/api/auth/atproto/v2/client-metadata.json",
+            axum::routing::get(atproto::client_metadata),
+        )
+        .route(
+            "/api/auth/atproto/login",
+            axum::routing::get(atproto::atproto_login),
+        )
+        .route(
+            "/api/auth/atproto/callback",
+            axum::routing::get(atproto::atproto_callback),
+        )
+        .route("/api/auth/logout", axum::routing::post(oauth::logout))
+        .layer(axum::middleware::from_fn(auth_rate_limit));
+
+    // WebSocket — connection rate limit
+    let ws_routes = Router::new()
         .route("/ws", axum::routing::get(ws_handler::ws_upgrade))
+        .layer(axum::middleware::from_fn(ws_rate_limit));
+
+    // All other API routes — general rate limit
+    let api_routes = Router::new()
         // Public channel endpoints (default server, backward compat)
         .route("/api/channels", axum::routing::get(rest_api::get_channels))
         .route(
@@ -58,29 +103,6 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/api/admin/users/{id}/admin",
             axum::routing::put(rest_api::admin_set_admin),
         )
-        // Auth status
-        .route(
-            "/api/auth/status",
-            axum::routing::get(rest_api::auth_status),
-        )
-        // Bluesky / AT Protocol OAuth
-        .route(
-            "/api/auth/atproto/client-metadata.json",
-            axum::routing::get(atproto::client_metadata),
-        )
-        .route(
-            "/api/auth/atproto/v2/client-metadata.json",
-            axum::routing::get(atproto::client_metadata),
-        )
-        .route(
-            "/api/auth/atproto/login",
-            axum::routing::get(atproto::atproto_login),
-        )
-        .route(
-            "/api/auth/atproto/callback",
-            axum::routing::get(atproto::atproto_callback),
-        )
-        .route("/api/auth/logout", axum::routing::post(oauth::logout))
         // User profile lookup (public)
         .route(
             "/api/users/{nickname}",
@@ -141,8 +163,16 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/api/webhooks/{id}/{token}",
             axum::routing::post(rest_api::execute_webhook),
         )
+        .layer(axum::middleware::from_fn(api_rate_limit));
+
+    Router::new()
+        .merge(ws_routes)
+        .merge(auth_routes)
+        .merge(api_routes)
         // Static files with SPA fallback — unmatched routes serve index.html
         .fallback_service(ServeDir::new("static").fallback(ServeFile::new("static/index.html")))
         .layer(cors)
+        // Inject rate limiters into all request extensions
+        .layer(axum::Extension(rate_limiters))
         .with_state(state)
 }

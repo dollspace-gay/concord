@@ -59,6 +59,19 @@ pub async fn increment_use_count(pool: &SqlitePool, invite_id: &str) -> Result<(
     Ok(())
 }
 
+/// Atomically check max_uses and increment use_count in a single query.
+/// Returns true if the invite was successfully consumed, false if at max capacity.
+pub async fn try_use_invite(pool: &SqlitePool, invite_id: &str) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query(
+        "UPDATE invites SET use_count = use_count + 1 \
+         WHERE id = ? AND (max_uses IS NULL OR use_count < max_uses)",
+    )
+    .bind(invite_id)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected() > 0)
+}
+
 pub async fn delete_invite(pool: &SqlitePool, invite_id: &str) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM invites WHERE id = ?")
         .bind(invite_id)

@@ -62,7 +62,7 @@ mod tests {
         engine: &ChatEngine,
         user_id: Option<&str>,
         nickname: &str,
-    ) -> (uuid::Uuid, tokio::sync::mpsc::UnboundedReceiver<ChatEvent>) {
+    ) -> (uuid::Uuid, tokio::sync::mpsc::Receiver<ChatEvent>) {
         engine
             .connect(
                 user_id.map(|s| s.to_string()),
@@ -74,7 +74,7 @@ mod tests {
     }
 
     /// Drain all pending events from a receiver.
-    fn drain_events(rx: &mut tokio::sync::mpsc::UnboundedReceiver<ChatEvent>) {
+    fn drain_events(rx: &mut tokio::sync::mpsc::Receiver<ChatEvent>) {
         while rx.try_recv().is_ok() {}
     }
 
@@ -259,7 +259,7 @@ mod tests {
         assert!(!perms.contains(Permissions::MANAGE_CHANNELS));
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_message_send_edit_delete_lifecycle() {
         let (engine, pool) = setup_engine().await;
 
@@ -883,7 +883,7 @@ mod tests {
             .unwrap();
 
         // Initially not discoverable
-        let found = queries::community::list_discoverable_servers(&pool, None)
+        let found = queries::community::list_discoverable_servers(&pool, None, 100, 0)
             .await
             .unwrap();
         assert!(
@@ -905,7 +905,7 @@ mod tests {
         .unwrap();
 
         // Now it should appear
-        let found = queries::community::list_discoverable_servers(&pool, None)
+        let found = queries::community::list_discoverable_servers(&pool, None, 100, 0)
             .await
             .unwrap();
         assert_eq!(found.len(), 1);
@@ -916,12 +916,12 @@ mod tests {
         );
 
         // Filter by category
-        let found_tech = queries::community::list_discoverable_servers(&pool, Some("technology"))
+        let found_tech = queries::community::list_discoverable_servers(&pool, Some("technology"), 100, 0)
             .await
             .unwrap();
         assert_eq!(found_tech.len(), 1);
 
-        let found_gaming = queries::community::list_discoverable_servers(&pool, Some("gaming"))
+        let found_gaming = queries::community::list_discoverable_servers(&pool, Some("gaming"), 100, 0)
             .await
             .unwrap();
         assert!(found_gaming.is_empty());
@@ -1672,7 +1672,7 @@ mod tests {
     //  9. Cross-Protocol Event Consistency Tests
     // ═══════════════════════════════════════════════════════════════
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_message_event_contains_all_fields() {
         let (engine, pool) = setup_engine().await;
 
@@ -2753,7 +2753,7 @@ mod tests {
     //  Engine: Multi-Session Messaging
     // ═══════════════════════════════════════════════════════════════
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_three_users_in_channel_messaging() {
         let (engine, pool) = setup_engine().await;
 

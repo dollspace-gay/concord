@@ -39,7 +39,13 @@ pub struct PendingAtprotoAuth {
     pub handle: String,
     pub auth_server: AuthorizationServer,
     pub pds_url: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }
+
+/// Maximum number of pending OAuth flows at any time.
+const MAX_PENDING_OAUTH: usize = 1000;
+/// TTL for pending OAuth flows (10 minutes).
+const PENDING_OAUTH_TTL_SECS: i64 = 600;
 
 impl AtprotoOAuth {
     /// Load the signing key from the database, or generate and persist a new one.
@@ -250,6 +256,16 @@ pub async fn atproto_login(
 
     {
         let mut pending = state.atproto.pending.lock().await;
+        // Evict expired entries (older than TTL)
+        let cutoff = Utc::now() - chrono::Duration::seconds(PENDING_OAUTH_TTL_SECS);
+        pending.retain(|_, v| v.created_at > cutoff);
+
+        // Enforce max pending count
+        if pending.len() >= MAX_PENDING_OAUTH {
+            warn!("Too many pending OAuth flows ({}), rejecting new request", pending.len());
+            return (StatusCode::SERVICE_UNAVAILABLE, "Too many pending login requests").into_response();
+        }
+
         pending.insert(
             oauth_state.clone(),
             PendingAtprotoAuth {
@@ -258,6 +274,7 @@ pub async fn atproto_login(
                 handle: handle.clone(),
                 auth_server: auth_server.clone(),
                 pds_url: pds_url.clone(),
+                created_at: Utc::now(),
             },
         );
     }

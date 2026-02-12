@@ -2,6 +2,16 @@ use sqlx::SqlitePool;
 
 use crate::db::models::{AutomodRuleRow, CreateAutomodRuleParams};
 
+pub async fn get_rule(
+    pool: &SqlitePool,
+    rule_id: &str,
+) -> Result<Option<AutomodRuleRow>, sqlx::Error> {
+    sqlx::query_as::<_, AutomodRuleRow>("SELECT * FROM automod_rules WHERE id = ?")
+        .bind(rule_id)
+        .fetch_optional(pool)
+        .await
+}
+
 pub async fn create_rule(
     pool: &SqlitePool,
     params: &CreateAutomodRuleParams<'_>,

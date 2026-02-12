@@ -3,6 +3,7 @@ pub mod atproto;
 pub mod auth_middleware;
 pub mod oauth;
 pub mod pds_client;
+pub mod rate_limit;
 pub mod rest_api;
 pub mod router;
 pub mod ws_handler;

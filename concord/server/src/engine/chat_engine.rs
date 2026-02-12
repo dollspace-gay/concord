@@ -200,7 +200,7 @@ impl ChatEngine {
         nickname: String,
         protocol: Protocol,
         avatar_url: Option<String>,
-    ) -> Result<(SessionId, mpsc::UnboundedReceiver<ChatEvent>), String> {
+    ) -> Result<(SessionId, mpsc::Receiver<ChatEvent>), String> {
         validation::validate_nickname(&nickname)?;
 
         // If nickname is already in use, disconnect the stale session.
@@ -210,7 +210,7 @@ impl ChatEngine {
         }
 
         let session_id = Uuid::new_v4();
-        let (tx, rx) = mpsc::unbounded_channel();
+        let (tx, rx) = mpsc::channel(crate::engine::user_session::MAX_OUTBOUND_QUEUE);
 
         let session = Arc::new(UserSession::new(
             session_id,
@@ -517,13 +517,29 @@ impl ChatEngine {
             .unwrap_or(false)
     }
 
+    /// Check if a user is a member of a server (in-memory check).
+    pub fn user_is_server_member(&self, server_id: &str, user_id: &str) -> bool {
+        self.servers
+            .get(server_id)
+            .map(|s| s.member_user_ids.contains(user_id))
+            .unwrap_or(false)
+    }
+
     /// Join a server (persistent membership).
     pub async fn join_server(&self, user_id: &str, server_id: &str) -> Result<(), String> {
         if !self.servers.contains_key(server_id) {
             return Err(format!("No such server: {server_id}"));
         }
 
+        // Check if the user is banned from this server
         if let Some(pool) = &self.db {
+            if crate::db::queries::bans::is_banned(pool, server_id, user_id)
+                .await
+                .unwrap_or(false)
+            {
+                return Err("You are banned from this server".into());
+            }
+
             crate::db::queries::servers::add_server_member(pool, server_id, user_id, "member")
                 .await
                 .map_err(|e| format!("Failed to join server: {e}"))?;
@@ -675,6 +691,41 @@ impl ChatEngine {
             .ok_or("Session not found")?
             .clone();
 
+        // Check private channel access control
+        if let Some(id) = self
+            .channel_name_index
+            .get(&(server_id.to_string(), channel_name.clone()))
+            && let Some(ch) = self.channels.get(id.value())
+            && ch.is_private
+        {
+            // Private channel: require VIEW_CHANNELS permission
+            if let Some(ref uid) = session.user_id
+                && self.db.is_some()
+            {
+                let srv = server_id.to_string();
+                let ch_id = id.clone();
+                let uid = uid.clone();
+                let has_view = tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let perms = self
+                            .get_effective_permissions(&srv, Some(&ch_id), &uid)
+                            .await;
+                        perms.contains(Permissions::VIEW_CHANNELS)
+                    })
+                });
+                if !has_view {
+                    return Err(
+                        "You do not have permission to join this private channel"
+                            .into(),
+                    );
+                }
+            } else {
+                return Err(
+                    "Authentication required to join private channels".into(),
+                );
+            }
+        }
+
         // Get or create channel
         let channel_id = if let Some(id) = self
             .channel_name_index
@@ -819,6 +870,7 @@ impl ChatEngine {
         attachment_ids: Option<&[String]>,
     ) -> Result<(), String> {
         validation::validate_message(content)?;
+        let content = &validation::sanitize_html(content);
 
         let session = self
             .sessions
@@ -828,6 +880,146 @@ impl ChatEngine {
 
         if !self.message_limiter.check(&session.nickname) {
             return Err("Rate limit exceeded. Please slow down.".into());
+        }
+
+        // Enforce timeout: timed-out users cannot send messages
+        if let Some(pool) = &self.db
+            && let Some(ref uid) = session.user_id
+        {
+            let pool = pool.clone();
+            let srv = server_id.to_string();
+            let uid = uid.clone();
+            let timed_out = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    if let Ok(Some(until)) =
+                        crate::db::queries::moderation::get_member_timeout(&pool, &srv, &uid)
+                            .await
+                        && let Ok(timeout_dt) =
+                            chrono::NaiveDateTime::parse_from_str(&until, "%Y-%m-%d %H:%M:%S")
+                    {
+                        let timeout_utc = timeout_dt.and_utc();
+                        return timeout_utc > chrono::Utc::now();
+                    }
+                    false
+                })
+            });
+            if timed_out {
+                return Err("You are timed out and cannot send messages".into());
+            }
+        }
+
+        // Enforce slow mode: check per-channel cooldown
+        if let Some(pool) = &self.db {
+            let pool = pool.clone();
+            let srv = server_id.to_string();
+            let tgt = target.to_string();
+            let nick = session.nickname.clone();
+            let slow_err = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    if let Ok(Some(ch)) =
+                        crate::db::queries::channels::get_channel_by_name(&pool, &srv, &tgt).await
+                        && ch.slowmode_seconds > 0
+                        && let Ok(Some(last)) =
+                            crate::db::queries::messages::get_last_user_message_time(
+                                &pool, &ch.id, &nick,
+                            )
+                            .await
+                        && let Ok(last_dt) = chrono::NaiveDateTime::parse_from_str(
+                            &last,
+                            "%Y-%m-%d %H:%M:%S",
+                        )
+                    {
+                        let last_utc = last_dt.and_utc();
+                        let cooldown =
+                            chrono::Duration::seconds(ch.slowmode_seconds as i64);
+                        if chrono::Utc::now() - last_utc < cooldown {
+                            return Some(format!(
+                                "Slow mode: wait {} seconds between messages",
+                                ch.slowmode_seconds
+                            ));
+                        }
+                    }
+                    None
+                })
+            });
+            if let Some(err) = slow_err {
+                return Err(err);
+            }
+        }
+
+        // Evaluate automod rules (keyword, mention_spam, link_filter)
+        if let Some(pool) = &self.db {
+            let pool = pool.clone();
+            let srv = server_id.to_string();
+            let content_clone = content.to_string();
+            let automod_err = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let rules = crate::db::queries::automod::get_enabled_rules(&pool, &srv)
+                        .await
+                        .unwrap_or_default();
+                    for rule in rules {
+                        let triggered = match rule.rule_type.as_str() {
+                            "keyword" => {
+                                // Config: {"words":["bad","spam"]}
+                                if let Ok(config) = serde_json::from_str::<serde_json::Value>(&rule.config) {
+                                    if let Some(words) = config.get("words").and_then(|w| w.as_array()) {
+                                        let lower = content_clone.to_lowercase();
+                                        words.iter().any(|w| {
+                                            w.as_str()
+                                                .is_some_and(|kw| lower.contains(&kw.to_lowercase()))
+                                        })
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            }
+                            "mention_spam" => {
+                                // Config: {"max_mentions":5}
+                                if let Ok(config) = serde_json::from_str::<serde_json::Value>(&rule.config) {
+                                    let max = config
+                                        .get("max_mentions")
+                                        .and_then(|m| m.as_i64())
+                                        .unwrap_or(5) as usize;
+                                    let mention_count = content_clone.matches('@').count();
+                                    mention_count > max
+                                } else {
+                                    false
+                                }
+                            }
+                            "link_filter" => {
+                                // Config: {"block_all":true}
+                                if let Ok(config) = serde_json::from_str::<serde_json::Value>(&rule.config) {
+                                    let block_all = config
+                                        .get("block_all")
+                                        .and_then(|b| b.as_bool())
+                                        .unwrap_or(false);
+                                    if block_all {
+                                        content_clone.contains("http://")
+                                            || content_clone.contains("https://")
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            }
+                            _ => false,
+                        };
+                        if triggered {
+                            return Some(format!(
+                                "Message blocked by automod rule: {}",
+                                rule.name
+                            ));
+                        }
+                    }
+                    None
+                })
+            });
+            if let Some(err) = automod_err {
+                return Err(err);
+            }
         }
 
         // Build reply info if replying to a message
@@ -974,7 +1166,7 @@ impl ChatEngine {
                 let server_id_owned = server_id.to_string();
                 let channel_name_owned = channel_name.clone();
                 // Collect senders for channel members before spawning
-                let member_senders: Vec<mpsc::UnboundedSender<ChatEvent>> =
+                let member_senders: Vec<mpsc::Sender<ChatEvent>> =
                     if let Some(channel) = self.channels.get(&channel_id) {
                         channel
                             .members
@@ -1022,7 +1214,7 @@ impl ChatEngine {
                             embeds,
                         };
                         for sender in &member_senders {
-                            let _ = sender.send(embed_event.clone());
+                            let _ = sender.try_send(embed_event.clone());
                         }
                     }
                 });
@@ -1074,6 +1266,7 @@ impl ChatEngine {
         topic: String,
     ) -> Result<(), String> {
         validation::validate_topic(&topic)?;
+        let topic = validation::sanitize_html(&topic);
         let channel_name = normalize_channel_name(channel_name);
         let channel_id = self.resolve_channel_id(server_id, &channel_name)?;
 
@@ -1315,6 +1508,7 @@ impl ChatEngine {
         new_content: &str,
     ) -> Result<(), String> {
         validation::validate_message(new_content)?;
+        let new_content = &validation::sanitize_html(new_content);
 
         let session = self
             .sessions
@@ -1329,9 +1523,9 @@ impl ChatEngine {
             .map_err(|e| format!("DB error: {e}"))?
             .ok_or("Message not found")?;
 
-        // Only the sender can edit their own messages
-        let sender_id = session.user_id.as_deref().unwrap_or("");
-        if msg.sender_id != sender_id && msg.sender_nick != session.nickname {
+        // Only the sender can edit their own messages (require user_id match, not nickname)
+        let sender_id = session.user_id.as_deref().ok_or("Authentication required to edit messages")?;
+        if msg.sender_id != sender_id {
             return Err("You can only edit your own messages".into());
         }
 
@@ -1382,8 +1576,8 @@ impl ChatEngine {
             .map_err(|e| format!("DB error: {e}"))?
             .ok_or("Message not found")?;
 
-        let sender_id = session.user_id.as_deref().unwrap_or("");
-        let is_sender = msg.sender_id == sender_id || msg.sender_nick == session.nickname;
+        let sender_id = session.user_id.as_deref().ok_or("Authentication required to delete messages")?;
+        let is_sender = msg.sender_id == sender_id;
 
         if !is_sender {
             // Check if user has moderator+ role
@@ -1773,12 +1967,21 @@ impl ChatEngine {
     /// Update a custom role.
     pub async fn update_role(
         &self,
+        server_id: &str,
         role_id: &str,
         name: &str,
         color: Option<&str>,
         permissions: i64,
     ) -> Result<RoleInfo, String> {
         let pool = self.db.as_ref().ok_or("No database configured")?;
+        // Verify the role belongs to the expected server (prevents cross-server manipulation)
+        let role = crate::db::queries::roles::get_role(pool, role_id)
+            .await
+            .map_err(|e| format!("DB error: {e}"))?
+            .ok_or("Role not found")?;
+        if role.server_id != server_id {
+            return Err("Role does not belong to this server".into());
+        }
         crate::db::queries::roles::update_role(pool, role_id, name, color, None, permissions)
             .await
             .map_err(|e| format!("Failed to update role: {e}"))?;
@@ -1790,7 +1993,7 @@ impl ChatEngine {
     }
 
     /// Delete a custom role.
-    pub async fn delete_role(&self, role_id: &str) -> Result<(), String> {
+    pub async fn delete_role(&self, server_id: &str, role_id: &str) -> Result<(), String> {
         let pool = self.db.as_ref().ok_or("No database configured")?;
         // Prevent deleting the @everyone default role
         let role = crate::db::queries::roles::get_role(pool, role_id)
@@ -1799,6 +2002,10 @@ impl ChatEngine {
             .ok_or("Role not found")?;
         if role.is_default != 0 {
             return Err("Cannot delete the default @everyone role".into());
+        }
+        // Verify the role belongs to the expected server (prevents cross-server manipulation)
+        if role.server_id != server_id {
+            return Err("Role does not belong to this server".into());
         }
         crate::db::queries::roles::delete_role(pool, role_id)
             .await
@@ -2833,6 +3040,11 @@ impl ChatEngine {
             .require_permission(session_id, server_id, None, Permissions::KICK_MEMBERS)
             .await?;
 
+        // Prevent kicking the server owner
+        if self.is_server_owner(server_id, target_user_id) {
+            return Err("Cannot kick the server owner".into());
+        }
+
         let Some(pool) = &self.db else {
             return Err("No database configured".into());
         };
@@ -2887,6 +3099,11 @@ impl ChatEngine {
         let actor_id = self
             .require_permission(session_id, server_id, None, Permissions::BAN_MEMBERS)
             .await?;
+
+        // Prevent banning the server owner
+        if self.is_server_owner(server_id, target_user_id) {
+            return Err("Cannot ban the server owner".into());
+        }
 
         let Some(pool) = &self.db else {
             return Err("No database configured".into());
@@ -3287,6 +3504,8 @@ impl ChatEngine {
         if !["delete", "timeout", "flag"].contains(&action_type) {
             return Err("Invalid action type. Must be 'delete', 'timeout', or 'flag'".into());
         }
+        // Validate config JSON matches rule_type schema
+        validate_automod_config(rule_type, config)?;
 
         let rule_id = Uuid::new_v4().to_string();
         let db_params = crate::db::models::CreateAutomodRuleParams {
@@ -3343,6 +3562,18 @@ impl ChatEngine {
             return Err("No database configured".into());
         };
 
+        // Validate action_type
+        if !["delete", "timeout", "flag"].contains(&action_type) {
+            return Err("Invalid action type. Must be 'delete', 'timeout', or 'flag'".into());
+        }
+
+        // Fetch existing rule to get rule_type for config validation
+        let existing = crate::db::queries::automod::get_rule(pool, rule_id)
+            .await
+            .map_err(|e| format!("Failed to fetch automod rule: {e}"))?
+            .ok_or_else(|| "Automod rule not found".to_string())?;
+        validate_automod_config(&existing.rule_type, config)?;
+
         crate::db::queries::automod::update_rule(
             pool,
             rule_id,
@@ -3359,7 +3590,7 @@ impl ChatEngine {
             id: rule_id.to_string(),
             name: name.to_string(),
             enabled,
-            rule_type: String::new(), // caller doesn't change rule_type
+            rule_type: existing.rule_type,
             config: config.to_string(),
             action_type: action_type.to_string(),
             timeout_duration_seconds,
@@ -3465,12 +3696,12 @@ impl ChatEngine {
         };
 
         let invite_id = Uuid::new_v4().to_string();
-        // Generate random 8-char alphanumeric invite code from UUID
-        let code: String = Uuid::new_v4()
-            .to_string()
-            .replace('-', "")
-            .chars()
-            .take(8)
+        // Generate random 16-char alphanumeric invite code (brute-force resistant)
+        use rand::Rng;
+        let code: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(16)
+            .map(char::from)
             .collect();
 
         crate::db::queries::invites::create_invite(
@@ -3593,13 +3824,6 @@ impl ChatEngine {
             return Err("Invite has expired".into());
         }
 
-        // Check max uses
-        if let Some(max) = invite.max_uses
-            && invite.use_count >= max
-        {
-            return Err("Invite has reached maximum uses".into());
-        }
-
         // Check if user is already a member
         if let Some(server) = self.servers.get(&invite.server_id)
             && server.member_user_ids.contains(&user_id)
@@ -3607,13 +3831,16 @@ impl ChatEngine {
             return Err("Already a member of this server".into());
         }
 
+        // Atomically check max_uses and increment use_count (prevents TOCTOU race)
+        let used = crate::db::queries::invites::try_use_invite(pool, &invite.id)
+            .await
+            .map_err(|e| format!("Failed to use invite: {e}"))?;
+        if !used {
+            return Err("Invite has reached maximum uses".into());
+        }
+
         // Add user as server member
         self.join_server(&user_id, &invite.server_id).await?;
-
-        // Increment use count
-        crate::db::queries::invites::increment_use_count(pool, &invite.id)
-            .await
-            .map_err(|e| format!("Failed to increment invite use: {e}"))?;
 
         // Auto-join default channel (#general)
         let default_channel = self
@@ -4002,9 +4229,10 @@ impl ChatEngine {
             return Err("No database configured".into());
         };
 
-        let rows = crate::db::queries::community::list_discoverable_servers(pool, category)
-            .await
-            .map_err(|e| format!("Failed to list discoverable servers: {e}"))?;
+        let rows =
+            crate::db::queries::community::list_discoverable_servers(pool, category, 100, 0)
+                .await
+                .map_err(|e| format!("Failed to list discoverable servers: {e}"))?;
 
         let servers: Vec<ServerCommunityInfo> = rows
             .into_iter()
@@ -4350,7 +4578,9 @@ impl ChatEngine {
         }
 
         let id = Uuid::new_v4().to_string();
-        let token = format!("{}.{}", id, Uuid::new_v4());
+        let raw_token = format!("{}.{}", id, Uuid::new_v4());
+        let token_hash = crate::auth::token::hash_irc_token(&raw_token)
+            .map_err(|e| format!("Failed to hash webhook token: {e}"))?;
 
         use crate::db::models::CreateWebhookParams;
         let params = CreateWebhookParams {
@@ -4360,7 +4590,7 @@ impl ChatEngine {
             name,
             avatar_url: None,
             webhook_type,
-            token: &token,
+            token: &token_hash,
             url,
             created_by: &self.get_user_id(session_id)?,
         };
@@ -4376,7 +4606,7 @@ impl ChatEngine {
             name: name.to_string(),
             avatar_url: None,
             webhook_type: webhook_type.to_string(),
-            token,
+            token: raw_token,
             url: url.map(String::from),
             created_by: self.get_user_id(session_id)?,
             created_at: Utc::now().to_rfc3339(),
@@ -4991,7 +5221,9 @@ impl ChatEngine {
         };
 
         let id = Uuid::new_v4().to_string();
-        let client_secret = format!("secret_{}", Uuid::new_v4());
+        let raw_secret = format!("secret_{}", Uuid::new_v4());
+        let secret_hash = crate::auth::token::hash_irc_token(&raw_secret)
+            .map_err(|e| format!("Failed to hash OAuth2 secret: {e}"))?;
         let uris_json = serde_json::to_string(redirect_uris)
             .map_err(|e| format!("Invalid redirect URIs: {e}"))?;
 
@@ -5002,7 +5234,7 @@ impl ChatEngine {
             description: description.unwrap_or(""),
             icon_url: None,
             owner_id: &user_id,
-            client_secret: &client_secret,
+            client_secret: &secret_hash,
             redirect_uris: &uris_json,
             scopes: "identify",
         };
@@ -5027,7 +5259,7 @@ impl ChatEngine {
             // Also show the secret (only time visible)
             let _ = session.send(ChatEvent::ServerNotice {
                 message: format!(
-                    "OAuth2 app created! Client ID: {id}, Client Secret: {client_secret}"
+                    "OAuth2 app created! Client ID: {id}, Client Secret: {raw_secret}"
                 ),
             });
         }
@@ -5104,6 +5336,7 @@ impl ChatEngine {
     /// No session required; the webhook token is the authentication.
     pub async fn execute_incoming_webhook(
         &self,
+        webhook_id: &str,
         webhook_token: &str,
         content: &str,
         username_override: Option<&str>,
@@ -5113,17 +5346,24 @@ impl ChatEngine {
             return Err("No database configured".into());
         };
 
-        let wh = crate::db::queries::webhooks::get_webhook_by_token(pool, webhook_token)
+        let wh = crate::db::queries::webhooks::get_webhook(pool, webhook_id)
             .await
             .map_err(|e| format!("DB error: {e}"))?
-            .ok_or("Invalid webhook token")?;
+            .ok_or("Invalid webhook")?;
+
+        // Verify the token against the stored hash
+        if !crate::auth::token::verify_irc_token(webhook_token, &wh.token) {
+            return Err("Invalid webhook token".into());
+        }
 
         if wh.webhook_type != "incoming" {
             return Err("This endpoint is only for incoming webhooks".into());
         }
 
         let channel_name = self.resolve_channel_name_from_id(&wh.channel_id)?;
-        let display_name = username_override.unwrap_or(&wh.name);
+        // Tag webhook display names to prevent impersonation of real users
+        let base_name = username_override.unwrap_or(&wh.name);
+        let display_name = format!("{base_name} [Webhook]");
         let avatar = avatar_override.map(String::from).or(wh.avatar_url.clone());
 
         let msg_id = Uuid::new_v4();
@@ -5184,6 +5424,56 @@ impl ChatEngine {
             .map(|ch| ch.name.clone())
             .ok_or_else(|| format!("Channel ID {channel_id} not found"))
     }
+}
+
+/// Validate automod rule config JSON matches the expected schema for its rule_type.
+fn validate_automod_config(rule_type: &str, config: &str) -> Result<(), String> {
+    let parsed: serde_json::Value =
+        serde_json::from_str(config).map_err(|_| "Invalid JSON in automod config".to_string())?;
+
+    match rule_type {
+        "keyword" => {
+            // Expect {"words": ["word1", "word2", ...]}
+            let words = parsed
+                .get("words")
+                .and_then(|v| v.as_array())
+                .ok_or("keyword config must have a 'words' array")?;
+            if words.is_empty() {
+                return Err("keyword config 'words' array must not be empty".into());
+            }
+            if words.len() > 1000 {
+                return Err("keyword config 'words' array exceeds maximum of 1000 entries".into());
+            }
+            for w in words {
+                if w.as_str().is_none() {
+                    return Err("keyword config 'words' must contain only strings".into());
+                }
+            }
+        }
+        "mention_spam" => {
+            // Expect {"max_mentions": <positive integer>}
+            let max = parsed
+                .get("max_mentions")
+                .and_then(|v| v.as_i64())
+                .ok_or("mention_spam config must have a 'max_mentions' integer")?;
+            if !(1..=100).contains(&max) {
+                return Err("mention_spam 'max_mentions' must be between 1 and 100".into());
+            }
+        }
+        "link_filter" => {
+            // Expect {"block_all": <bool>} or {"allowed_domains": [...]}
+            if parsed.get("block_all").is_none() && parsed.get("allowed_domains").is_none() {
+                return Err(
+                    "link_filter config must have 'block_all' (bool) or 'allowed_domains' (array)"
+                        .into(),
+                );
+            }
+        }
+        _ => {
+            return Err(format!("Unknown rule type: {rule_type}"));
+        }
+    }
+    Ok(())
 }
 
 /// Convert a RoleRow to a RoleInfo for client consumption.

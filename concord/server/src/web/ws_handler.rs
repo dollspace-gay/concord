@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::extract::ws::{Message, WebSocket};
-use axum::extract::{Query, State, WebSocketUpgrade};
+use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use axum_extra::extract::CookieJar;
 use futures_util::{SinkExt, StreamExt};
@@ -16,14 +16,6 @@ use crate::engine::permissions::Permissions;
 use crate::engine::user_session::Protocol;
 
 use super::app_state::AppState;
-
-/// Query parameters for WebSocket upgrade.
-/// If authenticated via cookie, nickname is looked up from the user's profile.
-/// Falls back to ?nickname= for unauthenticated dev/test usage.
-#[derive(Deserialize, Default)]
-pub struct WsParams {
-    pub nickname: Option<String>,
-}
 
 /// Client-to-server WebSocket message types.
 #[derive(Deserialize)]
@@ -519,7 +511,6 @@ fn default_server_id() -> String {
 pub async fn ws_upgrade(
     State(state): State<Arc<AppState>>,
     jar: CookieJar,
-    Query(params): Query<WsParams>,
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
     // Try cookie-based auth first
@@ -539,13 +530,10 @@ pub async fn ws_upgrade(
             )
                 .into_response();
         }
-    } else if let Some(nick) = params.nickname {
-        // Fallback: allow ?nickname= for dev/test (no auth required)
-        (nick, None)
     } else {
         return (
             axum::http::StatusCode::UNAUTHORIZED,
-            "Not authenticated. Provide a session cookie or ?nickname= param.",
+            "Not authenticated. Provide a valid session cookie.",
         )
             .into_response();
     };
@@ -568,7 +556,8 @@ pub async fn ws_upgrade(
     };
 
     let engine = state.engine.clone();
-    ws.on_upgrade(move |socket| handle_ws_connection(socket, engine, user_id, nickname, avatar_url))
+    ws.max_message_size(64 * 1024) // 64 KB max WS message
+        .on_upgrade(move |socket| handle_ws_connection(socket, engine, user_id, nickname, avatar_url))
         .into_response()
 }
 
@@ -676,48 +665,75 @@ async fn handle_client_message(
             before,
             limit,
         } => {
-            let limit = limit.unwrap_or(50).min(200);
-            match engine
-                .fetch_history(&server_id, &channel, before.as_deref(), limit)
-                .await
-            {
-                Ok((messages, has_more)) => {
-                    if let Some(session) = engine.get_session(session_id) {
-                        let _ = session.send(ChatEvent::History {
-                            server_id,
-                            channel,
-                            messages,
-                            has_more,
-                        });
+            // Verify the user is a member of this server
+            let is_member = engine
+                .get_session(session_id)
+                .and_then(|s| s.user_id.as_ref().map(|uid| engine.user_is_server_member(&server_id, uid)))
+                .unwrap_or(false);
+            if !is_member {
+                Err("You are not a member of this server".into())
+            } else {
+                let limit = limit.unwrap_or(50).min(200);
+                match engine
+                    .fetch_history(&server_id, &channel, before.as_deref(), limit)
+                    .await
+                {
+                    Ok((messages, has_more)) => {
+                        if let Some(session) = engine.get_session(session_id) {
+                            let _ = session.send(ChatEvent::History {
+                                server_id,
+                                channel,
+                                messages,
+                                has_more,
+                            });
+                        }
+                        Ok(())
                     }
-                    Ok(())
+                    Err(e) => Err(e),
                 }
-                Err(e) => Err(e),
             }
         }
         ClientMessage::ListChannels { server_id } => {
-            let channels = engine.list_channels(&server_id);
-            if let Some(session) = engine.get_session(session_id) {
-                let _ = session.send(ChatEvent::ChannelList {
-                    server_id,
-                    channels,
-                });
+            // Verify the user is a member of this server
+            let is_member = engine
+                .get_session(session_id)
+                .and_then(|s| s.user_id.as_ref().map(|uid| engine.user_is_server_member(&server_id, uid)))
+                .unwrap_or(false);
+            if !is_member {
+                Err("You are not a member of this server".into())
+            } else {
+                let channels = engine.list_channels(&server_id);
+                if let Some(session) = engine.get_session(session_id) {
+                    let _ = session.send(ChatEvent::ChannelList {
+                        server_id,
+                        channels,
+                    });
+                }
+                Ok(())
             }
-            Ok(())
         }
         ClientMessage::GetMembers { server_id, channel } => {
-            match engine.get_members(&server_id, &channel) {
-                Ok(member_infos) => {
-                    if let Some(session) = engine.get_session(session_id) {
-                        let _ = session.send(ChatEvent::Names {
-                            server_id,
-                            channel,
-                            members: member_infos,
-                        });
+            // Verify the user is a member of this server
+            let is_member = engine
+                .get_session(session_id)
+                .and_then(|s| s.user_id.as_ref().map(|uid| engine.user_is_server_member(&server_id, uid)))
+                .unwrap_or(false);
+            if !is_member {
+                Err("You are not a member of this server".into())
+            } else {
+                match engine.get_members(&server_id, &channel) {
+                    Ok(member_infos) => {
+                        if let Some(session) = engine.get_session(session_id) {
+                            let _ = session.send(ChatEvent::Names {
+                                server_id,
+                                channel,
+                                members: member_infos,
+                            });
+                        }
+                        Ok(())
                     }
-                    Ok(())
+                    Err(e) => Err(e),
                 }
-                Err(e) => Err(e),
             }
         }
         ClientMessage::ListServers => {
@@ -725,7 +741,7 @@ async fn handle_client_message(
                 let servers = if let Some(ref uid) = session.user_id {
                     engine.list_servers_for_user(uid)
                 } else {
-                    engine.list_all_servers()
+                    vec![] // unauthenticated sessions see no servers
                 };
                 let _ = session.send(ChatEvent::ServerList { servers });
             }
@@ -928,12 +944,55 @@ async fn handle_client_message(
             user_id,
             role,
         } => {
-            if let Some(pool) = engine.db() {
-                crate::db::queries::servers::update_member_role(pool, &server_id, &user_id, &role)
-                    .await
-                    .map_err(|e| format!("Failed to update role: {e}"))
-            } else {
-                Err("No database configured".into())
+            // Require MANAGE_ROLES permission
+            match engine
+                .require_permission(
+                    session_id,
+                    &server_id,
+                    None,
+                    Permissions::MANAGE_ROLES,
+                )
+                .await
+            {
+                Ok(_) => {
+                    // Prevent assigning "owner" through this path
+                    if role == "owner" {
+                        Err("Cannot assign owner role — use ownership transfer".into())
+                    } else if engine.is_server_owner(&server_id, &user_id) {
+                        // Prevent modifying the server owner's role
+                        Err("Cannot change the server owner's role".into())
+                    } else {
+                        // Role hierarchy: caller must outrank the target role
+                        let mut hierarchy_ok = true;
+                        if let Some(session) = engine.get_session(session_id)
+                            && let Some(ref caller_uid) = session.user_id
+                            && !engine.is_server_owner(&server_id, caller_uid)
+                        {
+                            let caller_role = engine.get_server_role(&server_id, caller_uid).await;
+                            let target_role = match role.as_str() {
+                                "admin" => Some(crate::engine::permissions::ServerRole::Admin),
+                                "moderator" => Some(crate::engine::permissions::ServerRole::Moderator),
+                                "member" => Some(crate::engine::permissions::ServerRole::Member),
+                                _ => None,
+                            };
+                            if let (Some(caller), Some(target)) = (caller_role, target_role)
+                                && target >= caller
+                            {
+                                hierarchy_ok = false;
+                            }
+                        }
+                        if !hierarchy_ok {
+                            Err("Cannot assign a role at or above your own level".into())
+                        } else if let Some(pool) = engine.db() {
+                            crate::db::queries::servers::update_member_role(pool, &server_id, &user_id, &role)
+                                .await
+                                .map_err(|e| format!("Failed to update role: {e}"))
+                        } else {
+                            Err("No database configured".into())
+                        }
+                    }
+                }
+                Err(e) => Err(e),
             }
         }
         ClientMessage::EditMessage {
@@ -991,7 +1050,13 @@ async fn handle_client_message(
             permissions,
         } => {
             let perms = permissions.unwrap_or(0);
-            match engine
+            // Prevent non-owners from setting ADMINISTRATOR bit
+            let requested = crate::engine::permissions::Permissions::from_bits_truncate(perms as u64);
+            if requested.contains(crate::engine::permissions::Permissions::ADMINISTRATOR)
+                && !engine.is_server_owner(&server_id, &engine.get_session(session_id).and_then(|s| s.user_id.clone()).unwrap_or_default())
+            {
+                Err("Only the server owner can grant ADMINISTRATOR permission".into())
+            } else { match engine
                 .require_permission(
                     session_id,
                     &server_id,
@@ -1013,7 +1078,7 @@ async fn handle_client_message(
                     Err(e) => Err(e),
                 },
                 Err(e) => Err(e),
-            }
+            } }
         }
         ClientMessage::UpdateRole {
             server_id,
@@ -1022,28 +1087,36 @@ async fn handle_client_message(
             color,
             permissions,
         } => {
-            match engine
-                .require_permission(
-                    session_id,
-                    &server_id,
-                    None,
-                    crate::engine::permissions::Permissions::MANAGE_ROLES,
-                )
-                .await
+            // Prevent non-owners from setting ADMINISTRATOR bit
+            let requested = crate::engine::permissions::Permissions::from_bits_truncate(permissions as u64);
+            if requested.contains(crate::engine::permissions::Permissions::ADMINISTRATOR)
+                && !engine.is_server_owner(&server_id, &engine.get_session(session_id).and_then(|s| s.user_id.clone()).unwrap_or_default())
             {
-                Ok(_) => match engine
-                    .update_role(&role_id, &name, color.as_deref(), permissions)
+                Err("Only the server owner can grant ADMINISTRATOR permission".into())
+            } else {
+                match engine
+                    .require_permission(
+                        session_id,
+                        &server_id,
+                        None,
+                        crate::engine::permissions::Permissions::MANAGE_ROLES,
+                    )
                     .await
                 {
-                    Ok(role) => {
-                        if let Some(session) = engine.get_session(session_id) {
-                            let _ = session.send(ChatEvent::RoleUpdate { server_id, role });
+                    Ok(_) => match engine
+                        .update_role(&server_id, &role_id, &name, color.as_deref(), permissions)
+                        .await
+                    {
+                        Ok(role) => {
+                            if let Some(session) = engine.get_session(session_id) {
+                                let _ = session.send(ChatEvent::RoleUpdate { server_id, role });
+                            }
+                            Ok(())
                         }
-                        Ok(())
-                    }
+                        Err(e) => Err(e),
+                    },
                     Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
+                }
             }
         }
         ClientMessage::DeleteRole { server_id, role_id } => {
@@ -1056,7 +1129,7 @@ async fn handle_client_message(
                 )
                 .await
             {
-                Ok(_) => match engine.delete_role(&role_id).await {
+                Ok(_) => match engine.delete_role(&server_id, &role_id).await {
                     Ok(()) => {
                         if let Some(session) = engine.get_session(session_id) {
                             let _ = session.send(ChatEvent::RoleDelete { server_id, role_id });

@@ -27,6 +27,10 @@ pub struct AdminSection {
 pub struct ServerSection {
     pub web_address: String,
     pub irc_address: String,
+    /// Path to TLS certificate file (PEM) for IRC. If set, IRC listens with TLS.
+    pub irc_tls_cert: Option<String>,
+    /// Path to TLS private key file (PEM) for IRC.
+    pub irc_tls_key: Option<String>,
 }
 
 impl Default for ServerSection {
@@ -34,6 +38,8 @@ impl Default for ServerSection {
         Self {
             web_address: "0.0.0.0:8080".into(),
             irc_address: "0.0.0.0:6667".into(),
+            irc_tls_cert: None,
+            irc_tls_key: None,
         }
     }
 }
@@ -108,6 +114,12 @@ impl ServerConfig {
         }
         if let Ok(v) = std::env::var("IRC_ADDRESS") {
             self.server.irc_address = v;
+        }
+        if let Ok(v) = std::env::var("IRC_TLS_CERT") {
+            self.server.irc_tls_cert = Some(v);
+        }
+        if let Ok(v) = std::env::var("IRC_TLS_KEY") {
+            self.server.irc_tls_key = Some(v);
         }
         if let Ok(v) = std::env::var("DATABASE_URL") {
             self.database.url = v;

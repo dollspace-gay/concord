@@ -137,6 +137,21 @@ pub async fn get_all_irc_token_hashes(
     Ok(rows)
 }
 
+/// Get IRC token hashes for a specific nickname (scoped lookup for scalability).
+pub async fn get_irc_token_hashes_by_nick(
+    pool: &SqlitePool,
+    nickname: &str,
+) -> Result<Vec<(String, String)>, sqlx::Error> {
+    sqlx::query_as::<_, (String, String)>(
+        "SELECT t.user_id, t.token_hash \
+         FROM irc_tokens t JOIN users u ON t.user_id = u.id \
+         WHERE u.username = ?",
+    )
+    .bind(nickname)
+    .fetch_all(pool)
+    .await
+}
+
 /// Look up a user profile by nickname, including OAuth provider info.
 /// Returns (user_id, username, email, avatar_url, provider, provider_id).
 pub async fn get_user_by_nickname(

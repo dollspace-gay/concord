@@ -10,13 +10,55 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::auth::token::{generate_irc_token, hash_irc_token};
-use crate::db::queries::{attachments, bots, community, emoji, invites, servers, users};
+use crate::auth::token::{generate_irc_token, hash_irc_token, verify_irc_token};
+use crate::db::queries::{attachments, bots, community, emoji, invites, roles, servers, users};
 use crate::engine::events::HistoryMessage;
+use crate::engine::permissions::{Permissions, compute_effective_permissions};
 use sqlx;
 
 use super::app_state::AppState;
 use super::auth_middleware::AuthUser;
+
+/// Check if a user has a specific permission in a server.
+/// Returns Ok(()) if permitted, or an error response.
+async fn check_server_permission(
+    pool: &sqlx::SqlitePool,
+    server_id: &str,
+    user_id: &str,
+    required: Permissions,
+) -> Result<(), (StatusCode, &'static str)> {
+    let server = servers::get_server(pool, server_id)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Database error"))?
+        .ok_or((StatusCode::NOT_FOUND, "Server not found"))?;
+
+    if server.owner_id == user_id {
+        return Ok(()); // Owner has all permissions
+    }
+
+    let default_role = roles::get_default_role(pool, server_id)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Database error"))?;
+    let base = default_role
+        .map(|r| Permissions::from_bits_truncate(r.permissions as u64))
+        .unwrap_or(Permissions::empty());
+
+    let user_roles = roles::get_user_roles(pool, server_id, user_id)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Database error"))?;
+    let role_perms: Vec<(String, Permissions)> = user_roles
+        .iter()
+        .map(|r| (r.id.clone(), Permissions::from_bits_truncate(r.permissions as u64)))
+        .collect();
+
+    let effective = compute_effective_permissions(base, &role_perms, &[], "", user_id, false);
+
+    if effective.contains(required) {
+        Ok(())
+    } else {
+        Err((StatusCode::FORBIDDEN, "Insufficient permissions"))
+    }
+}
 
 // ── Phase 8: Bot token auth extractor ──────────────────────
 
@@ -48,13 +90,20 @@ where
             .strip_prefix("Bot ")
             .ok_or((StatusCode::UNAUTHORIZED, "Expected 'Bot <token>' format"))?;
 
-        // Hash the token and look it up
-        let token_hash = hash_irc_token(token)
-            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Token hash failed"))?;
+        // Bot tokens have format "bot_<user_id>.<random>" — extract user_id
+        // to scope the hash search to only that user's tokens.
+        let user_id_hint = token
+            .strip_prefix("bot_")
+            .and_then(|rest| rest.split('.').next())
+            .ok_or((StatusCode::UNAUTHORIZED, "Invalid bot token format"))?;
 
-        let row = bots::get_bot_token_by_hash(&app_state.db, &token_hash)
+        let user_tokens = bots::list_bot_tokens(&app_state.db, user_id_hint)
             .await
-            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Database error"))?
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Database error"))?;
+
+        let row = user_tokens
+            .into_iter()
+            .find(|t| verify_irc_token(token, &t.token_hash))
             .ok_or((StatusCode::UNAUTHORIZED, "Invalid bot token"))?;
 
         // Update last_used timestamp in background
@@ -93,6 +142,7 @@ pub struct ChannelListParams {
 
 pub async fn get_channel_history(
     State(state): State<Arc<AppState>>,
+    _auth: AuthUser,
     Path(channel_name): Path<String>,
     Query(params): Query<HistoryParams>,
 ) -> impl IntoResponse {
@@ -123,12 +173,16 @@ pub async fn get_channel_history(
             has_more,
         })
         .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to fetch history");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch history").into_response()
+        }
     }
 }
 
 pub async fn get_channels(
     State(state): State<Arc<AppState>>,
+    _auth: AuthUser,
     Query(params): Query<ChannelListParams>,
 ) -> impl IntoResponse {
     let Some(server_id) = params.server_id else {
@@ -180,6 +234,7 @@ pub async fn create_server(
 /// GET /api/servers/:id — get server info.
 pub async fn get_server(
     State(state): State<Arc<AppState>>,
+    _auth: AuthUser,
     Path(server_id): Path<String>,
 ) -> impl IntoResponse {
     match state
@@ -211,6 +266,7 @@ pub async fn delete_server(
 /// GET /api/servers/:id/channels — list channels in a server.
 pub async fn list_server_channels(
     State(state): State<Arc<AppState>>,
+    _auth: AuthUser,
     Path(server_id): Path<String>,
 ) -> impl IntoResponse {
     Json(state.engine.list_channels(&server_id))
@@ -219,6 +275,7 @@ pub async fn list_server_channels(
 /// GET /api/servers/:id/channels/:name/messages — channel history within a server.
 pub async fn get_server_channel_history(
     State(state): State<Arc<AppState>>,
+    _auth: AuthUser,
     Path((server_id, channel_name)): Path<(String, String)>,
     Query(params): Query<HistoryParams>,
 ) -> impl IntoResponse {
@@ -241,13 +298,17 @@ pub async fn get_server_channel_history(
             has_more,
         })
         .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to fetch history");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch history").into_response()
+        }
     }
 }
 
 /// GET /api/servers/:id/members — list server members.
 pub async fn list_server_members(
     State(state): State<Arc<AppState>>,
+    _auth: AuthUser,
     Path(server_id): Path<String>,
 ) -> impl IntoResponse {
     match servers::get_server_members(&state.db, &server_id).await {
@@ -646,6 +707,7 @@ pub async fn upload_file(
 /// GET /api/uploads/:id — serve an uploaded file.
 pub async fn get_upload(
     State(state): State<Arc<AppState>>,
+    _auth: AuthUser,
     Path(attachment_id): Path<String>,
 ) -> impl IntoResponse {
     // Look up attachment metadata
@@ -665,14 +727,31 @@ pub async fn get_upload(
         return (StatusCode::NOT_FOUND, "Attachment has no PDS blob URL").into_response();
     };
 
+    // SSRF protection: verify blob URL doesn't point to private/internal IPs
+    if !crate::engine::embeds::is_safe_url(blob_url).await {
+        return (StatusCode::FORBIDDEN, "Blob URL points to a restricted address").into_response();
+    }
+
     info!(attachment_id = %attachment_id, blob_url = %blob_url, "Proxying PDS blob");
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap_or_default();
     match client.get(blob_url.as_str()).send().await {
         Ok(resp) if resp.status().is_success() => {
-            let content_disposition = format!(
-                "inline; filename=\"{}\"",
-                attachment.original_filename.replace('"', "\\\"")
-            );
+            // Sanitize filename: strip control chars, newlines, semicolons, quotes
+            let safe_filename: String = attachment
+                .original_filename
+                .chars()
+                .filter(|c| !c.is_control() && *c != '"' && *c != ';' && *c != '\\')
+                .collect();
+            let safe_filename = if safe_filename.is_empty() {
+                "download".to_string()
+            } else {
+                safe_filename
+            };
+            let content_disposition = format!("inline; filename=\"{safe_filename}\"");
             let body = Body::from_stream(resp.bytes_stream());
             (
                 [
@@ -748,6 +827,13 @@ pub async fn create_server_emoji(
     user: AuthUser,
     Json(body): Json<CreateEmojiRequest>,
 ) -> impl IntoResponse {
+    if let Err(resp) =
+        check_server_permission(&state.db, &server_id, &user.user_id, Permissions::MANAGE_SERVER)
+            .await
+    {
+        return resp.into_response();
+    }
+
     // Validate emoji name: alphanumeric + underscores, 2-32 chars
     let name = body.name.trim().to_lowercase();
     if name.len() < 2 || name.len() > 32 || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
@@ -793,9 +879,16 @@ pub async fn create_server_emoji(
 
 pub async fn delete_server_emoji(
     State(state): State<Arc<AppState>>,
-    Path((_server_id, emoji_id)): Path<(String, String)>,
-    _user: AuthUser,
+    Path((server_id, emoji_id)): Path<(String, String)>,
+    user: AuthUser,
 ) -> impl IntoResponse {
+    if let Err(resp) =
+        check_server_permission(&state.db, &server_id, &user.user_id, Permissions::MANAGE_SERVER)
+            .await
+    {
+        return resp.into_response();
+    }
+
     match emoji::delete_emoji(&state.db, &emoji_id).await {
         Ok(true) => StatusCode::NO_CONTENT.into_response(),
         Ok(false) => (StatusCode::NOT_FOUND, "Emoji not found").into_response(),
@@ -999,15 +1092,21 @@ pub async fn get_invite_preview(
 #[derive(Deserialize)]
 pub struct DiscoverParams {
     pub category: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
-/// GET /api/discover — public server discovery
+/// GET /api/discover — public server discovery with pagination
 pub async fn discover_servers(
     State(state): State<Arc<AppState>>,
     Query(params): Query<DiscoverParams>,
 ) -> impl IntoResponse {
     let pool = &state.db;
-    match community::list_discoverable_servers(pool, params.category.as_deref()).await {
+    let limit = params.limit.unwrap_or(50).clamp(1, 100);
+    let offset = params.offset.unwrap_or(0).max(0);
+    match community::list_discoverable_servers(pool, params.category.as_deref(), limit, offset)
+        .await
+    {
         Ok(servers) => {
             let results: Vec<serde_json::Value> = servers
                 .iter()
@@ -1021,13 +1120,13 @@ pub async fn discover_servers(
                     })
                 })
                 .collect();
-            Json(serde_json::json!({ "servers": results })).into_response()
+            Json(serde_json::json!({ "servers": results, "limit": limit, "offset": offset }))
+                .into_response()
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()})),
-        )
-            .into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to list discoverable servers");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
     }
 }
 
@@ -1043,12 +1142,13 @@ pub struct WebhookExecuteRequest {
 /// POST /api/webhooks/{id}/{token} — execute an incoming webhook (public, no session auth).
 pub async fn execute_webhook(
     State(state): State<Arc<AppState>>,
-    Path((_webhook_id, token)): Path<(String, String)>,
+    Path((webhook_id, token)): Path<(String, String)>,
     Json(body): Json<WebhookExecuteRequest>,
 ) -> impl IntoResponse {
     match state
         .engine
         .execute_incoming_webhook(
+            &webhook_id,
             &token,
             &body.content,
             body.username.as_deref(),

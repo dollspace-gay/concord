@@ -2,22 +2,28 @@ use sqlx::SqlitePool;
 
 use crate::db::models::{ChannelFollowRow, ServerRow, ServerTemplateRow};
 
-/// List discoverable servers with optional category filter.
+/// List discoverable servers with optional category filter and pagination.
 pub async fn list_discoverable_servers(
     pool: &SqlitePool,
     category: Option<&str>,
+    limit: i64,
+    offset: i64,
 ) -> Result<Vec<ServerRow>, sqlx::Error> {
     if let Some(cat) = category {
         sqlx::query_as::<_, ServerRow>(
-            "SELECT * FROM servers WHERE is_discoverable = 1 AND category = ? ORDER BY name",
+            "SELECT * FROM servers WHERE is_discoverable = 1 AND category = ? ORDER BY name LIMIT ? OFFSET ?",
         )
         .bind(cat)
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await
     } else {
         sqlx::query_as::<_, ServerRow>(
-            "SELECT * FROM servers WHERE is_discoverable = 1 ORDER BY name",
+            "SELECT * FROM servers WHERE is_discoverable = 1 ORDER BY name LIMIT ? OFFSET ?",
         )
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await
     }
@@ -246,7 +252,7 @@ mod tests {
         setup_server(&pool).await;
 
         // Initially not discoverable
-        let discoverable = list_discoverable_servers(&pool, None).await.unwrap();
+        let discoverable = list_discoverable_servers(&pool, None, 100, 0).await.unwrap();
         assert!(discoverable.is_empty());
 
         // Make server discoverable
@@ -262,7 +268,7 @@ mod tests {
         .await
         .unwrap();
 
-        let discoverable = list_discoverable_servers(&pool, None).await.unwrap();
+        let discoverable = list_discoverable_servers(&pool, None, 100, 0).await.unwrap();
         assert_eq!(discoverable.len(), 1);
         assert_eq!(
             discoverable[0].description,
@@ -286,13 +292,13 @@ mod tests {
             .await
             .unwrap();
 
-        let gaming = list_discoverable_servers(&pool, Some("gaming"))
+        let gaming = list_discoverable_servers(&pool, Some("gaming"), 100, 0)
             .await
             .unwrap();
         assert_eq!(gaming.len(), 1);
         assert_eq!(gaming[0].id, "s1");
 
-        let music = list_discoverable_servers(&pool, Some("music"))
+        let music = list_discoverable_servers(&pool, Some("music"), 100, 0)
             .await
             .unwrap();
         assert_eq!(music.len(), 1);

@@ -5,6 +5,9 @@ use tokio::sync::mpsc;
 
 use super::events::{ChatEvent, SessionId};
 
+/// Maximum queued outbound events per session (prevents memory exhaustion from slow clients).
+pub const MAX_OUTBOUND_QUEUE: usize = 1024;
+
 /// Which protocol this session connected via.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Protocol {
@@ -21,8 +24,8 @@ pub struct UserSession {
     pub user_id: Option<String>,
     pub nickname: String,
     pub protocol: Protocol,
-    /// Send outbound events to this session's write loop.
-    pub outbound: mpsc::UnboundedSender<ChatEvent>,
+    /// Send outbound events to this session's write loop (bounded to prevent memory exhaustion).
+    pub outbound: mpsc::Sender<ChatEvent>,
     /// Channels this session is currently in.
     pub channels: HashSet<String>,
     pub connected_at: DateTime<Utc>,
@@ -36,7 +39,7 @@ impl UserSession {
         user_id: Option<String>,
         nickname: String,
         protocol: Protocol,
-        outbound: mpsc::UnboundedSender<ChatEvent>,
+        outbound: mpsc::Sender<ChatEvent>,
         avatar_url: Option<String>,
     ) -> Self {
         Self {
@@ -51,8 +54,9 @@ impl UserSession {
         }
     }
 
-    /// Send an event to this session. Returns false if the channel is closed.
+    /// Send an event to this session. Returns false if the channel is closed
+    /// or the outbound queue is full (slow client protection — drops event rather than blocking).
     pub fn send(&self, event: ChatEvent) -> bool {
-        self.outbound.send(event).is_ok()
+        self.outbound.try_send(event).is_ok()
     }
 }

@@ -32,3 +32,4 @@ concord/web/.chainlink/
 # OS files
 .DS_Store
 Thumbs.db
+SECURITY_AUDIT.md

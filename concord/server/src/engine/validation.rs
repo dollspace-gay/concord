@@ -65,6 +65,15 @@ pub fn validate_channel_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Sanitize user-generated content by escaping HTML entities.
+/// Prevents XSS when content is rendered in the web frontend.
+pub fn sanitize_html(input: &str) -> String {
+    input
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
 /// Validate message content. Must be non-empty and under the length limit.
 pub fn validate_message(content: &str) -> Result<(), String> {
     if content.trim().is_empty() {
@@ -340,5 +349,30 @@ mod tests {
     fn test_topic_with_special_chars() {
         assert!(validate_topic("Welcome! <b>bold</b> & \"quoted\"").is_ok());
         assert!(validate_topic("Topic with\nnewline").is_ok());
+    }
+
+    #[test]
+    fn test_sanitize_html_escapes_tags() {
+        assert_eq!(sanitize_html("<script>alert('xss')</script>"), "&lt;script&gt;alert('xss')&lt;/script&gt;");
+    }
+
+    #[test]
+    fn test_sanitize_html_escapes_ampersand() {
+        assert_eq!(sanitize_html("a & b"), "a &amp; b");
+    }
+
+    #[test]
+    fn test_sanitize_html_preserves_normal_text() {
+        assert_eq!(sanitize_html("hello world"), "hello world");
+    }
+
+    #[test]
+    fn test_sanitize_html_preserves_markdown() {
+        assert_eq!(sanitize_html("**bold** _italic_ `code`"), "**bold** _italic_ `code`");
+    }
+
+    #[test]
+    fn test_sanitize_html_mixed_content() {
+        assert_eq!(sanitize_html("Hello <b>world</b> & friends"), "Hello &lt;b&gt;world&lt;/b&gt; &amp; friends");
     }
 }

@@ -157,7 +157,7 @@ Every TOML value can be overridden with an environment variable (see [Configurat
 ```bash
 cd concord/server
 cargo build --release
-./target/release/concord-server
+../target/release/concord-server
 ```
 
 On Windows:

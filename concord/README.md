@@ -32,7 +32,7 @@ Any IRC client (HexChat, irssi, WeeChat) connects alongside web users — messag
 cd web
 npm ci
 npm run build
-cp -r dist/ ../server/static/
+cp -r dist/* ../server/static/
 cd ..
 
 # Build the server
@@ -44,7 +44,7 @@ cargo build --release
 
 ```bash
 # From the server directory
-./target/release/concord-server
+../target/release/concord-server
 ```
 
 The server starts on:

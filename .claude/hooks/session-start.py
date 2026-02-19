@@ -30,10 +30,22 @@ def run_chainlink(args):
 
 
 def check_chainlink_initialized():
-    """Check if .chainlink directory exists."""
-    cwd = os.getcwd()
-    current = cwd
+    """Check if .chainlink directory exists.
 
+    Prefers the project root derived from the hook script's own path
+    (reliable even when cwd is a subdirectory), falling back to walking
+    up from cwd.
+    """
+    # Primary: resolve from script location (.claude/hooks/ -> project root)
+    try:
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        if os.path.isdir(os.path.join(root, ".chainlink")):
+            return True
+    except (NameError, OSError):
+        pass
+
+    # Fallback: walk up from cwd
+    current = os.getcwd()
     while True:
         candidate = os.path.join(current, ".chainlink")
         if os.path.isdir(candidate):

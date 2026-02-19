@@ -13,6 +13,7 @@ pub struct ServerConfig {
     pub auth: AuthSection,
     pub storage: StorageSection,
     pub admin: AdminSection,
+    pub irc: IrcSection,
 }
 
 #[derive(Deserialize, Default)]
@@ -88,6 +89,13 @@ impl Default for StorageSection {
             max_file_size_mb: 100,
         }
     }
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+pub struct IrcSection {
+    /// Message of the day lines. If empty, clients see ERR_NOMOTD.
+    pub motd: Vec<String>,
 }
 
 impl ServerConfig {

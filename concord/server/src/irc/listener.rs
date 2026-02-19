@@ -1,5 +1,8 @@
+use std::net::IpAddr;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
+use dashmap::DashMap;
 use sqlx::SqlitePool;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
@@ -9,6 +12,9 @@ use tracing::{error, info, warn};
 use crate::engine::chat_engine::ChatEngine;
 
 use super::connection::handle_irc_connection;
+
+/// Maximum concurrent IRC connections per IP address.
+const MAX_CONNECTIONS_PER_IP: u32 = 5;
 
 /// Start the IRC TCP listener. Accepts connections and spawns a handler task for each.
 /// If a TLS acceptor is provided, connections are wrapped in TLS.
@@ -30,6 +36,9 @@ pub async fn start_irc_listener(
         info!("IRC listener started on {} (plaintext)", bind_addr);
     }
 
+    // Track active connection count per IP
+    let ip_counts: Arc<DashMap<IpAddr, AtomicU32>> = Arc::new(DashMap::new());
+
     loop {
         tokio::select! {
             _ = cancel.cancelled() => {
@@ -39,9 +48,24 @@ pub async fn start_irc_listener(
             result = listener.accept() => {
                 match result {
                     Ok((stream, addr)) => {
+                        let ip = addr.ip();
+
+                        // Enforce per-IP connection limit
+                        let count = ip_counts
+                            .entry(ip)
+                            .or_insert_with(|| AtomicU32::new(0));
+                        let current = count.load(Ordering::Relaxed);
+                        if current >= MAX_CONNECTIONS_PER_IP {
+                            warn!(%ip, count = current, "IRC connection rejected: per-IP limit reached");
+                            drop(stream);
+                            continue;
+                        }
+                        count.fetch_add(1, Ordering::Relaxed);
+
                         let engine = engine.clone();
                         let db = db.clone();
                         let peer = addr.to_string();
+                        let ip_counts = ip_counts.clone();
                         if let Some(ref acceptor) = tls_acceptor {
                             let acceptor = acceptor.clone();
                             tokio::spawn(async move {
@@ -53,10 +77,12 @@ pub async fn start_irc_listener(
                                         warn!(%peer, error = %e, "TLS handshake failed");
                                     }
                                 }
+                                decrement_ip_count(&ip_counts, ip);
                             });
                         } else {
                             tokio::spawn(async move {
                                 handle_irc_connection(stream, peer, engine, db).await;
+                                decrement_ip_count(&ip_counts, ip);
                             });
                         }
                     }
@@ -65,6 +91,17 @@ pub async fn start_irc_listener(
                     }
                 }
             }
+        }
+    }
+}
+
+/// Decrement the connection count for an IP, removing the entry when it reaches zero.
+fn decrement_ip_count(ip_counts: &DashMap<IpAddr, AtomicU32>, ip: IpAddr) {
+    if let Some(entry) = ip_counts.get(&ip) {
+        let prev = entry.fetch_sub(1, Ordering::Relaxed);
+        drop(entry);
+        if prev <= 1 {
+            ip_counts.remove(&ip);
         }
     }
 }

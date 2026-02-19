@@ -538,7 +538,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       case 'names': {
         const key = channelKey(event.server_id, event.channel);
         set((s) => {
-          let newAvatars = { ...s.avatars };
+          const newAvatars = { ...s.avatars };
           for (const m of event.members) {
             if (m.avatar_url) {
               newAvatars[m.nickname] = m.avatar_url;

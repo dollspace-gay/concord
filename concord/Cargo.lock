@@ -491,6 +491,7 @@ dependencies = [
  "atproto-oauth",
  "axum",
  "axum-extra",
+ "base64",
  "bitflags",
  "chrono",
  "clap",

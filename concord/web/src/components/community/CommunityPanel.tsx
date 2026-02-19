@@ -25,7 +25,6 @@ export function CommunityPanel({ serverId, onClose }: Props) {
   const createEvent = useChatStore(s => s.createEvent);
   const deleteEvent = useChatStore(s => s.deleteEvent);
   const setRsvp = useChatStore(s => s.setRsvp);
-  const removeRsvp = useChatStore(s => s.removeRsvp);
   const updateCommunitySettings = useChatStore(s => s.updateCommunitySettings);
   const getCommunitySettings = useChatStore(s => s.getCommunitySettings);
   const discoverServers = useChatStore(s => s.discoverServers);
@@ -100,7 +99,6 @@ export function CommunityPanel({ serverId, onClose }: Props) {
               onCreate={createEvent}
               onDelete={deleteEvent}
               onRsvp={setRsvp}
-              onRemoveRsvp={removeRsvp}
             />
           )}
           {activeTab === 'settings' && (
@@ -247,13 +245,12 @@ function InvitesTab({ invites, serverId, onCreate, onDelete }: {
 
 // ── Events Tab ──────────────────────────────────────────
 
-function EventsTab({ events, serverId, onCreate, onDelete, onRsvp, onRemoveRsvp: _onRemoveRsvp }: {
+function EventsTab({ events, serverId, onCreate, onDelete, onRsvp }: {
   events: EventInfo[];
   serverId: string;
   onCreate: (serverId: string, name: string, startTime: string, options?: { description?: string; channelId?: string; endTime?: string; imageUrl?: string }) => void;
   onDelete: (serverId: string, eventId: string) => void;
   onRsvp: (serverId: string, eventId: string, status: string) => void;
-  onRemoveRsvp: (serverId: string, eventId: string) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
@@ -433,16 +430,16 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
   const [templateDesc, setTemplateDesc] = useState('');
   const [showTemplateForm, setShowTemplateForm] = useState(false);
 
-  // Sync form when settings load
-  useEffect(() => {
-    if (settings) {
-      setDescription(settings.description ?? '');
-      setIsDiscoverable(settings.is_discoverable);
-      setWelcomeMessage(settings.welcome_message ?? '');
-      setRulesText(settings.rules_text ?? '');
-      setCategory(settings.category ?? '');
-    }
-  }, [settings]);
+  // Sync form when settings load (render-time adjustment per React docs)
+  const [prevSettings, setPrevSettings] = useState(settings);
+  if (settings && settings !== prevSettings) {
+    setPrevSettings(settings);
+    setDescription(settings.description ?? '');
+    setIsDiscoverable(settings.is_discoverable);
+    setWelcomeMessage(settings.welcome_message ?? '');
+    setRulesText(settings.rules_text ?? '');
+    setCategory(settings.category ?? '');
+  }
 
   const handleSave = () => {
     onUpdate(serverId, {

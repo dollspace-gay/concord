@@ -34,3 +34,6 @@ concord/web/.chainlink/
 Thumbs.db
 SECURITY_AUDIT.md
 nul
+CHANGELOG.md
+smoke_test.py
+__pycache__/smoke_test.cpython-312.pyc

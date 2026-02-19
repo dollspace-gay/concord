@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — IRC Robustness (#198)
+- CTCP ACTION (/me) support for IRC clients (#199)
+- Per-IP connection limits (max 5) and per-connection command rate limiting (#200)
+- KICK command for IRC moderators with permission checks (#201)
+- AWAY/BACK presence mapping to engine status (#202)
+- Complete WHOIS response with channel list (319) and away status (301) (#203)
+- INVITE command to join users to channels (#204)
+- Configurable MOTD via `[irc]` config section with on-demand MOTD command (#205)
+- IRCv3 CAP negotiation with server-time, message-tags, and sasl capabilities (#206)
+- SASL PLAIN authentication for IRC clients (#207)
+- CTCP VERSION/PING/TIME responses (#208)
+- Reply context prefix in PRIVMSG showing original author and preview (#209)
+- Reaction formatting as CTCP ACTION for IRC visibility (#210)
+- Role prefixes (@) in NAMES reply for server owners (#211)
+- Attachment URLs sent as separate PRIVMSG lines for IRC clients
+
 ### Added — Server Management & Emoji UX (#148)
 - Channel creation UI with "+" button on each category header
 - Inline channel creation form with name, category, and private toggle

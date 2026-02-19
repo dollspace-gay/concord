@@ -468,6 +468,7 @@ function AttachmentPreview({ attachment }: { attachment: AttachmentInfo }) {
 function ImageLightbox({ url, filename, onClose }: { url: string; filename: string; onClose: () => void }) {
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
   const dragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
 
@@ -488,6 +489,7 @@ function ImageLightbox({ url, filename, onClose }: { url: string; filename: stri
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
     dragging.current = true;
+    setIsDragging(true);
     lastPos.current = { x: e.clientX, y: e.clientY };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
@@ -502,6 +504,7 @@ function ImageLightbox({ url, filename, onClose }: { url: string; filename: stri
 
   const handlePointerUp = useCallback(() => {
     dragging.current = false;
+    setIsDragging(false);
   }, []);
 
   const resetView = useCallback(() => {
@@ -549,7 +552,7 @@ function ImageLightbox({ url, filename, onClose }: { url: string; filename: stri
         className="max-h-[90vh] max-w-[90vw] select-none"
         style={{
           transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
-          cursor: dragging.current ? 'grabbing' : 'grab',
+          cursor: isDragging ? 'grabbing' : 'grab',
         }}
         draggable={false}
         onWheel={handleWheel}

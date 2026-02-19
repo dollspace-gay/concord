@@ -62,8 +62,8 @@ pub fn handle_command(
         "NAMES" => handle_names(engine, nick, msg),
         "LIST" => handle_list(engine, nick, msg),
         "WHO" => handle_who(engine, nick, msg),
-        "WHOIS" => handle_whois(engine, nick, msg),
-        "QUIT" => vec![], // Handled at connection level
+        "WHOIS" => vec![], // Handled async in connection.rs
+        "QUIT" => vec![],  // Handled at connection level
         "PING" => {
             let token = msg.params.first().map(|s| s.as_str()).unwrap_or("concord");
             vec![formatter::pong(token)]
@@ -182,7 +182,12 @@ fn handle_privmsg(
     }
 
     let target = &msg.params[0];
-    let content = &msg.params[1];
+    let raw_content = &msg.params[1];
+
+    // Handle CTCP messages (\x01...\x01)
+    if let Some(ctcp) = parse_ctcp(raw_content) {
+        return handle_ctcp(engine, session_id, nick, target, &ctcp);
+    }
 
     if target.starts_with('#') {
         // Channel message — parse server/channel from IRC name
@@ -191,7 +196,7 @@ fn handle_privmsg(
             session_id,
             &server_id,
             &channel_name,
-            content,
+            raw_content,
             None,
             None,
             None,
@@ -205,7 +210,7 @@ fn handle_privmsg(
             session_id,
             DEFAULT_SERVER_ID,
             target,
-            content,
+            raw_content,
             None,
             None,
             None,
@@ -216,6 +221,90 @@ fn handle_privmsg(
     }
 
     vec![]
+}
+
+/// CTCP message content (between \x01 markers).
+struct CtcpMessage {
+    command: String,
+    params: Option<String>,
+}
+
+/// Parse a CTCP message: \x01COMMAND [params]\x01
+fn parse_ctcp(content: &str) -> Option<CtcpMessage> {
+    let inner = content.strip_prefix('\x01')?.strip_suffix('\x01')?;
+    if inner.is_empty() {
+        return None;
+    }
+    let (command, params) = match inner.find(' ') {
+        Some(pos) => (&inner[..pos], Some(inner[pos + 1..].to_string())),
+        None => (inner, None),
+    };
+    Some(CtcpMessage {
+        command: command.to_uppercase(),
+        params,
+    })
+}
+
+/// Handle CTCP commands: ACTION → /me, VERSION/PING/TIME → reply.
+fn handle_ctcp(
+    engine: &ChatEngine,
+    session_id: SessionId,
+    nick: &str,
+    target: &str,
+    ctcp: &CtcpMessage,
+) -> Vec<String> {
+    match ctcp.command.as_str() {
+        "ACTION" => {
+            // Convert to /me format for the engine
+            let action_text = ctcp.params.as_deref().unwrap_or("");
+            let content = format!("/me {action_text}");
+            if target.starts_with('#') {
+                let (server_id, channel_name) = parse_irc_channel(engine, target);
+                if let Err(e) = engine.send_message(
+                    session_id,
+                    &server_id,
+                    &channel_name,
+                    &content,
+                    None,
+                    None,
+                    None,
+                ) {
+                    warn!(error = %e, %target, "CTCP ACTION failed");
+                    return vec![formatter::err_nosuchnick(nick, target)];
+                }
+            } else if let Err(e) = engine.send_message(
+                session_id,
+                DEFAULT_SERVER_ID,
+                target,
+                &content,
+                None,
+                None,
+                None,
+            ) {
+                warn!(error = %e, %target, "CTCP ACTION failed");
+                return vec![formatter::err_nosuchnick(nick, target)];
+            }
+            vec![]
+        }
+        "VERSION" => {
+            vec![formatter::ctcp_reply(
+                nick,
+                "VERSION",
+                "Concord IRC Bridge 0.1.0",
+            )]
+        }
+        "PING" => {
+            let token = ctcp.params.as_deref().unwrap_or("");
+            vec![formatter::ctcp_reply(nick, "PING", token)]
+        }
+        "TIME" => {
+            let now = chrono::Utc::now()
+                .format("%a %b %d %H:%M:%S %Y UTC")
+                .to_string();
+            vec![formatter::ctcp_reply(nick, "TIME", &now)]
+        }
+        _ => vec![], // Unknown CTCP — silently ignore
+    }
 }
 
 fn handle_topic(
@@ -358,20 +447,4 @@ fn handle_who(engine: &ChatEngine, nick: &str, msg: &IrcMessage) -> Vec<String> 
     }
 
     replies
-}
-
-fn handle_whois(engine: &ChatEngine, nick: &str, msg: &IrcMessage) -> Vec<String> {
-    let Some(target) = msg.params.first() else {
-        return vec![formatter::err_needmoreparams(nick, "WHOIS")];
-    };
-
-    if !engine.is_nick_available(target) {
-        vec![
-            formatter::rpl_whoisuser(nick, target),
-            formatter::rpl_whoisserver(nick, target),
-            formatter::rpl_endofwhois(nick, target),
-        ]
-    } else {
-        vec![formatter::err_nosuchnick(nick, target)]
-    }
 }

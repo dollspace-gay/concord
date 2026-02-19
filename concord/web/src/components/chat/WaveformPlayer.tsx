@@ -57,12 +57,16 @@ export function WaveformPlayer({ src, filename, fileSize }: WaveformPlayerProps)
     return () => { cancelled = true; };
   }, [src]);
 
-  const updateProgress = useCallback(() => {
-    const audio = audioRef.current;
-    if (audio && !audio.paused) {
-      setProgress(audio.currentTime / (audio.duration || 1));
-      animRef.current = requestAnimationFrame(updateProgress);
-    }
+  const updateProgressRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    updateProgressRef.current = () => {
+      const audio = audioRef.current;
+      if (audio && !audio.paused) {
+        setProgress(audio.currentTime / (audio.duration || 1));
+        animRef.current = requestAnimationFrame(() => updateProgressRef.current());
+      }
+    };
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -71,13 +75,13 @@ export function WaveformPlayer({ src, filename, fileSize }: WaveformPlayerProps)
     if (audio.paused) {
       audio.play();
       setPlaying(true);
-      animRef.current = requestAnimationFrame(updateProgress);
+      animRef.current = requestAnimationFrame(() => updateProgressRef.current());
     } else {
       audio.pause();
       setPlaying(false);
       cancelAnimationFrame(animRef.current);
     }
-  }, [updateProgress]);
+  }, []);
 
   const handleEnded = useCallback(() => {
     setPlaying(false);

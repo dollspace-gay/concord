@@ -1,5 +1,5 @@
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, OnceLock};
+use std::time::{Duration, Instant};
 
 use sqlx::SqlitePool;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
@@ -10,9 +10,61 @@ use tracing::{info, warn};
 const MAX_LINE_LENGTH: usize = 4096;
 /// Idle timeout — disconnect clients that send nothing for 5 minutes.
 const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
+/// Command rate limit: burst capacity (commands allowed in a rapid burst).
+const CMD_RATE_BURST: f64 = 10.0;
+/// Command rate limit: refill rate (commands per second).
+const CMD_RATE_PER_SEC: f64 = 2.0;
+
+/// Global MOTD lines, initialized at startup from config.
+static MOTD_LINES: OnceLock<Vec<String>> = OnceLock::new();
+
+/// Supported IRCv3 capabilities.
+const SUPPORTED_CAPS: &str = "server-time message-tags sasl";
+
+/// Tracks which IRCv3 capabilities a client has negotiated.
+#[derive(Default)]
+struct ClientCaps {
+    server_time: bool,
+    message_tags: bool,
+    sasl: bool,
+}
+
+/// Set the MOTD lines from config. Call once at startup.
+pub fn set_motd(lines: Vec<String>) {
+    let _ = MOTD_LINES.set(lines);
+}
+
+/// Per-connection token bucket for command rate limiting.
+struct CommandRateLimit {
+    tokens: f64,
+    last_refill: Instant,
+}
+
+impl CommandRateLimit {
+    fn new() -> Self {
+        Self {
+            tokens: CMD_RATE_BURST,
+            last_refill: Instant::now(),
+        }
+    }
+
+    /// Returns true if the command is allowed, false if rate limited.
+    fn check(&mut self) -> bool {
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.last_refill).as_secs_f64();
+        self.tokens = (self.tokens + elapsed * CMD_RATE_PER_SEC).min(CMD_RATE_BURST);
+        self.last_refill = now;
+        if self.tokens >= 1.0 {
+            self.tokens -= 1.0;
+            true
+        } else {
+            false
+        }
+    }
+}
 
 use crate::auth::token::verify_irc_token;
-use crate::db::queries::users;
+use crate::db::queries::{presence, users};
 use crate::engine::chat_engine::{ChatEngine, DEFAULT_SERVER_ID};
 use crate::engine::events::{ChatEvent, SessionId};
 use crate::engine::user_session::Protocol;
@@ -106,6 +158,8 @@ pub async fn handle_irc_connection<S>(
 
     let mut line_buf = String::new();
     let mut event_rx: Option<mpsc::Receiver<ChatEvent>> = None;
+    let mut cmd_rate = CommandRateLimit::new();
+    let mut caps = ClientCaps::default();
 
     loop {
         // When registered, also select on engine events
@@ -121,6 +175,12 @@ pub async fn handle_irc_connection<S>(
                     line_buf.clear();
 
                     if line.is_empty() {
+                        continue;
+                    }
+
+                    // Enforce per-connection command rate limit
+                    if !cmd_rate.check() {
+                        warn!(%peer, "IRC command rate limited");
                         continue;
                     }
 
@@ -140,6 +200,38 @@ pub async fn handle_irc_connection<S>(
                             break;
                         }
 
+                        // MOTD command — re-send MOTD on demand
+                        if msg.command == "MOTD" {
+                            let motd = MOTD_LINES.get();
+                            if let Some(lines) = motd
+                                && !lines.is_empty()
+                            {
+                                send_line(&out_tx, &formatter::rpl_motdstart(nick));
+                                for line in lines {
+                                    send_line(&out_tx, &formatter::rpl_motd(nick, line));
+                                }
+                                send_line(&out_tx, &formatter::rpl_endofmotd(nick));
+                            } else {
+                                send_line(&out_tx, &formatter::err_nomotd(nick));
+                            }
+                            continue;
+                        }
+
+                        // Async commands — need DB lookups or engine async methods
+                        if matches!(msg.command.as_str(), "KICK" | "AWAY" | "INVITE" | "WHOIS") {
+                            let replies = match msg.command.as_str() {
+                                "KICK" => handle_kick(&engine, &db, *session_id, nick, &msg).await,
+                                "AWAY" => handle_away(&engine, *session_id, nick, &msg).await,
+                                "INVITE" => handle_invite(&engine, &db, *session_id, nick, &msg).await,
+                                "WHOIS" => handle_whois(&engine, &db, nick, &msg).await,
+                                _ => unreachable!(),
+                            };
+                            for reply in replies {
+                                send_line(&out_tx, &reply);
+                            }
+                            continue;
+                        }
+
                         let replies = commands::handle_command(&engine, *session_id, nick, &msg);
                         for reply in replies {
                             send_line(&out_tx, &reply);
@@ -149,7 +241,7 @@ pub async fn handle_irc_connection<S>(
                 event = rx.recv() => {
                     let Some(event) = event else { break };
                     if let RegState::Registered { ref nick, .. } = state {
-                        let lines = event_to_irc_lines(&engine, nick, &event);
+                        let lines = event_to_irc_lines(&engine, nick, &event, &caps);
                         for line in lines {
                             send_line(&out_tx, &line);
                         }
@@ -172,6 +264,12 @@ pub async fn handle_irc_connection<S>(
                 continue;
             }
 
+            // Rate limit registration commands too (prevents brute-force token guessing)
+            if !cmd_rate.check() {
+                warn!(%peer, "IRC registration rate limited");
+                continue;
+            }
+
             let msg = match IrcMessage::parse(&line) {
                 Ok(m) => m,
                 Err(_) => continue,
@@ -179,13 +277,109 @@ pub async fn handle_irc_connection<S>(
 
             // Handle CAP during registration
             if msg.command == "CAP" {
-                if msg.params.first().map(|s| s.as_str()) == Some("LS") {
-                    send_line(
-                        &out_tx,
-                        &format!(":{} CAP * LS :", formatter::server_name()),
-                    );
+                let sn = formatter::server_name();
+                match msg.params.first().map(|s| s.as_str()) {
+                    Some("LS") => {
+                        send_line(&out_tx, &format!(":{sn} CAP * LS :{SUPPORTED_CAPS}"));
+                    }
+                    Some("REQ") => {
+                        // Client requests specific capabilities
+                        if let Some(requested) = msg.params.get(1) {
+                            let mut ack = Vec::new();
+                            for cap in requested.split_whitespace() {
+                                match cap {
+                                    "server-time" => {
+                                        caps.server_time = true;
+                                        ack.push(cap);
+                                    }
+                                    "message-tags" => {
+                                        caps.message_tags = true;
+                                        ack.push(cap);
+                                    }
+                                    "sasl" => {
+                                        caps.sasl = true;
+                                        ack.push(cap);
+                                    }
+                                    _ => {} // Ignore unsupported caps
+                                }
+                            }
+                            if !ack.is_empty() {
+                                send_line(&out_tx, &format!(":{sn} CAP * ACK :{}", ack.join(" ")));
+                            }
+                        }
+                    }
+                    Some("END") => {} // Falls through to registration check
+                    _ => {}
                 }
-                // CAP END just falls through
+                continue;
+            }
+
+            // Handle SASL AUTHENTICATE during registration
+            if msg.command == "AUTHENTICATE" {
+                let sn = formatter::server_name();
+                if let Some(param) = msg.params.first() {
+                    if param == "PLAIN" {
+                        // Acknowledge, ask for credentials
+                        send_line(&out_tx, "AUTHENTICATE +");
+                    } else if param == "*" {
+                        // Client aborts SASL
+                        send_line(
+                            &out_tx,
+                            &format!(":{sn} 906 * :SASL authentication aborted"),
+                        );
+                    } else {
+                        // base64 payload: \0username\0token
+                        use base64::Engine as _;
+                        let decoded = base64::engine::general_purpose::STANDARD.decode(param);
+                        if let Ok(bytes) = decoded {
+                            // Split on NUL: [authzid, authcid, passwd]
+                            let parts: Vec<&[u8]> = bytes.splitn(3, |&b| b == 0).collect();
+                            if parts.len() == 3 {
+                                let _authzid = String::from_utf8_lossy(parts[0]);
+                                let authcid = String::from_utf8_lossy(parts[1]);
+                                let passwd = String::from_utf8_lossy(parts[2]);
+                                // Validate the token
+                                let nick_hint = if authcid.is_empty() { "*" } else { &authcid };
+                                match validate_irc_pass(&db, &passwd, nick_hint).await {
+                                    Ok(Some(uid)) => {
+                                        if let RegState::Unregistered { ref mut pass, .. } = state {
+                                            *pass = Some(passwd.into_owned());
+                                        }
+                                        send_line(
+                                            &out_tx,
+                                            &format!(
+                                                ":{sn} 900 * {uid} :You are now logged in as {uid}"
+                                            ),
+                                        );
+                                        send_line(
+                                            &out_tx,
+                                            &format!(":{sn} 903 * :SASL authentication successful"),
+                                        );
+                                    }
+                                    Ok(None) => {
+                                        send_line(
+                                            &out_tx,
+                                            &format!(":{sn} 904 * :SASL authentication failed"),
+                                        );
+                                    }
+                                    Err(_) => {
+                                        send_line(
+                                            &out_tx,
+                                            &format!(":{sn} 904 * :SASL authentication failed"),
+                                        );
+                                    }
+                                }
+                            } else {
+                                send_line(
+                                    &out_tx,
+                                    &format!(":{sn} 904 * :SASL authentication failed"),
+                                );
+                            }
+                        } else {
+                            send_line(&out_tx, &format!(":{sn} 904 * :SASL authentication failed"));
+                        }
+                    }
+                }
                 continue;
             }
 
@@ -277,7 +471,20 @@ pub async fn handle_irc_connection<S>(
                         send_line(&out_tx, &formatter::rpl_yourhost(&nick_owned));
                         send_line(&out_tx, &formatter::rpl_created(&nick_owned));
                         send_line(&out_tx, &formatter::rpl_myinfo(&nick_owned));
-                        send_line(&out_tx, &formatter::err_nomotd(&nick_owned));
+
+                        // Send MOTD or ERR_NOMOTD
+                        let motd = MOTD_LINES.get();
+                        if let Some(lines) = motd
+                            && !lines.is_empty()
+                        {
+                            send_line(&out_tx, &formatter::rpl_motdstart(&nick_owned));
+                            for line in lines {
+                                send_line(&out_tx, &formatter::rpl_motd(&nick_owned, line));
+                            }
+                            send_line(&out_tx, &formatter::rpl_endofmotd(&nick_owned));
+                        } else {
+                            send_line(&out_tx, &formatter::err_nomotd(&nick_owned));
+                        }
 
                         state = RegState::Registered {
                             session_id: sid,
@@ -333,15 +540,238 @@ async fn validate_irc_pass(
     Ok(None)
 }
 
+/// Handle IRC KICK command: KICK #channel user [:reason]
+/// Requires async because it does a DB lookup (nickname → user_id) and calls engine.kick_member().
+async fn handle_kick(
+    engine: &ChatEngine,
+    db: &SqlitePool,
+    session_id: SessionId,
+    nick: &str,
+    msg: &IrcMessage,
+) -> Vec<String> {
+    if msg.params.len() < 2 {
+        return vec![formatter::err_needmoreparams(nick, "KICK")];
+    }
+    let target_channel = &msg.params[0];
+    let target_nick = &msg.params[1];
+    let reason = msg.params.get(2).map(|s| s.as_str());
+
+    if !target_channel.starts_with('#') {
+        return vec![formatter::err_nosuchchannel(nick, target_channel)];
+    }
+
+    let (server_id, _channel_name) = commands::parse_irc_channel(engine, target_channel);
+
+    // Resolve target nickname → user_id via DB
+    let target_user_id = match users::get_user_by_nickname(db, target_nick).await {
+        Ok(Some((uid, ..))) => uid,
+        Ok(None) => return vec![formatter::err_nosuchnick(nick, target_nick)],
+        Err(e) => {
+            warn!(error = %e, "KICK: DB error resolving nickname");
+            return vec![formatter::err_nosuchnick(nick, target_nick)];
+        }
+    };
+
+    match engine
+        .kick_member(session_id, &server_id, &target_user_id, reason)
+        .await
+    {
+        Ok(()) => vec![],
+        Err(e) => {
+            // Map permission errors to IRC numeric 482
+            if e.contains("permission") || e.contains("Permission") {
+                vec![format!(
+                    ":{} 482 {} {} :{}",
+                    formatter::server_name(),
+                    nick,
+                    target_channel,
+                    e
+                )]
+            } else {
+                vec![format!(
+                    ":{} NOTICE {} :KICK failed: {}",
+                    formatter::server_name(),
+                    nick,
+                    e
+                )]
+            }
+        }
+    }
+}
+
+/// Handle IRC AWAY command: AWAY [:message] / AWAY (no params = back)
+async fn handle_away(
+    engine: &ChatEngine,
+    session_id: SessionId,
+    nick: &str,
+    msg: &IrcMessage,
+) -> Vec<String> {
+    let sn = formatter::server_name();
+    if let Some(away_msg) = msg.params.first() {
+        match engine
+            .set_presence(session_id, "idle", Some(away_msg), None)
+            .await
+        {
+            Ok(()) => vec![format!(
+                ":{sn} 306 {nick} :You have been marked as being away"
+            )],
+            Err(e) => vec![format!(":{sn} NOTICE {nick} :AWAY failed: {e}")],
+        }
+    } else {
+        match engine.set_presence(session_id, "online", None, None).await {
+            Ok(()) => vec![format!(
+                ":{sn} 305 {nick} :You are no longer marked as being away"
+            )],
+            Err(e) => vec![format!(":{sn} NOTICE {nick} :AWAY failed: {e}")],
+        }
+    }
+}
+
+/// Handle IRC INVITE command: INVITE target #channel
+async fn handle_invite(
+    engine: &ChatEngine,
+    db: &SqlitePool,
+    _session_id: SessionId,
+    nick: &str,
+    msg: &IrcMessage,
+) -> Vec<String> {
+    let sn = formatter::server_name();
+    if msg.params.len() < 2 {
+        return vec![formatter::err_needmoreparams(nick, "INVITE")];
+    }
+    let target_nick = &msg.params[0];
+    let target_channel = &msg.params[1];
+
+    if !target_channel.starts_with('#') {
+        return vec![formatter::err_nosuchchannel(nick, target_channel)];
+    }
+
+    let (server_id, channel_name) = commands::parse_irc_channel(engine, target_channel);
+
+    // Resolve target nickname → session_id
+    let target_sid = match engine.get_session_id_by_nick(target_nick) {
+        Some(sid) => sid,
+        None => return vec![formatter::err_nosuchnick(nick, target_nick)],
+    };
+
+    // Look up target user_id
+    let _target_user_id = match users::get_user_by_nickname(db, target_nick).await {
+        Ok(Some((uid, ..))) => uid,
+        _ => return vec![formatter::err_nosuchnick(nick, target_nick)],
+    };
+
+    // Join target to the channel
+    if let Err(e) = engine.join_channel(target_sid, &server_id, &channel_name) {
+        return vec![format!(":{sn} NOTICE {nick} :INVITE failed: {e}")];
+    }
+
+    let irc_channel = commands::to_irc_channel(engine, &server_id, &channel_name);
+    vec![format!(":{sn} 341 {nick} {target_nick} {irc_channel}")]
+}
+
+/// Handle IRC WHOIS command with channel list and away status.
+async fn handle_whois(
+    engine: &ChatEngine,
+    db: &SqlitePool,
+    nick: &str,
+    msg: &IrcMessage,
+) -> Vec<String> {
+    let Some(target) = msg.params.first().or(msg.params.get(1)) else {
+        return vec![formatter::err_needmoreparams(nick, "WHOIS")];
+    };
+    // Strip leading server param: WHOIS server target → use target
+    let target = target.as_str();
+
+    let Some(target_sid) = engine.get_session_id_by_nick(target) else {
+        return vec![formatter::err_nosuchnick(nick, target)];
+    };
+
+    let mut lines = vec![
+        formatter::rpl_whoisuser(nick, target),
+        formatter::rpl_whoisserver(nick, target),
+    ];
+
+    // 319 RPL_WHOISCHANNELS — list channels the target is in
+    let channels = engine.get_session_channels(target_sid);
+    if !channels.is_empty() {
+        let irc_names: Vec<String> = channels
+            .iter()
+            .map(|(sid, cname)| to_irc_channel(engine, sid, cname))
+            .collect();
+        lines.push(formatter::rpl_whoischannels(
+            nick,
+            target,
+            &irc_names.join(" "),
+        ));
+    }
+
+    // 301 RPL_AWAY — if the target has an away/idle status with a custom message
+    if let Some(session) = engine.get_session(target_sid)
+        && let Some(ref uid) = session.user_id
+        && let Ok(Some(pres)) = presence::get_presence(db, uid).await
+        && (pres.status == "idle" || pres.status == "dnd")
+    {
+        let away_msg = pres.custom_status.as_deref().unwrap_or("Away");
+        lines.push(formatter::rpl_away(nick, target, away_msg));
+    }
+
+    lines.push(formatter::rpl_endofwhois(nick, target));
+    lines
+}
+
+/// Build an IRCv3 tag prefix string based on event metadata and negotiated caps.
+fn build_tag_prefix(caps: &ClientCaps, event: &ChatEvent) -> String {
+    let mut tags = Vec::new();
+    if caps.server_time {
+        // Extract timestamp from events that have one
+        if let ChatEvent::Message { timestamp, .. } = event {
+            tags.push(format!(
+                "time={}",
+                timestamp.format("%Y-%m-%dT%H:%M:%S%.3fZ")
+            ));
+        }
+    }
+    if caps.message_tags {
+        // Attach message ID where available
+        if let ChatEvent::Message { id, .. } = event {
+            tags.push(format!("msgid={id}"));
+        }
+    }
+    if tags.is_empty() {
+        String::new()
+    } else {
+        format!("@{} ", tags.join(";"))
+    }
+}
+
 /// Convert a ChatEvent to IRC protocol lines for a specific recipient.
 /// Uses the engine to translate (server_id, channel_name) to IRC format.
-fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> Vec<String> {
+fn event_to_irc_lines(
+    engine: &ChatEngine,
+    my_nick: &str,
+    event: &ChatEvent,
+    caps: &ClientCaps,
+) -> Vec<String> {
+    let tag_prefix = build_tag_prefix(caps, event);
+    let mut lines = event_to_irc_lines_inner(engine, my_nick, event);
+    if !tag_prefix.is_empty() {
+        for line in &mut lines {
+            line.insert_str(0, &tag_prefix);
+        }
+    }
+    lines
+}
+
+/// Inner function that produces raw IRC lines without tags.
+fn event_to_irc_lines_inner(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> Vec<String> {
     match event {
         ChatEvent::Message {
             server_id,
             from,
             target,
             content,
+            reply_to,
+            attachments,
             ..
         } => {
             let irc_target = if target.starts_with('#') {
@@ -350,7 +780,26 @@ fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> 
             } else {
                 target.clone()
             };
-            vec![formatter::privmsg(from, &irc_target, content)]
+            // Build display content with reply context prefix
+            let display = if let Some(reply) = reply_to {
+                format!("[re: {} \"{}\"] {}", reply.from, reply.content_preview, content)
+            } else {
+                content.clone()
+            };
+            let mut lines = Vec::new();
+            // Convert /me prefix to CTCP ACTION
+            if let Some(action) = display.strip_prefix("/me ") {
+                lines.push(formatter::ctcp_action(from, &irc_target, action));
+            } else {
+                lines.push(formatter::privmsg(from, &irc_target, &display));
+            }
+            // Append attachment URLs as separate messages
+            if let Some(atts) = attachments {
+                for att in atts {
+                    lines.push(formatter::privmsg(from, &irc_target, &att.url));
+                }
+            }
+            lines
         }
         ChatEvent::Join {
             nickname,
@@ -391,7 +840,18 @@ fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> 
             members,
         } => {
             let irc_channel = to_irc_channel(engine, server_id, channel);
-            let nicks: Vec<String> = members.iter().map(|m| m.nickname.clone()).collect();
+            let owner_id = engine.get_server_owner_id(server_id);
+            let nicks: Vec<String> = members
+                .iter()
+                .map(|m| {
+                    // Prefix server owner with @ (operator)
+                    if owner_id.as_deref() == m.user_id.as_deref() && m.user_id.is_some() {
+                        format!("@{}", m.nickname)
+                    } else {
+                        m.nickname.clone()
+                    }
+                })
+                .collect();
             vec![
                 formatter::rpl_namreply(my_nick, &irc_channel, &nicks),
                 formatter::rpl_endofnames(my_nick, &irc_channel),
@@ -452,7 +912,7 @@ fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> 
         }
         // MessageAck is WS-only (sender-only event)
         ChatEvent::MessageAck { .. } => vec![],
-        // Reactions: send a NOTICE with the reaction info
+        // Reactions: show as a PRIVMSG action from the reacting user
         ChatEvent::ReactionAdd {
             server_id,
             channel,
@@ -461,16 +921,18 @@ fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> 
             ..
         } => {
             let irc_channel = to_irc_channel(engine, server_id, channel);
-            vec![format!(
-                ":{} NOTICE {} :* {} reacted with {} in {}",
-                formatter::server_name(),
-                my_nick,
-                nickname,
-                emoji,
-                irc_channel
-            )]
+            vec![formatter::ctcp_action(nickname, &irc_channel, &format!("reacted with {emoji}"))]
         }
-        ChatEvent::ReactionRemove { .. } => vec![],
+        ChatEvent::ReactionRemove {
+            server_id,
+            channel,
+            nickname,
+            emoji,
+            ..
+        } => {
+            let irc_channel = to_irc_channel(engine, server_id, channel);
+            vec![formatter::ctcp_action(nickname, &irc_channel, &format!("removed reaction {emoji}"))]
+        }
         // Typing indicators are not sent to IRC
         ChatEvent::TypingStart { .. } => vec![],
         // Embeds are WebSocket-only (rich previews don't map to IRC)
@@ -634,6 +1096,11 @@ mod tests {
     /// Create a minimal ChatEngine with no database for unit tests.
     fn test_engine() -> Arc<ChatEngine> {
         Arc::new(ChatEngine::new(None))
+    }
+
+    /// Test helper — calls the inner (tag-free) event formatter.
+    fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> Vec<String> {
+        event_to_irc_lines_inner(engine, my_nick, event)
     }
 
     // ── Message event ──
@@ -975,7 +1442,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reaction_remove_event_is_empty() {
+    fn test_reaction_remove_event_formats_action() {
         let engine = test_engine();
         let lines = event_to_irc_lines(
             &engine,
@@ -989,7 +1456,9 @@ mod tests {
                 emoji: "\u{1f44d}".into(),
             },
         );
-        assert!(lines.is_empty());
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("ACTION"));
+        assert!(lines[0].contains("removed reaction"));
     }
 
     // ── Events that produce no IRC output ──

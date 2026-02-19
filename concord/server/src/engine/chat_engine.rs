@@ -593,6 +593,11 @@ impl ChatEngine {
         self.servers.get(server_id).map(|s| s.name.clone())
     }
 
+    /// Get the owner user ID for a server.
+    pub fn get_server_owner_id(&self, server_id: &str) -> Option<String> {
+        self.servers.get(server_id).map(|s| s.owner_id.clone())
+    }
+
     // ── Channel management ──────────────────────────────────────────
 
     /// Create a channel within a server. Returns the channel ID.
@@ -2235,6 +2240,35 @@ impl ChatEngine {
     /// Check if a nickname is available.
     pub fn is_nick_available(&self, nickname: &str) -> bool {
         !self.nick_to_session.contains_key(nickname)
+    }
+
+    /// Look up a session ID by nickname. Returns None if no session with that nick exists.
+    pub fn get_session_id_by_nick(&self, nickname: &str) -> Option<SessionId> {
+        self.nick_to_session.get(nickname).map(|r| *r)
+    }
+
+    /// Get the user_id for a session. Returns None if session not found or has no user.
+    pub fn get_session_user_id(&self, session_id: SessionId) -> Option<String> {
+        self.sessions
+            .get(&session_id)
+            .and_then(|s| s.user_id.clone())
+    }
+
+    /// Get (server_id, channel_name) pairs for all channels a session is in.
+    pub fn get_session_channels(&self, session_id: SessionId) -> Vec<(String, String)> {
+        let session = match self.sessions.get(&session_id) {
+            Some(s) => s.clone(),
+            None => return vec![],
+        };
+        session
+            .channels
+            .iter()
+            .filter_map(|ch_id| {
+                self.channels
+                    .get(ch_id)
+                    .map(|ch| (ch.server_id.clone(), ch.name.clone()))
+            })
+            .collect()
     }
 
     /// Get a session by ID.

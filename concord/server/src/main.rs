@@ -109,6 +109,9 @@ async fn main() {
         _ => None,
     };
 
+    // Initialize IRC MOTD from config
+    concord_server::irc::connection::set_motd(config.irc.motd.clone());
+
     // Start IRC listener
     let irc_engine = engine.clone();
     let irc_pool = pool.clone();

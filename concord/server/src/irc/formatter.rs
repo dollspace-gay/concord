@@ -58,6 +58,39 @@ pub fn rpl_myinfo(nick: &str) -> String {
     .format()
 }
 
+/// :concord 375 nick :- concord Message of the Day -
+pub fn rpl_motdstart(nick: &str) -> String {
+    IrcMessage::server_reply(
+        SERVER_NAME,
+        RPL_MOTDSTART,
+        vec![
+            nick.into(),
+            format!("- {} Message of the Day -", SERVER_NAME),
+        ],
+    )
+    .format()
+}
+
+/// :concord 372 nick :- line text
+pub fn rpl_motd(nick: &str, line: &str) -> String {
+    IrcMessage::server_reply(
+        SERVER_NAME,
+        RPL_MOTD,
+        vec![nick.into(), format!("- {line}")],
+    )
+    .format()
+}
+
+/// :concord 376 nick :End of /MOTD command
+pub fn rpl_endofmotd(nick: &str) -> String {
+    IrcMessage::server_reply(
+        SERVER_NAME,
+        RPL_ENDOFMOTD,
+        vec![nick.into(), "End of /MOTD command".into()],
+    )
+    .format()
+}
+
 /// :concord 422 nick :MOTD File is missing
 pub fn err_nomotd(nick: &str) -> String {
     IrcMessage::server_reply(
@@ -98,6 +131,26 @@ pub fn privmsg(nick: &str, target: &str, message: &str) -> String {
         prefix: Some(format!("{}!{}@{}", nick, nick, SERVER_NAME)),
         command: "PRIVMSG".into(),
         params: vec![target.into(), message.into()],
+    }
+    .format()
+}
+
+/// :nick!nick@concord PRIVMSG target :\x01ACTION does something\x01
+pub fn ctcp_action(nick: &str, target: &str, action: &str) -> String {
+    IrcMessage {
+        prefix: Some(format!("{}!{}@{}", nick, nick, SERVER_NAME)),
+        command: "PRIVMSG".into(),
+        params: vec![target.into(), format!("\x01ACTION {action}\x01")],
+    }
+    .format()
+}
+
+/// :concord NOTICE nick :\x01COMMAND response\x01
+pub fn ctcp_reply(nick: &str, command: &str, response: &str) -> String {
+    IrcMessage {
+        prefix: Some(server_name().to_string()),
+        command: "NOTICE".into(),
+        params: vec![nick.into(), format!("\x01{command} {response}\x01")],
     }
     .format()
 }
@@ -229,6 +282,26 @@ pub fn rpl_whoisserver(requestor: &str, nick: &str) -> String {
             SERVER_NAME.into(),
             "Concord IRC-compatible chat server".into(),
         ],
+    )
+    .format()
+}
+
+/// :concord 319 requestor nick :#channel1 #channel2 ...
+pub fn rpl_whoischannels(requestor: &str, nick: &str, channels: &str) -> String {
+    IrcMessage::server_reply(
+        SERVER_NAME,
+        RPL_WHOISCHANNELS,
+        vec![requestor.into(), nick.into(), channels.into()],
+    )
+    .format()
+}
+
+/// :concord 301 requestor nick :away message
+pub fn rpl_away(requestor: &str, nick: &str, message: &str) -> String {
+    IrcMessage::server_reply(
+        SERVER_NAME,
+        RPL_AWAY,
+        vec![requestor.into(), nick.into(), message.into()],
     )
     .format()
 }

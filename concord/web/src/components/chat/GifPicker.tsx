@@ -17,6 +17,7 @@ interface GifPickerProps {
   onClose: () => void;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function isGifPickerAvailable(): boolean {
   return !!TENOR_API_KEY;
 }

@@ -54,9 +54,12 @@ export function QuickSwitcher() {
     return items.slice(0, 10);
   }, [query, servers, channels]);
 
-  useEffect(() => {
+  // Reset selection when query changes (render-time adjustment per React docs)
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (query !== prevQuery) {
+    setPrevQuery(query);
     setSelectedIndex(0);
-  }, [query]);
+  }
 
   if (!show) return null;
 

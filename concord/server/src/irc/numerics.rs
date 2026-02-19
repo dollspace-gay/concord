@@ -5,9 +5,15 @@ pub const RPL_YOURHOST: &str = "002";
 pub const RPL_CREATED: &str = "003";
 pub const RPL_MYINFO: &str = "004";
 
+// Away
+pub const RPL_AWAY: &str = "301";
+pub const RPL_UNAWAY: &str = "305";
+pub const RPL_NOWAWAY: &str = "306";
+
 // Channel operations
 pub const RPL_TOPIC: &str = "332";
 pub const RPL_NOTOPIC: &str = "331";
+pub const RPL_INVITING: &str = "341";
 pub const RPL_NAMREPLY: &str = "353";
 pub const RPL_ENDOFNAMES: &str = "366";
 
@@ -29,6 +35,11 @@ pub const RPL_MOTD: &str = "372";
 pub const RPL_ENDOFMOTD: &str = "376";
 pub const ERR_NOMOTD: &str = "422";
 
+// SASL
+pub const RPL_LOGGEDIN: &str = "900";
+pub const RPL_SASLSUCCESS: &str = "903";
+pub const ERR_SASLFAIL: &str = "904";
+
 // Errors
 pub const ERR_NOSUCHNICK: &str = "401";
 pub const ERR_NOSUCHCHANNEL: &str = "403";
@@ -41,3 +52,4 @@ pub const ERR_NOTREGISTERED: &str = "451";
 pub const ERR_NEEDMOREPARAMS: &str = "461";
 pub const ERR_ALREADYREGISTERED: &str = "462";
 pub const ERR_PASSWDMISMATCH: &str = "464";
+pub const ERR_CHANOPRIVSNEEDED: &str = "482";

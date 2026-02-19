@@ -13,6 +13,15 @@ export function VoiceRecorder({ onRecorded, onCancel }: VoiceRecorderProps) {
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const cleanup = useCallback(() => {
+    clearInterval(timerRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setRecording(false);
+  }, []);
+
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -47,7 +56,7 @@ export function VoiceRecorder({ onRecorded, onCancel }: VoiceRecorderProps) {
       console.error('Failed to start recording:', err);
       onCancel();
     }
-  }, [onRecorded, onCancel]);
+  }, [onRecorded, onCancel, cleanup]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -55,23 +64,14 @@ export function VoiceRecorder({ onRecorded, onCancel }: VoiceRecorderProps) {
     }
   }, []);
 
-  const cleanup = useCallback(() => {
-    clearInterval(timerRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    setRecording(false);
-  }, []);
-
   const handleCancel = useCallback(() => {
     cleanup();
     onCancel();
   }, [cleanup, onCancel]);
 
-  // Start immediately on mount
+  // Start immediately on mount — setState in startRecording is after async getUserMedia
   useEffect(() => {
-    startRecording();
+    startRecording(); // eslint-disable-line react-hooks/set-state-in-effect
     return () => {
       cleanup();
     };

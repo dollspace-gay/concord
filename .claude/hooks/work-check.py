@@ -67,8 +67,29 @@ def load_config(chainlink_dir):
     return mode, blocked, allowed
 
 
+def _project_root_from_script():
+    """Derive project root from this script's location (.claude/hooks/<script>.py -> project root)."""
+    try:
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    except (NameError, OSError):
+        return None
+
+
 def find_chainlink_dir():
-    """Find the .chainlink directory by walking up from cwd."""
+    """Find the .chainlink directory.
+
+    Prefers the project root derived from the hook script's own path
+    (reliable even when cwd is a subdirectory), falling back to walking
+    up from cwd for standalone/test usage.
+    """
+    # Primary: resolve from script location
+    root = _project_root_from_script()
+    if root:
+        candidate = os.path.join(root, '.chainlink')
+        if os.path.isdir(candidate):
+            return candidate
+
+    # Fallback: walk up from cwd
     current = os.getcwd()
     for _ in range(10):
         candidate = os.path.join(current, '.chainlink')

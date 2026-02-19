@@ -21,9 +21,8 @@ export function PinnedMessagesPanel() {
     }
   }, [activeServer, activeChannel, getPinnedMessages]);
 
-  const handleJumpToMessage = (_pin: PinnedMessageInfo) => {
+  const handleJumpToMessage = () => {
     // Future: scroll to specific message ID within the current channel
-    // The pin is already in the current channel view
   };
 
   const handleUnpin = (pin: PinnedMessageInfo) => {
@@ -76,7 +75,7 @@ export function PinnedMessagesPanel() {
                 </div>
                 <div className="mt-2 flex gap-2">
                   <button
-                    onClick={() => handleJumpToMessage(pin)}
+                    onClick={() => handleJumpToMessage()}
                     className="rounded bg-bg-tertiary px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary"
                   >
                     Jump to message

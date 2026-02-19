@@ -1724,11 +1724,13 @@ async fn handle_client_message(
             end_time,
             image_url,
         } => {
+            let user_id = engine.get_session_user_id(session_id).unwrap_or_default();
+            let event_id = uuid::Uuid::new_v4().to_string();
             engine
                 .create_event(
                     session_id,
                     &crate::db::models::CreateServerEventParams {
-                        id: "",
+                        id: &event_id,
                         server_id: &server_id,
                         name: &name,
                         description: description.as_deref(),
@@ -1736,7 +1738,7 @@ async fn handle_client_message(
                         start_time: &start_time,
                         end_time: end_time.as_deref(),
                         image_url: image_url.as_deref(),
-                        created_by: "",
+                        created_by: &user_id,
                     },
                 )
                 .await

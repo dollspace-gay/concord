@@ -17,8 +17,38 @@ from datetime import datetime
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
+def _project_root_from_script():
+    """Derive project root from this script's location (.claude/hooks/<script>.py -> project root)."""
+    try:
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    except (NameError, OSError):
+        return None
+
+
+def _get_project_root():
+    """Get the project root directory.
+
+    Prefers deriving from the hook script's own path (works even when cwd is a
+    subdirectory), falling back to cwd.
+    """
+    root = _project_root_from_script()
+    if root and os.path.isdir(root):
+        return root
+    return os.getcwd()
+
+
 def find_chainlink_dir():
-    """Find the .chainlink directory by walking up from cwd."""
+    """Find the .chainlink directory.
+
+    Prefers the project root derived from the hook script's own path,
+    falling back to walking up from cwd.
+    """
+    root = _project_root_from_script()
+    if root:
+        candidate = os.path.join(root, '.chainlink')
+        if os.path.isdir(candidate):
+            return candidate
+
     current = os.getcwd()
     for _ in range(10):
         candidate = os.path.join(current, '.chainlink')
@@ -114,7 +144,7 @@ def detect_languages():
     }
 
     found = set()
-    cwd = os.getcwd()
+    cwd = _get_project_root()
 
     # Check for project config files first (more reliable than scanning)
     config_indicators = {
@@ -198,7 +228,7 @@ SKIP_DIRS = {
 
 def get_project_tree(max_depth=3, max_entries=50):
     """Generate a compact project tree to prevent path hallucinations."""
-    cwd = os.getcwd()
+    cwd = _get_project_root()
     entries = []
 
     def should_skip(name):
@@ -246,9 +276,6 @@ def get_project_tree(max_depth=3, max_entries=50):
     return "\n".join(entries)
 
 
-# Cache directory for dependency snapshots
-CACHE_DIR = os.path.join(os.getcwd(), '.chainlink', '.cache')
-
 
 def get_lock_file_hash(lock_path):
     """Get a hash of the lock file for cache invalidation."""
@@ -278,7 +305,7 @@ def run_command(cmd, timeout=5):
 
 def get_dependencies(max_deps=30):
     """Get installed dependencies with versions. Uses caching based on lock file mtime."""
-    cwd = os.getcwd()
+    cwd = _get_project_root()
     deps = []
 
     # Check for Rust (Cargo.toml)

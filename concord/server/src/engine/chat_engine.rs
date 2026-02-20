@@ -60,10 +60,12 @@ pub struct ChatEngine {
     message_limiter: RateLimiter,
     /// HTTP client for outbound requests (link embed unfurling).
     http_client: reqwest::Client,
+    /// Maximum message content length (configurable, default 4000).
+    max_message_length: usize,
 }
 
 impl ChatEngine {
-    pub fn new(db: Option<SqlitePool>) -> Self {
+    pub fn new(db: Option<SqlitePool>, max_message_length: usize) -> Self {
         Self {
             sessions: DashMap::new(),
             servers: DashMap::new(),
@@ -73,7 +75,13 @@ impl ChatEngine {
             db,
             message_limiter: RateLimiter::new(10, 1.0),
             http_client: reqwest::Client::new(),
+            max_message_length,
         }
+    }
+
+    /// Get the configured maximum message length.
+    pub fn max_message_length(&self) -> usize {
+        self.max_message_length
     }
 
     // ── Startup loading ─────────────────────────────────────────────
@@ -801,6 +809,7 @@ impl ChatEngine {
                     self.sessions.get(sid).map(|s| MemberInfo {
                         nickname: s.nickname.clone(),
                         avatar_url: s.avatar_url.clone(),
+                        server_avatar_url: None,
                         status: None,
                         custom_status: None,
                         status_emoji: None,
@@ -875,7 +884,7 @@ impl ChatEngine {
         attachment_ids: Option<&[String]>,
         nonce: Option<&str>,
     ) -> Result<(), String> {
-        validation::validate_message(content)?;
+        validation::validate_message_with_limit(content, self.max_message_length)?;
         let content = &validation::sanitize_html(content);
 
         let session = self
@@ -1518,6 +1527,7 @@ impl ChatEngine {
                 self.sessions.get(sid).map(|s| MemberInfo {
                     nickname: s.nickname.clone(),
                     avatar_url: s.avatar_url.clone(),
+                    server_avatar_url: None,
                     status: None,
                     custom_status: None,
                     status_emoji: None,
@@ -1536,7 +1546,7 @@ impl ChatEngine {
         message_id: &str,
         new_content: &str,
     ) -> Result<(), String> {
-        validation::validate_message(new_content)?;
+        validation::validate_message_with_limit(new_content, self.max_message_length)?;
         let new_content = &validation::sanitize_html(new_content);
 
         let session = self
@@ -2274,6 +2284,11 @@ impl ChatEngine {
     /// Get a session by ID.
     pub fn get_session(&self, session_id: SessionId) -> Option<Arc<UserSession>> {
         self.sessions.get(&session_id).map(|s| s.clone())
+    }
+
+    /// Get the database pool (if configured).
+    pub fn get_db(&self) -> Option<SqlitePool> {
+        self.db.clone()
     }
 
     /// Resolve a channel name within a server to its channel ID.
@@ -3076,7 +3091,7 @@ impl ChatEngine {
     // ── Phase 6: Moderation ─────────────────────────────────────
 
     /// Broadcast a ChatEvent to all connected sessions that belong to a server.
-    fn broadcast_to_server(&self, server_id: &str, event: &ChatEvent) {
+    pub fn broadcast_to_server(&self, server_id: &str, event: &ChatEvent) {
         let Some(server) = self.servers.get(server_id) else {
             return;
         };
@@ -5602,7 +5617,7 @@ mod tests {
 
     /// Helper: create engine with a default server in memory (no DB).
     fn setup_engine() -> ChatEngine {
-        let engine = ChatEngine::new(None);
+        let engine = ChatEngine::new(None, 4000);
         let state = ServerState::new(
             DEFAULT_SERVER_ID.to_string(),
             "Concord".to_string(),
@@ -6099,7 +6114,7 @@ mod tests {
         engine
             .join_channel(sid, DEFAULT_SERVER_ID, "#general")
             .unwrap();
-        let long_msg = "x".repeat(2001);
+        let long_msg = "x".repeat(4001);
         let result = engine.send_message(
             sid,
             DEFAULT_SERVER_ID,
@@ -6121,7 +6136,7 @@ mod tests {
         engine
             .join_channel(sid, DEFAULT_SERVER_ID, "#general")
             .unwrap();
-        let max_msg = "x".repeat(2000);
+        let max_msg = "x".repeat(4000);
         let result = engine.send_message(
             sid,
             DEFAULT_SERVER_ID,

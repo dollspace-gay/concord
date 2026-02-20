@@ -14,6 +14,9 @@ pub struct ServerRow {
     pub welcome_message: Option<String>,
     pub rules_text: Option<String>,
     pub category: Option<String>,
+    pub allow_external_emoji: i32,
+    pub shareable_emoji: i32,
+    pub vanity_code: Option<String>,
 }
 
 /// A server membership record.
@@ -23,6 +26,19 @@ pub struct ServerMemberRow {
     pub user_id: String,
     pub role: String,
     pub joined_at: String,
+    pub avatar_url: Option<String>,
+}
+
+/// A custom sticker in a server.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct StickerRow {
+    pub id: String,
+    pub server_id: String,
+    pub name: String,
+    pub image_url: String,
+    pub description: Option<String>,
+    pub uploader_id: String,
+    pub created_at: String,
 }
 
 /// A stored message from the database.

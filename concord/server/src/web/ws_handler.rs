@@ -503,6 +503,17 @@ enum ClientMessage {
     DeleteOAuth2App {
         app_id: String,
     },
+
+    // ── Premium-for-Free features ──
+    SetServerAvatar {
+        server_id: String,
+        avatar_url: Option<String>,
+    },
+    SetVanityCode {
+        server_id: String,
+        vanity_code: Option<String>,
+    },
+    GetServerLimits,
 }
 
 fn default_server_id() -> String {
@@ -1993,6 +2004,98 @@ async fn handle_client_message(
         ClientMessage::ListOAuth2Apps => engine.list_oauth2_apps(session_id).await,
         ClientMessage::DeleteOAuth2App { app_id } => {
             engine.delete_oauth2_app(session_id, &app_id).await
+        }
+
+        // ── Premium-for-Free features ──
+        ClientMessage::SetServerAvatar {
+            server_id,
+            avatar_url,
+        } => {
+            let user_id = engine
+                .get_session_user_id(session_id)
+                .ok_or_else(|| "Not authenticated".to_string());
+            match user_id {
+                Err(e) => Err(e),
+                Ok(user_id) => {
+                    let pool = engine.get_db().ok_or("No database".to_string());
+                    match pool {
+                        Err(e) => Err(e),
+                        Ok(pool) => {
+                            match crate::db::queries::servers::set_server_avatar(
+                                &pool,
+                                &server_id,
+                                &user_id,
+                                avatar_url.as_deref(),
+                            )
+                            .await
+                            {
+                                Ok(()) => {
+                                    let event = ChatEvent::ServerAvatarUpdate {
+                                        server_id: server_id.clone(),
+                                        user_id,
+                                        avatar_url,
+                                    };
+                                    engine.broadcast_to_server(&server_id, &event);
+                                    Ok(())
+                                }
+                                Err(e) => Err(format!("Failed to set server avatar: {e}")),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        ClientMessage::SetVanityCode {
+            server_id,
+            vanity_code,
+        } => {
+            match engine
+                .require_permission(
+                    session_id,
+                    &server_id,
+                    None,
+                    crate::engine::permissions::Permissions::MANAGE_SERVER,
+                )
+                .await
+            {
+                Err(e) => Err(e),
+                Ok(_) => {
+                    let valid = if let Some(ref code) = vanity_code {
+                        crate::engine::validation::validate_vanity_code(code)
+                    } else {
+                        Ok(())
+                    };
+                    match valid {
+                        Err(e) => Err(e),
+                        Ok(()) => match engine.get_db() {
+                            None => Err("No database".to_string()),
+                            Some(pool) => {
+                                match crate::db::queries::servers::set_vanity_code(
+                                    &pool,
+                                    &server_id,
+                                    vanity_code.as_deref(),
+                                )
+                                .await
+                                {
+                                    Ok(()) => Ok(()),
+                                    Err(e) => Err(format!("Failed to set vanity code: {e}")),
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+
+        ClientMessage::GetServerLimits => {
+            if let Some(session) = engine.get_session(session_id) {
+                let _ = session.send(ChatEvent::ServerLimits {
+                    max_message_length: engine.max_message_length(),
+                    max_file_size_mb: 100,
+                });
+            }
+            Ok(())
         }
     };
 

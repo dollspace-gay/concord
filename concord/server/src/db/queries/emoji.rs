@@ -57,6 +57,24 @@ pub async fn insert_emoji(
     Ok(())
 }
 
+/// List emoji from all servers a user belongs to where the server allows sharing.
+pub async fn list_emoji_for_user_servers(
+    pool: &SqlitePool,
+    user_id: &str,
+) -> Result<Vec<EmojiRow>, sqlx::Error> {
+    sqlx::query_as::<_, EmojiRow>(
+        "SELECT e.id, e.server_id, e.name, e.image_url, e.uploader_id, e.created_at \
+         FROM custom_emoji e \
+         JOIN servers s ON e.server_id = s.id \
+         JOIN server_members sm ON s.id = sm.server_id \
+         WHERE sm.user_id = ? AND s.shareable_emoji = 1 \
+         ORDER BY s.name, e.name",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+}
+
 pub async fn delete_emoji(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
     let result = sqlx::query("DELETE FROM custom_emoji WHERE id = ?")
         .bind(id)

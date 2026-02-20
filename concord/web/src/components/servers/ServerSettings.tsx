@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
-import type { RoleInfo, CategoryInfo, ChannelInfo } from '../../api/types';
+import type { RoleInfo, CategoryInfo, ChannelInfo, StickerInfo } from '../../api/types';
 import { hasPermission, Permissions } from '../../api/types';
 import { uploadFile } from '../../api/client';
 
@@ -9,8 +9,9 @@ const EMPTY_ROLES: RoleInfo[] = [];
 const EMPTY_CATEGORIES: CategoryInfo[] = [];
 const EMPTY_CHANNELS: ChannelInfo[] = [];
 const EMPTY_EMOJI: Record<string, string> = {};
+const EMPTY_STICKERS: StickerInfo[] = [];
 
-type Tab = 'overview' | 'channels' | 'roles' | 'categories' | 'emoji';
+type Tab = 'overview' | 'channels' | 'roles' | 'categories' | 'emoji' | 'stickers';
 
 export function ServerSettings() {
   const activeServer = useUiStore((s) => s.activeServer);
@@ -32,18 +33,26 @@ export function ServerSettings() {
   const loadServerEmoji = useChatStore((s) => s.loadServerEmoji);
   const createEmoji = useChatStore((s) => s.createEmoji);
   const deleteEmoji = useChatStore((s) => s.deleteEmoji);
+  const stickers = useChatStore((s) => (activeServer ? s.stickers[activeServer] ?? EMPTY_STICKERS : EMPTY_STICKERS));
+  const loadServerStickers = useChatStore((s) => s.loadServerStickers);
+  const createSticker = useChatStore((s) => s.createSticker);
+  const deleteSticker = useChatStore((s) => s.deleteSticker);
+  const setVanityCode = useChatStore((s) => s.setVanityCode);
 
   const [tab, setTab] = useState<Tab>('overview');
 
   const server = servers.find((s) => s.id === activeServer);
   const serverName = server?.name ?? 'Server';
 
-  // Load emoji when switching to emoji tab
+  // Load emoji/stickers when switching to their tabs
   useEffect(() => {
     if (tab === 'emoji' && activeServer) {
       loadServerEmoji(activeServer);
     }
-  }, [tab, activeServer, loadServerEmoji]);
+    if (tab === 'stickers' && activeServer) {
+      loadServerStickers(activeServer);
+    }
+  }, [tab, activeServer, loadServerEmoji, loadServerStickers]);
 
   if (!activeServer) return null;
 
@@ -53,6 +62,7 @@ export function ServerSettings() {
     { key: 'roles', label: 'Roles' },
     { key: 'categories', label: 'Categories' },
     { key: 'emoji', label: 'Emoji' },
+    { key: 'stickers', label: 'Stickers' },
   ];
 
   return (
@@ -86,7 +96,7 @@ export function ServerSettings() {
         </div>
 
         {tab === 'overview' && (
-          <OverviewTab serverId={activeServer} server={server!} updateServer={updateServer} />
+          <OverviewTab serverId={activeServer} server={server!} updateServer={updateServer} setVanityCode={setVanityCode} />
         )}
         {tab === 'channels' && (
           <ChannelsTab
@@ -123,6 +133,14 @@ export function ServerSettings() {
             deleteEmoji={deleteEmoji}
           />
         )}
+        {tab === 'stickers' && (
+          <StickersTab
+            serverId={activeServer}
+            stickers={stickers}
+            createSticker={createSticker}
+            deleteSticker={deleteSticker}
+          />
+        )}
       </div>
     </div>
   );
@@ -134,17 +152,26 @@ function OverviewTab({
   serverId,
   server,
   updateServer,
+  setVanityCode,
 }: {
   serverId: string;
   server: { name: string; icon_url?: string | null };
   updateServer: (serverId: string, name?: string, iconUrl?: string) => void;
+  setVanityCode: (serverId: string, vanityCode?: string | null) => void;
 }) {
   const [name, setName] = useState(server.name);
   const [iconUrl, setIconUrl] = useState(server.icon_url ?? '');
+  const [vanity, setVanity] = useState('');
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
     updateServer(serverId, name.trim() || undefined, iconUrl.trim() || undefined);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleVanitySave = () => {
+    setVanityCode(serverId, vanity.trim() || null);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -190,6 +217,34 @@ function OverviewTab({
           Save Changes
         </button>
         {saved && <span className="text-sm text-green-400">Saved!</span>}
+      </div>
+
+      {/* Vanity Invite URL */}
+      <div className="border-t border-border-primary pt-4">
+        <label className="mb-1 block text-sm font-medium text-text-secondary">Vanity Invite Code</label>
+        <p className="mb-2 text-xs text-text-muted">Set a custom invite code (e.g., &quot;my-server&quot;). 2-32 lowercase letters, digits, and hyphens.</p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={vanity}
+            onChange={(e) => setVanity(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+            className="flex-1 rounded bg-bg-input px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none"
+            placeholder="my-server"
+            maxLength={32}
+          />
+          <button
+            onClick={handleVanitySave}
+            className="rounded bg-bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-bg-accent-hover"
+          >
+            Set
+          </button>
+          <button
+            onClick={() => { setVanityCode(serverId, null); setVanity(''); }}
+            className="rounded px-3 py-2 text-sm text-text-muted hover:text-text-primary"
+          >
+            Clear
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -695,6 +750,122 @@ function EmojiTab({
 
         {emojiEntries.length === 0 && (
           <p className="py-4 text-center text-sm text-text-muted">No custom emoji yet. Upload one above!</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Stickers Tab ──────────────────────────────────────────
+
+function StickersTab({
+  serverId,
+  stickers,
+  createSticker,
+  deleteSticker,
+}: {
+  serverId: string;
+  stickers: StickerInfo[];
+  createSticker: (serverId: string, name: string, imageUrl: string, description?: string) => Promise<void>;
+  deleteSticker: (serverId: string, stickerId: string) => Promise<void>;
+}) {
+  const [newName, setNewName] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = async () => {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file || !newName.trim()) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Only image files are allowed');
+      return;
+    }
+    if (file.size > 512 * 1024) {
+      setError('Sticker must be under 512KB');
+      return;
+    }
+
+    setUploading(true);
+    setError('');
+    try {
+      const attachment = await uploadFile(file);
+      await createSticker(serverId, newName.trim(), attachment.url, newDesc.trim() || undefined);
+      setNewName('');
+      setNewDesc('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      {/* Upload form */}
+      <div className="mb-4 space-y-2 rounded-md bg-bg-tertiary p-3">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+            placeholder="sticker_name"
+            className="flex-1 rounded bg-bg-input px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none"
+            maxLength={32}
+          />
+          <button
+            onClick={handleUpload}
+            disabled={uploading || !newName.trim() || !fileInputRef.current?.files?.length}
+            className="rounded bg-bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-bg-accent-hover disabled:opacity-50"
+          >
+            {uploading ? 'Uploading...' : 'Upload'}
+          </button>
+        </div>
+        <input
+          type="text"
+          value={newDesc}
+          onChange={(e) => setNewDesc(e.target.value)}
+          placeholder="Description (optional)"
+          className="w-full rounded bg-bg-input px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none"
+          maxLength={100}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="text-sm text-text-secondary file:mr-3 file:rounded file:border-0 file:bg-bg-accent file:px-3 file:py-1 file:text-sm file:text-white"
+        />
+        {newName && <p className="text-xs text-text-muted">Send as <code className="rounded bg-bg-primary px-1">[sticker:{newName}]</code></p>}
+        {error && <p className="text-xs text-red-400">{error}</p>}
+      </div>
+
+      {/* Sticker list */}
+      <div className="space-y-1">
+        {stickers.map((sticker) => (
+          <div key={sticker.id} className="flex items-center justify-between rounded-md bg-bg-tertiary px-3 py-2">
+            <div className="flex items-center gap-3">
+              <img src={sticker.image_url} alt={sticker.name} className="h-12 w-12 object-contain" />
+              <div>
+                <span className="text-sm font-medium text-text-primary">{sticker.name}</span>
+                {sticker.description && (
+                  <p className="text-xs text-text-muted">{sticker.description}</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => deleteSticker(serverId, sticker.id)}
+              className="rounded px-2 py-1 text-xs text-bg-danger hover:bg-bg-danger/10"
+            >
+              Delete
+            </button>
+          </div>
+        ))}
+
+        {stickers.length === 0 && (
+          <p className="py-4 text-center text-sm text-text-muted">No stickers yet. Upload one above!</p>
         )}
       </div>
     </div>

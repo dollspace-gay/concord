@@ -115,6 +115,42 @@ export const updateAtprotoSyncSetting = (enabled: boolean) =>
     body: JSON.stringify({ enabled }),
   });
 
+// Stickers
+export interface StickerData {
+  id: string;
+  server_id: string;
+  name: string;
+  image_url: string;
+  description?: string | null;
+}
+
+export const listServerStickers = (serverId: string) =>
+  request<StickerData[]>(`/servers/${encodeURIComponent(serverId)}/stickers`);
+export const createServerSticker = (serverId: string, name: string, imageUrl: string, description?: string) =>
+  request<StickerData>(`/servers/${encodeURIComponent(serverId)}/stickers`, {
+    method: 'POST',
+    body: JSON.stringify({ name, image_url: imageUrl, description: description || null }),
+  });
+export const deleteServerSticker = (serverId: string, stickerId: string) =>
+  request<void>(`/servers/${encodeURIComponent(serverId)}/stickers/${encodeURIComponent(stickerId)}`, {
+    method: 'DELETE',
+  });
+
+// Cross-server emoji
+export const listAllUserEmoji = () =>
+  request<{ server_id: string; name: string; image_url: string }[]>('/users/me/emoji');
+
+// Emoji settings
+export const updateServerEmojiSettings = (serverId: string, allowExternal: boolean, shareable: boolean) =>
+  request<void>(`/servers/${encodeURIComponent(serverId)}/emoji-settings`, {
+    method: 'PATCH',
+    body: JSON.stringify({ allow_external_emoji: allowExternal, shareable_emoji: shareable }),
+  });
+
+// Server limits
+export const getServerLimits = () =>
+  request<{ max_message_length: number; max_file_size_mb: number }>('/config/limits');
+
 // File uploads
 export async function uploadFile(file: File): Promise<AttachmentInfo> {
   const formData = new FormData();

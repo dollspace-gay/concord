@@ -24,6 +24,7 @@ pub mod roles;
 pub mod search;
 pub mod servers;
 pub mod slash_commands;
+pub mod stickers;
 pub mod threads;
 pub mod users;
 pub mod webhooks;

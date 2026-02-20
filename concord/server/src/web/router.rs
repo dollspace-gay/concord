@@ -182,6 +182,31 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             axum::routing::get(rest_api::get_atproto_sync_setting)
                 .patch(rest_api::update_atproto_sync_setting),
         )
+        // Stickers
+        .route(
+            "/api/servers/{id}/stickers",
+            axum::routing::get(rest_api::list_server_stickers)
+                .post(rest_api::create_server_sticker),
+        )
+        .route(
+            "/api/servers/{id}/stickers/{sticker_id}",
+            axum::routing::delete(rest_api::delete_server_sticker),
+        )
+        // Cross-server emoji (all emoji for a user across servers)
+        .route(
+            "/api/users/me/emoji",
+            axum::routing::get(rest_api::list_user_emoji),
+        )
+        // Emoji sharing settings
+        .route(
+            "/api/servers/{id}/emoji-settings",
+            axum::routing::patch(rest_api::update_emoji_settings),
+        )
+        // Server limits (public)
+        .route(
+            "/api/config/limits",
+            axum::routing::get(rest_api::get_server_limits),
+        )
         .layer(axum::middleware::from_fn(api_rate_limit));
 
     Router::new()

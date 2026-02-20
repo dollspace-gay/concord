@@ -15,7 +15,8 @@ type Token =
   | { type: 'code'; value: string }
   | { type: 'spoiler'; children: Token[] }
   | { type: 'mention'; value: string }
-  | { type: 'custom_emoji'; name: string };
+  | { type: 'custom_emoji'; name: string }
+  | { type: 'sticker'; name: string };
 
 /**
  * Parse inline markdown tokens from a string.
@@ -96,9 +97,19 @@ function parseInline(text: string): Token[] {
       }
     }
 
+    // Sticker: [sticker:name]
+    if (text[i] === '[') {
+      const match = text.slice(i).match(/^\[sticker:(\w{2,32})\]/);
+      if (match) {
+        tokens.push({ type: 'sticker', name: match[1] });
+        i += match[0].length;
+        continue;
+      }
+    }
+
     // Plain text — collect until next special character
     let j = i + 1;
-    while (j < text.length && !['*', '~', '`', '|', '@', ':'].includes(text[j])) {
+    while (j < text.length && !['*', '~', '`', '|', '@', ':', '['].includes(text[j])) {
       j++;
     }
     tokens.push({ type: 'text', value: text.slice(i, j) });
@@ -133,6 +144,8 @@ function renderTokens(tokens: Token[], keyPrefix = ''): React.ReactNode[] {
         return <MentionSpan key={key} value={token.value} />;
       case 'custom_emoji':
         return <CustomEmojiSpan key={key} name={token.name} />;
+      case 'sticker':
+        return <StickerSpan key={key} name={token.name} />;
     }
   });
 }
@@ -164,7 +177,16 @@ function MentionSpan({ value }: { value: string }) {
 
 function CustomEmojiSpan({ name }: { name: string }) {
   const activeServer = useUiStore((s) => s.activeServer);
-  const url = useChatStore((s) => (activeServer ? s.customEmoji[activeServer]?.[name] : undefined));
+  const url = useChatStore((s) => {
+    // Priority 1: current server emoji
+    if (activeServer) {
+      const local = s.customEmoji[activeServer]?.[name];
+      if (local) return local;
+    }
+    // Priority 2: cross-server emoji from all user's servers
+    const cross = s.allUserEmoji.find((e) => e.name === name);
+    return cross?.image_url;
+  });
 
   if (url) {
     return (
@@ -177,6 +199,27 @@ function CustomEmojiSpan({ name }: { name: string }) {
     );
   }
   return <span>:{name}:</span>;
+}
+
+function StickerSpan({ name }: { name: string }) {
+  const activeServer = useUiStore((s) => s.activeServer);
+  const url = useChatStore((s) => {
+    if (!activeServer) return undefined;
+    const sticker = s.stickers[activeServer]?.find((st) => st.name === name);
+    return sticker?.image_url;
+  });
+
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={`[sticker:${name}]`}
+        title={name}
+        className="inline-block h-32 w-32"
+      />
+    );
+  }
+  return <span>[sticker:{name}]</span>;
 }
 
 /**

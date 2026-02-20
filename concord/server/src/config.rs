@@ -81,12 +81,14 @@ impl Default for AuthSection {
 #[serde(default)]
 pub struct StorageSection {
     pub max_file_size_mb: u64,
+    pub max_message_length: usize,
 }
 
 impl Default for StorageSection {
     fn default() -> Self {
         Self {
             max_file_size_mb: 100,
+            max_message_length: 4000,
         }
     }
 }
@@ -147,6 +149,11 @@ impl ServerConfig {
             && let Ok(mb) = v.parse()
         {
             self.storage.max_file_size_mb = mb;
+        }
+        if let Ok(v) = std::env::var("MAX_MESSAGE_LENGTH")
+            && let Ok(len) = v.parse()
+        {
+            self.storage.max_message_length = len;
         }
         if let Ok(v) = std::env::var("ADMIN_USERS") {
             self.admin.admin_users = v

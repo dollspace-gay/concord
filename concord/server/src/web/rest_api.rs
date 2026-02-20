@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::auth::token::{generate_irc_token, hash_irc_token, verify_irc_token};
 use crate::db::queries::{
     atproto as atproto_queries, attachments, bots, community, emoji, invites, messages, profiles,
-    roles, servers, users,
+    roles, servers, stickers, users,
 };
 use crate::engine::events::HistoryMessage;
 use crate::engine::permissions::{Permissions, compute_effective_permissions};
@@ -1105,7 +1105,20 @@ pub async fn get_invite_preview(
                 _ => StatusCode::NOT_FOUND.into_response(),
             }
         }
-        _ => StatusCode::NOT_FOUND.into_response(),
+        _ => {
+            // Fallback: try vanity code
+            match servers::get_server_by_vanity(pool, &code).await {
+                Ok(Some(server)) => Json(serde_json::json!({
+                    "code": code,
+                    "server_id": server.id,
+                    "server_name": server.name,
+                    "server_icon_url": server.icon_url,
+                    "is_vanity": true,
+                }))
+                .into_response(),
+                _ => StatusCode::NOT_FOUND.into_response(),
+            }
+        }
     }
 }
 
@@ -1467,6 +1480,207 @@ pub async fn update_atproto_sync_setting(
                 .into_response()
         }
     }
+}
+
+// ── Sticker endpoints ──
+
+pub async fn list_server_stickers(
+    State(state): State<Arc<AppState>>,
+    Path(server_id): Path<String>,
+) -> impl IntoResponse {
+    match stickers::list_stickers(&state.db, &server_id).await {
+        Ok(rows) => {
+            let result: Vec<serde_json::Value> = rows
+                .into_iter()
+                .map(|s| {
+                    serde_json::json!({
+                        "id": s.id,
+                        "server_id": s.server_id,
+                        "name": s.name,
+                        "image_url": s.image_url,
+                        "description": s.description,
+                    })
+                })
+                .collect();
+            Json(result).into_response()
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to list stickers");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct CreateStickerRequest {
+    pub name: String,
+    pub image_url: String,
+    pub description: Option<String>,
+}
+
+pub async fn create_server_sticker(
+    State(state): State<Arc<AppState>>,
+    Path(server_id): Path<String>,
+    user: AuthUser,
+    Json(body): Json<CreateStickerRequest>,
+) -> impl IntoResponse {
+    if let Err(resp) = check_server_permission(
+        &state.db,
+        &server_id,
+        &user.user_id,
+        Permissions::MANAGE_SERVER,
+    )
+    .await
+    {
+        return resp.into_response();
+    }
+
+    let name = body.name.trim().to_lowercase();
+    if name.is_empty() || name.len() > 32 {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Sticker name must be 1-32 characters",
+        )
+            .into_response();
+    }
+    if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Sticker name must be alphanumeric with underscores",
+        )
+            .into_response();
+    }
+
+    let id = Uuid::new_v4().to_string();
+    match stickers::insert_sticker(
+        &state.db,
+        &id,
+        &server_id,
+        &name,
+        &body.image_url,
+        body.description.as_deref(),
+        &user.user_id,
+    )
+    .await
+    {
+        Ok(()) => Json(serde_json::json!({
+            "id": id,
+            "server_id": server_id,
+            "name": name,
+            "image_url": body.image_url,
+            "description": body.description,
+        }))
+        .into_response(),
+        Err(e) if e.to_string().contains("UNIQUE") => (
+            StatusCode::CONFLICT,
+            "A sticker with that name already exists",
+        )
+            .into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to create sticker");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
+    }
+}
+
+pub async fn delete_server_sticker(
+    State(state): State<Arc<AppState>>,
+    Path((server_id, sticker_id)): Path<(String, String)>,
+    user: AuthUser,
+) -> impl IntoResponse {
+    if let Err(resp) = check_server_permission(
+        &state.db,
+        &server_id,
+        &user.user_id,
+        Permissions::MANAGE_SERVER,
+    )
+    .await
+    {
+        return resp.into_response();
+    }
+
+    match stickers::delete_sticker(&state.db, &sticker_id).await {
+        Ok(true) => StatusCode::NO_CONTENT.into_response(),
+        Ok(false) => (StatusCode::NOT_FOUND, "Sticker not found").into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to delete sticker");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
+    }
+}
+
+// ── Cross-server emoji endpoint ──
+
+pub async fn list_user_emoji(
+    State(state): State<Arc<AppState>>,
+    user: AuthUser,
+) -> impl IntoResponse {
+    match emoji::list_emoji_for_user_servers(&state.db, &user.user_id).await {
+        Ok(rows) => {
+            let result: Vec<serde_json::Value> = rows
+                .into_iter()
+                .map(|e| {
+                    serde_json::json!({
+                        "id": e.id,
+                        "server_id": e.server_id,
+                        "name": e.name,
+                        "image_url": e.image_url,
+                    })
+                })
+                .collect();
+            Json(result).into_response()
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to list user emoji");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
+    }
+}
+
+// ── Emoji settings endpoint ──
+
+#[derive(Deserialize)]
+pub struct UpdateEmojiSettingsRequest {
+    pub allow_external_emoji: Option<bool>,
+    pub shareable_emoji: Option<bool>,
+}
+
+pub async fn update_emoji_settings(
+    State(state): State<Arc<AppState>>,
+    Path(server_id): Path<String>,
+    user: AuthUser,
+    Json(body): Json<UpdateEmojiSettingsRequest>,
+) -> impl IntoResponse {
+    if let Err(resp) = check_server_permission(
+        &state.db,
+        &server_id,
+        &user.user_id,
+        Permissions::MANAGE_SERVER,
+    )
+    .await
+    {
+        return resp.into_response();
+    }
+
+    let allow_external = body.allow_external_emoji.unwrap_or(true);
+    let shareable = body.shareable_emoji.unwrap_or(true);
+
+    match servers::update_emoji_settings(&state.db, &server_id, allow_external, shareable).await {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => {
+            error!(error = %e, "Failed to update emoji settings");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
+    }
+}
+
+// ── Server limits endpoint ──
+
+pub async fn get_server_limits(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    Json(serde_json::json!({
+        "max_message_length": state.max_message_length,
+        "max_file_size_mb": state.max_file_size / (1024 * 1024),
+    }))
 }
 
 #[cfg(test)]

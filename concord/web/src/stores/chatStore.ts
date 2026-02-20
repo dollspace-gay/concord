@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { AttachmentInfo, AuditLogEntry, AutomodRuleInfo, BanInfo, BlueskyIdentityInfo, BlueskyShareResult, BookmarkInfo, BotTokenInfo, CategoryInfo, ChannelInfo, ChannelPositionInfo, EventInfo, ForumTagInfo, HistoryMessage, InviteInfo, MemberInfo, OAuth2AppInfo, PinnedMessageInfo, PresenceInfo, ReplyInfo, RoleInfo, SearchResultMessage, ServerCommunityInfo, ServerEvent, ServerInfo, SlashCommandInfo, TemplateInfo, ThreadInfo, UserProfileInfo, WebhookInfo } from '../api/types';
-import { listServerEmoji, createServerEmoji, deleteServerEmoji, syncBlueskyProfile, getBlueskyIdentity, shareToBluesky, getAtprotoSyncSetting, updateAtprotoSyncSetting } from '../api/client';
+import type { StickerInfo } from '../api/types';
+import { listServerEmoji, createServerEmoji, deleteServerEmoji, syncBlueskyProfile, getBlueskyIdentity, shareToBluesky, getAtprotoSyncSetting, updateAtprotoSyncSetting, listServerStickers, createServerSticker, deleteServerSticker, listAllUserEmoji, getServerLimits } from '../api/client';
 import { channelKey } from '../api/types';
 import { WebSocketManager } from '../api/websocket';
 
@@ -101,6 +102,16 @@ interface ChatState {
   blueskyIdentities: Record<string, BlueskyIdentityInfo>;
   /** Whether current user has AT Protocol record sync enabled */
   atprotoSyncEnabled: boolean;
+  /** server_id -> stickers */
+  stickers: Record<string, StickerInfo[]>;
+  /** All emoji from all user's servers (for cross-server emoji) */
+  allUserEmoji: { server_id: string; name: string; image_url: string }[];
+  /** server_id -> user_id -> avatar_url (per-server avatars) */
+  serverAvatars: Record<string, Record<string, string>>;
+  /** Configurable message length limit */
+  maxMessageLength: number;
+  /** Configurable max file size in MB */
+  maxFileSizeMb: number;
   ws: WebSocketManager | null;
 
   connect: (nickname: string) => void;
@@ -215,6 +226,14 @@ interface ChatState {
   createOAuth2App: (name: string, description: string, redirectUris: string, scopes?: string) => void;
   listOAuth2Apps: () => void;
   deleteOAuth2App: (appId: string) => void;
+  // ── Phase 9.5: Premium-for-Free Features ──
+  loadServerStickers: (serverId: string) => void;
+  createSticker: (serverId: string, name: string, imageUrl: string, description?: string) => Promise<void>;
+  deleteSticker: (serverId: string, stickerId: string) => Promise<void>;
+  loadAllUserEmoji: () => void;
+  setServerAvatar: (serverId: string, avatarUrl?: string | null) => void;
+  setVanityCode: (serverId: string, vanityCode?: string | null) => void;
+  fetchServerLimits: () => void;
   // ── Phase 9: AT Protocol Deep Integration ──
   syncBlueskyProfile: () => Promise<void>;
   fetchBlueskyIdentity: (userId: string) => void;
@@ -269,6 +288,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   oauth2Apps: EMPTY_OAUTH2_APPS,
   blueskyIdentities: EMPTY_BLUESKY_IDENTITIES,
   atprotoSyncEnabled: false,
+  stickers: {} as Record<string, StickerInfo[]>,
+  allUserEmoji: [],
+  serverAvatars: {} as Record<string, Record<string, string>>,
+  maxMessageLength: 4000,
+  maxFileSizeMb: 100,
   ws: null,
 
   connect: (nickname: string) => {
@@ -288,6 +312,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set({ connected });
         if (connected) {
           ws.send({ type: 'list_servers' });
+          ws.send({ type: 'get_server_limits' });
         }
       },
     );
@@ -539,14 +564,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const key = channelKey(event.server_id, event.channel);
         set((s) => {
           const newAvatars = { ...s.avatars };
+          const serverAvs = { ...(s.serverAvatars[event.server_id] || {}) };
+          let serverAvsChanged = false;
           for (const m of event.members) {
             if (m.avatar_url) {
               newAvatars[m.nickname] = m.avatar_url;
+            }
+            if (m.server_avatar_url && m.user_id) {
+              serverAvs[m.user_id] = m.server_avatar_url;
+              serverAvsChanged = true;
             }
           }
           return {
             members: { ...s.members, [key]: event.members },
             avatars: newAvatars,
+            ...(serverAvsChanged ? { serverAvatars: { ...s.serverAvatars, [event.server_id]: serverAvs } } : {}),
           };
         });
         break;
@@ -1100,6 +1132,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
         break;
       }
 
+      case 'server_avatar_update': {
+        const sa = { ...get().serverAvatars };
+        if (!sa[event.server_id]) sa[event.server_id] = {};
+        if (event.avatar_url) {
+          sa[event.server_id] = { ...sa[event.server_id], [event.user_id]: event.avatar_url };
+        } else {
+          const copy = { ...sa[event.server_id] };
+          delete copy[event.user_id];
+          sa[event.server_id] = copy;
+        }
+        set({ serverAvatars: sa });
+        break;
+      }
+
+      case 'server_limits': {
+        set({ maxMessageLength: event.max_message_length, maxFileSizeMb: event.max_file_size_mb });
+        break;
+      }
+
       case 'error': {
         console.error(`Server error [${event.code}]: ${event.message}`);
         break;
@@ -1544,6 +1595,52 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
   deleteOAuth2App: (appId) => {
     get().ws?.send({ type: 'delete_oauth2_app', app_id: appId });
+  },
+  // ── Phase 9.5: Premium-for-Free Features ──
+  loadServerStickers: (serverId) => {
+    listServerStickers(serverId)
+      .then((stickers) => {
+        set((s) => ({ stickers: { ...s.stickers, [serverId]: stickers } }));
+      })
+      .catch((e) => console.error('Failed to load stickers:', e));
+  },
+  createSticker: async (serverId, name, imageUrl, description) => {
+    await createServerSticker(serverId, name, imageUrl, description);
+    // Reload stickers for this server
+    listServerStickers(serverId)
+      .then((stickers) => {
+        set((s) => ({ stickers: { ...s.stickers, [serverId]: stickers } }));
+      })
+      .catch((e) => console.error('Failed to reload stickers:', e));
+  },
+  deleteSticker: async (serverId, stickerId) => {
+    await deleteServerSticker(serverId, stickerId);
+    set((s) => ({
+      stickers: {
+        ...s.stickers,
+        [serverId]: (s.stickers[serverId] || []).filter((st) => st.id !== stickerId),
+      },
+    }));
+  },
+  loadAllUserEmoji: () => {
+    listAllUserEmoji()
+      .then((emoji) => {
+        set({ allUserEmoji: emoji });
+      })
+      .catch((e) => console.error('Failed to load cross-server emoji:', e));
+  },
+  setServerAvatar: (serverId, avatarUrl) => {
+    get().ws?.send({ type: 'set_server_avatar', server_id: serverId, avatar_url: avatarUrl ?? null });
+  },
+  setVanityCode: (serverId, vanityCode) => {
+    get().ws?.send({ type: 'set_vanity_code', server_id: serverId, vanity_code: vanityCode ?? null });
+  },
+  fetchServerLimits: () => {
+    getServerLimits()
+      .then((limits) => {
+        set({ maxMessageLength: limits.max_message_length, maxFileSizeMb: limits.max_file_size_mb });
+      })
+      .catch((e) => console.error('Failed to fetch server limits:', e));
   },
   // ── Phase 9: AT Protocol Deep Integration ──
   syncBlueskyProfile: async () => {

@@ -73,7 +73,10 @@ async fn main() {
     }
 
     // Create the shared chat engine with database
-    let engine = Arc::new(ChatEngine::new(Some(pool.clone())));
+    let engine = Arc::new(ChatEngine::new(
+        Some(pool.clone()),
+        config.storage.max_message_length,
+    ));
 
     // Load persisted servers and channels into memory
     engine
@@ -133,12 +136,14 @@ async fn main() {
     // Build shared app state for the web server
     let auth_config = config.to_auth_config();
     let atproto = AtprotoOAuth::load_or_create(&pool).await;
+    let max_message_length = config.storage.max_message_length;
     let app_state = Arc::new(AppState {
         engine,
         db: pool,
         auth_config,
         atproto,
         max_file_size,
+        max_message_length,
     });
 
     let app = build_router(app_state);

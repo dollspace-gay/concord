@@ -226,6 +226,87 @@ pub async fn set_server_nickname(
     Ok(())
 }
 
+// ── Per-server avatar ───────────────────────────────────────
+
+/// Set a member's per-server avatar URL.
+pub async fn set_server_avatar(
+    pool: &SqlitePool,
+    server_id: &str,
+    user_id: &str,
+    avatar_url: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE server_members SET avatar_url = ? WHERE server_id = ? AND user_id = ?")
+        .bind(avatar_url)
+        .bind(server_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Get a member's per-server avatar URL.
+pub async fn get_server_avatar(
+    pool: &SqlitePool,
+    server_id: &str,
+    user_id: &str,
+) -> Result<Option<String>, sqlx::Error> {
+    let row: Option<(Option<String>,)> =
+        sqlx::query_as("SELECT avatar_url FROM server_members WHERE server_id = ? AND user_id = ?")
+            .bind(server_id)
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await?;
+    Ok(row.and_then(|r| r.0))
+}
+
+// ── Emoji sharing settings ──────────────────────────────────
+
+/// Update server emoji sharing settings.
+pub async fn update_emoji_settings(
+    pool: &SqlitePool,
+    server_id: &str,
+    allow_external: bool,
+    shareable: bool,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE servers SET allow_external_emoji = ?, shareable_emoji = ?, \
+         updated_at = datetime('now') WHERE id = ?",
+    )
+    .bind(if allow_external { 1 } else { 0 })
+    .bind(if shareable { 1 } else { 0 })
+    .bind(server_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+// ── Vanity invite code ──────────────────────────────────────
+
+/// Set or clear a server's vanity invite code.
+pub async fn set_vanity_code(
+    pool: &SqlitePool,
+    server_id: &str,
+    vanity_code: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE servers SET vanity_code = ?, updated_at = datetime('now') WHERE id = ?")
+        .bind(vanity_code)
+        .bind(server_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Look up a server by its vanity invite code.
+pub async fn get_server_by_vanity(
+    pool: &SqlitePool,
+    vanity_code: &str,
+) -> Result<Option<ServerRow>, sqlx::Error> {
+    sqlx::query_as::<_, ServerRow>("SELECT * FROM servers WHERE vanity_code = ?")
+        .bind(vanity_code)
+        .fetch_optional(pool)
+        .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -469,5 +550,94 @@ mod tests {
 
         let members = get_server_members(&pool, "s1").await.unwrap();
         assert_eq!(members.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_set_and_get_server_avatar() {
+        let pool = setup_db().await;
+        create_test_user(&pool, "u1", "alice").await;
+        create_server(&pool, "s1", "Test", "u1", None)
+            .await
+            .unwrap();
+
+        // Initially no server avatar
+        let avatar = get_server_avatar(&pool, "s1", "u1").await.unwrap();
+        assert!(avatar.is_none());
+
+        // Set server avatar
+        set_server_avatar(&pool, "s1", "u1", Some("https://example.com/avatar.png"))
+            .await
+            .unwrap();
+        let avatar = get_server_avatar(&pool, "s1", "u1").await.unwrap();
+        assert_eq!(avatar, Some("https://example.com/avatar.png".to_string()));
+
+        // Clear server avatar
+        set_server_avatar(&pool, "s1", "u1", None).await.unwrap();
+        let avatar = get_server_avatar(&pool, "s1", "u1").await.unwrap();
+        assert!(avatar.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_update_emoji_settings() {
+        let pool = setup_db().await;
+        create_test_user(&pool, "u1", "alice").await;
+        create_server(&pool, "s1", "Test", "u1", None)
+            .await
+            .unwrap();
+
+        // Defaults are 1 (enabled)
+        let server = get_server(&pool, "s1").await.unwrap().unwrap();
+        assert_eq!(server.allow_external_emoji, 1);
+        assert_eq!(server.shareable_emoji, 1);
+
+        // Disable both
+        update_emoji_settings(&pool, "s1", false, false)
+            .await
+            .unwrap();
+        let server = get_server(&pool, "s1").await.unwrap().unwrap();
+        assert_eq!(server.allow_external_emoji, 0);
+        assert_eq!(server.shareable_emoji, 0);
+
+        // Re-enable
+        update_emoji_settings(&pool, "s1", true, true)
+            .await
+            .unwrap();
+        let server = get_server(&pool, "s1").await.unwrap().unwrap();
+        assert_eq!(server.allow_external_emoji, 1);
+        assert_eq!(server.shareable_emoji, 1);
+    }
+
+    #[tokio::test]
+    async fn test_set_vanity_code() {
+        let pool = setup_db().await;
+        create_test_user(&pool, "u1", "alice").await;
+        create_server(&pool, "s1", "Test", "u1", None)
+            .await
+            .unwrap();
+
+        // Initially no vanity code
+        let server = get_server(&pool, "s1").await.unwrap().unwrap();
+        assert!(server.vanity_code.is_none());
+
+        // Set vanity code
+        set_vanity_code(&pool, "s1", Some("my-server"))
+            .await
+            .unwrap();
+        let server = get_server(&pool, "s1").await.unwrap().unwrap();
+        assert_eq!(server.vanity_code, Some("my-server".to_string()));
+
+        // Look up by vanity code
+        let found = get_server_by_vanity(&pool, "my-server").await.unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "s1");
+
+        // Non-existent vanity code
+        let not_found = get_server_by_vanity(&pool, "other").await.unwrap();
+        assert!(not_found.is_none());
+
+        // Clear vanity code
+        set_vanity_code(&pool, "s1", None).await.unwrap();
+        let server = get_server(&pool, "s1").await.unwrap().unwrap();
+        assert!(server.vanity_code.is_none());
     }
 }

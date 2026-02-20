@@ -79,14 +79,37 @@ pub fn sanitize_html(input: &str) -> String {
 
 /// Validate message content. Must be non-empty and under the length limit.
 pub fn validate_message(content: &str) -> Result<(), String> {
+    validate_message_with_limit(content, MAX_MESSAGE_LENGTH)
+}
+
+/// Validate message content with a configurable length limit.
+pub fn validate_message_with_limit(content: &str, max_length: usize) -> Result<(), String> {
     if content.trim().is_empty() {
         return Err("Message cannot be empty".into());
     }
-    if content.len() > MAX_MESSAGE_LENGTH {
-        return Err(format!(
-            "Message too long (max {} characters)",
-            MAX_MESSAGE_LENGTH
-        ));
+    if content.len() > max_length {
+        return Err(format!("Message too long (max {} characters)", max_length));
+    }
+    Ok(())
+}
+
+/// Validate a vanity invite code. Must be 2-32 lowercase alphanumeric + hyphens,
+/// no leading/trailing hyphens.
+pub fn validate_vanity_code(code: &str) -> Result<(), String> {
+    if code.len() < 2 {
+        return Err("Vanity code too short (min 2 characters)".into());
+    }
+    if code.len() > 32 {
+        return Err("Vanity code too long (max 32 characters)".into());
+    }
+    if code.starts_with('-') || code.ends_with('-') {
+        return Err("Vanity code cannot start or end with a hyphen".into());
+    }
+    if !code
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
+        return Err("Vanity code can only contain lowercase letters, digits, and hyphens".into());
     }
     Ok(())
 }
@@ -388,5 +411,72 @@ mod tests {
             sanitize_html("Hello <b>world</b> & friends"),
             "Hello &lt;b&gt;world&lt;/b&gt; &amp; friends"
         );
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Configurable message length
+    // ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_message_with_custom_limit() {
+        assert!(validate_message_with_limit("hello", 10).is_ok());
+        assert!(validate_message_with_limit(&"a".repeat(10), 10).is_ok());
+        assert!(validate_message_with_limit(&"a".repeat(11), 10).is_err());
+    }
+
+    #[test]
+    fn test_message_with_4000_limit() {
+        assert!(validate_message_with_limit(&"a".repeat(4000), 4000).is_ok());
+        assert!(validate_message_with_limit(&"a".repeat(4001), 4000).is_err());
+    }
+
+    #[test]
+    fn test_message_empty_with_custom_limit() {
+        assert!(validate_message_with_limit("", 4000).is_err());
+        assert!(validate_message_with_limit("   ", 4000).is_err());
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Vanity invite code validation
+    // ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_valid_vanity_codes() {
+        assert!(validate_vanity_code("ab").is_ok());
+        assert!(validate_vanity_code("my-server").is_ok());
+        assert!(validate_vanity_code("server123").is_ok());
+        assert!(validate_vanity_code("a-b-c").is_ok());
+        assert!(validate_vanity_code(&"a".repeat(32)).is_ok());
+    }
+
+    #[test]
+    fn test_vanity_code_too_short() {
+        assert!(validate_vanity_code("a").is_err());
+        assert!(validate_vanity_code("").is_err());
+    }
+
+    #[test]
+    fn test_vanity_code_too_long() {
+        assert!(validate_vanity_code(&"a".repeat(33)).is_err());
+    }
+
+    #[test]
+    fn test_vanity_code_no_leading_trailing_hyphens() {
+        assert!(validate_vanity_code("-abc").is_err());
+        assert!(validate_vanity_code("abc-").is_err());
+        assert!(validate_vanity_code("-abc-").is_err());
+    }
+
+    #[test]
+    fn test_vanity_code_lowercase_only() {
+        assert!(validate_vanity_code("ABC").is_err());
+        assert!(validate_vanity_code("MyServer").is_err());
+    }
+
+    #[test]
+    fn test_vanity_code_no_special_chars() {
+        assert!(validate_vanity_code("my_server").is_err());
+        assert!(validate_vanity_code("my.server").is_err());
+        assert!(validate_vanity_code("my server").is_err());
     }
 }

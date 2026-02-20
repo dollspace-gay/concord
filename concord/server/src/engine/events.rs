@@ -549,6 +549,20 @@ pub enum ChatEvent {
         error: Option<String>,
     },
 
+    /// Per-server avatar updated.
+    ServerAvatarUpdate {
+        server_id: String,
+        user_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        avatar_url: Option<String>,
+    },
+
+    /// Server configuration/limits info.
+    ServerLimits {
+        max_message_length: usize,
+        max_file_size_mb: u64,
+    },
+
     /// Error from the server.
     Error { code: String, message: String },
 }
@@ -602,6 +616,8 @@ pub struct MemberInfo {
     pub nickname: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub avatar_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_avatar_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1935,6 +1951,7 @@ mod tests {
                 custom_status: None,
                 status_emoji: None,
                 user_id: None,
+                server_avatar_url: None,
             }
         );
         let _ = format!(

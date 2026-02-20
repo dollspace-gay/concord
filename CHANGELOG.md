@@ -149,6 +149,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix missing migration 4 and add emoji picker (#125)
 
 ### Changed
+- Feature: Animated avatars verification (#220)
+- Feature: Custom stickers (#219)
+- Feature: Cross-server emoji (#218)
+- Feature: Per-server avatars (#217)
+- Feature: Vanity invite URLs (#216)
+- Feature: Configurable message and upload limits (#215)
+- Migration 015: Premium-for-free database schema (#214)
 - Update README with install instructions and ngrok setup (#143)
 - Clean repo of build artifacts (#136)
 - Persist AT Protocol signing key across server restarts (#133)

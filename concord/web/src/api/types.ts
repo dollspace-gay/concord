@@ -44,6 +44,15 @@ export interface MemberInfo {
   custom_status?: string | null;
   status_emoji?: string | null;
   user_id?: string | null;
+  server_avatar_url?: string | null;
+}
+
+export interface StickerInfo {
+  id: string;
+  server_id: string;
+  name: string;
+  image_url: string;
+  description?: string | null;
 }
 
 export interface ReplyInfo {
@@ -539,6 +548,8 @@ export type ServerEvent =
   | { type: 'bot_token_list'; tokens: BotTokenInfo[] }
   | { type: 'oauth2_app_list'; apps: OAuth2AppInfo[] }
   | { type: 'oauth2_app_update'; app: OAuth2AppInfo }
+  | { type: 'server_avatar_update'; server_id: string; user_id: string; avatar_url: string | null }
+  | { type: 'server_limits'; max_message_length: number; max_file_size_mb: number }
   | { type: 'error'; code: string; message: string };
 
 // Client → Server commands
@@ -646,7 +657,10 @@ export type ClientCommand =
   | { type: 'create_oauth2_app'; name: string; description: string; redirect_uris: string; scopes?: string }
   | { type: 'list_oauth2_apps' }
   | { type: 'delete_oauth2_app'; app_id: string }
-  | { type: 'update_server'; server_id: string; name?: string; icon_url?: string };
+  | { type: 'update_server'; server_id: string; name?: string; icon_url?: string }
+  | { type: 'set_server_avatar'; server_id: string; avatar_url?: string | null }
+  | { type: 'set_vanity_code'; server_id: string; vanity_code?: string | null }
+  | { type: 'get_server_limits' };
 
 // ── Helpers ─────────────────────────────────────────────
 

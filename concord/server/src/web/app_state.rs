@@ -14,4 +14,5 @@ pub struct AppState {
     pub auth_config: AuthConfig,
     pub atproto: AtprotoOAuth,
     pub max_file_size: u64,
+    pub max_message_length: usize,
 }

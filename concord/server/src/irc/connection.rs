@@ -1077,7 +1077,9 @@ fn event_to_irc_lines_inner(engine: &ChatEngine, my_nick: &str, event: &ChatEven
         | ChatEvent::OAuth2AppList { .. }
         | ChatEvent::OAuth2AppUpdate { .. }
         | ChatEvent::BlueskyProfileSync { .. }
-        | ChatEvent::BlueskyShareResult { .. } => vec![],
+        | ChatEvent::BlueskyShareResult { .. }
+        | ChatEvent::ServerAvatarUpdate { .. }
+        | ChatEvent::ServerLimits { .. } => vec![],
     }
 }
 
@@ -1095,7 +1097,7 @@ mod tests {
 
     /// Create a minimal ChatEngine with no database for unit tests.
     fn test_engine() -> Arc<ChatEngine> {
-        Arc::new(ChatEngine::new(None))
+        Arc::new(ChatEngine::new(None, 4000))
     }
 
     /// Test helper — calls the inner (tag-free) event formatter.
@@ -1325,6 +1327,7 @@ mod tests {
                         custom_status: None,
                         status_emoji: None,
                         user_id: None,
+                        server_avatar_url: None,
                     },
                     MemberInfo {
                         nickname: "bob".into(),
@@ -1333,6 +1336,7 @@ mod tests {
                         custom_status: None,
                         status_emoji: None,
                         user_id: None,
+                        server_avatar_url: None,
                     },
                 ],
             },

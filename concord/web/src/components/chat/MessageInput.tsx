@@ -104,14 +104,20 @@ export function MessageInput() {
 
     if (pendingFiles.length > 0) {
       setUploading(true);
-      try {
-        attachments = await Promise.all(pendingFiles.map((f) => uploadFile(f)));
-      } catch (err) {
-        console.error('Upload failed:', err);
-        setUploading(false);
-        return;
+      const results = await Promise.allSettled(pendingFiles.map((f) => uploadFile(f)));
+      const succeeded = results
+        .filter((r): r is PromiseFulfilledResult<import('../../api/types').AttachmentInfo> => r.status === 'fulfilled')
+        .map((r) => r.value);
+      const failedCount = results.filter((r) => r.status === 'rejected').length;
+      if (failedCount > 0) {
+        console.error(`${failedCount} of ${pendingFiles.length} uploads failed`);
       }
       setUploading(false);
+      if (succeeded.length > 0) {
+        attachments = succeeded;
+      } else if (failedCount > 0) {
+        return; // All uploads failed — don't send the message
+      }
     }
 
     sendMessage(activeServer, activeChannel, trimmed || '\u200B', attachments);

@@ -181,7 +181,7 @@ function CustomEmojiSpan({ name }: { name: string }) {
     // Priority 1: current server emoji
     if (activeServer) {
       const local = s.customEmoji[activeServer]?.[name];
-      if (local) return local;
+      if (local) return local.image_url;
     }
     // Priority 2: cross-server emoji from all user's servers
     const cross = s.allUserEmoji.find((e) => e.name === name);

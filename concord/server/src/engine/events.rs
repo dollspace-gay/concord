@@ -592,6 +592,9 @@ pub struct ServerInfo {
     pub member_count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
+    /// Effective permission bitfield for the requesting user in this server.
+    #[serde(default)]
+    pub my_permissions: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1924,6 +1927,7 @@ mod tests {
                 icon_url: None,
                 member_count: 0,
                 role: None,
+                my_permissions: 0,
             }
         );
         let _ = format!(

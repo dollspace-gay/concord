@@ -9,13 +9,12 @@ pub async fn create_bot_user(
     avatar_url: Option<&str>,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO users (id, username, avatar_url, provider, provider_id, is_bot)
-         VALUES (?, ?, ?, 'bot', ?, 1)",
+        "INSERT INTO users (id, username, avatar_url, is_bot)
+         VALUES (?, ?, ?, 1)",
     )
     .bind(user_id)
     .bind(username)
     .bind(avatar_url)
-    .bind(user_id)
     .execute(pool)
     .await?;
     Ok(())
@@ -112,6 +111,19 @@ pub async fn add_bot_to_server(
     Ok(())
 }
 
+/// List server IDs that a bot user is a member of.
+pub async fn list_bot_server_ids(
+    pool: &SqlitePool,
+    bot_user_id: &str,
+) -> Result<Vec<String>, sqlx::Error> {
+    let rows: Vec<(String,)> =
+        sqlx::query_as("SELECT server_id FROM server_members WHERE user_id = ?")
+            .bind(bot_user_id)
+            .fetch_all(pool)
+            .await?;
+    Ok(rows.into_iter().map(|(sid,)| sid).collect())
+}
+
 pub async fn remove_bot_from_server(
     pool: &SqlitePool,
     server_id: &str,
@@ -155,13 +167,8 @@ mod tests {
         .unwrap();
     }
 
-    /// Create a bot user directly in the users table (the create_bot_user function
-    /// references columns that don't exist in the current schema, so we insert manually).
     async fn insert_bot_user(pool: &SqlitePool, user_id: &str, username: &str) {
-        sqlx::query("INSERT INTO users (id, username, is_bot) VALUES (?, ?, 1)")
-            .bind(user_id)
-            .bind(username)
-            .execute(pool)
+        create_bot_user(pool, user_id, username, None)
             .await
             .unwrap();
     }

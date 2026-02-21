@@ -30,6 +30,10 @@ pub struct ChannelState {
     pub auto_archive_minutes: i32,
     /// Whether this channel/thread is archived.
     pub archived: bool,
+    /// Slow mode cooldown in seconds (0 = disabled).
+    pub slowmode_seconds: i32,
+    /// Whether this channel is marked NSFW.
+    pub is_nsfw: bool,
 }
 
 impl ChannelState {
@@ -50,6 +54,8 @@ impl ChannelState {
             thread_parent_message_id: None,
             auto_archive_minutes: 1440,
             archived: false,
+            slowmode_seconds: 0,
+            is_nsfw: false,
         }
     }
 

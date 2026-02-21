@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
-import { channelKey } from '../../api/types';
+import { channelKey, Permissions, hasPermission } from '../../api/types';
 import type { CategoryInfo, ChannelInfo } from '../../api/types';
 
 const EMPTY_CHANNELS: ChannelInfo[] = [];
@@ -23,14 +23,19 @@ export function ChannelList() {
   const unreadCounts = useChatStore((s) => s.unreadCounts ?? EMPTY_UNREAD);
   const markRead = useChatStore((s) => s.markRead);
   const getUnreadCounts = useChatStore((s) => s.getUnreadCounts);
-  const messages = useChatStore((s) => s.messages);
+  const activeMessages = useChatStore((s) => {
+    if (!activeServer || !activeChannel) return undefined;
+    return s.messages[channelKey(activeServer, activeChannel)];
+  });
   const createChannel = useChatStore((s) => s.createChannel);
 
   const [creatingIn, setCreatingIn] = useState<string | null>(null); // category id or '__uncategorized__'
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelPrivate, setNewChannelPrivate] = useState(false);
 
-  const serverName = servers.find((s) => s.id === activeServer)?.name ?? 'Concord';
+  const activeServerInfo = servers.find((s) => s.id === activeServer);
+  const serverName = activeServerInfo?.name ?? 'Concord';
+  const canManageChannels = hasPermission(activeServerInfo?.my_permissions ?? 0, Permissions.MANAGE_CHANNELS);
 
   // Fetch unread counts when server changes
   useEffect(() => {
@@ -42,13 +47,11 @@ export function ChannelList() {
   // Auto-mark-read when viewing a channel (clear unread for active channel)
   useEffect(() => {
     if (!activeServer || !activeChannel) return;
-    const key = channelKey(activeServer, activeChannel);
-    const channelMessages = messages[key];
-    if (channelMessages && channelMessages.length > 0) {
-      const lastMsg = channelMessages[channelMessages.length - 1];
+    if (activeMessages && activeMessages.length > 0) {
+      const lastMsg = activeMessages[activeMessages.length - 1];
       markRead(activeServer, activeChannel, lastMsg.id);
     }
-  }, [activeServer, activeChannel, messages, markRead]);
+  }, [activeServer, activeChannel, activeMessages, markRead]);
 
   // Group channels by category, sorted by position
   const grouped = useMemo(() => {
@@ -97,7 +100,7 @@ export function ChannelList() {
     <div className="flex h-full flex-col bg-bg-secondary">
       <div className="flex h-12 items-center justify-between border-b border-border-primary px-4">
         <h2 className="font-semibold text-text-primary truncate">{serverName}</h2>
-        {activeServer && (
+        {activeServer && (hasPermission(activeServerInfo?.my_permissions ?? 0, Permissions.MANAGE_SERVER) || canManageChannels || hasPermission(activeServerInfo?.my_permissions ?? 0, Permissions.MANAGE_ROLES)) && (
           <button
             onClick={() => useUiStore.getState().setShowServerSettings(true)}
             className="rounded p-1 text-text-muted transition-colors hover:text-text-primary"
@@ -136,30 +139,34 @@ export function ChannelList() {
                     </svg>
                     <span className="truncate">{group.category.name}</span>
                   </button>
-                  <button
-                    onClick={() => startCreating(categoryKey)}
-                    className="rounded p-0.5 text-text-muted opacity-0 transition-opacity hover:text-text-primary group-hover/cat:opacity-100 [div:hover>&]:opacity-100"
-                    title="Create Channel"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
+                  {canManageChannels && (
+                    <button
+                      onClick={() => startCreating(categoryKey)}
+                      className="rounded p-0.5 text-text-muted opacity-0 transition-opacity hover:text-text-primary group-hover/cat:opacity-100 [div:hover>&]:opacity-100"
+                      title="Create Channel"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="mb-0.5 flex items-center justify-between px-2 py-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">
                     Channels
                   </span>
-                  <button
-                    onClick={() => startCreating(categoryKey)}
-                    className="rounded p-0.5 text-text-muted transition-colors hover:text-text-primary"
-                    title="Create Channel"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
+                  {canManageChannels && (
+                    <button
+                      onClick={() => startCreating(categoryKey)}
+                      className="rounded p-0.5 text-text-muted transition-colors hover:text-text-primary"
+                      title="Create Channel"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               )}
 

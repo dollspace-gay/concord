@@ -72,7 +72,7 @@ const EMOJI_CATEGORIES: { name: string; emojis: string[] }[] = [
   },
 ];
 
-const EMPTY_EMOJI: Record<string, string> = {};
+const EMPTY_EMOJI: Record<string, { id: string; image_url: string }> = {};
 
 export function EmojiPicker({ onSelect, onClose, serverId }: EmojiPickerProps) {
   const customEmoji = useChatStore((s) => (serverId ? s.customEmoji[serverId] ?? EMPTY_EMOJI : EMPTY_EMOJI));
@@ -176,7 +176,7 @@ export function EmojiPicker({ onSelect, onClose, serverId }: EmojiPickerProps) {
           <>
             {search && <p className="mb-1 text-xs font-semibold text-text-muted">Server Emoji</p>}
             <div className="grid grid-cols-8 gap-0.5">
-              {filteredCustom.map(([name, url]) => (
+              {filteredCustom.map(([name, emoji]) => (
                 <button
                   key={name}
                   onClick={() => {
@@ -186,7 +186,7 @@ export function EmojiPicker({ onSelect, onClose, serverId }: EmojiPickerProps) {
                   className="flex h-8 w-8 items-center justify-center rounded transition-colors hover:bg-bg-hover"
                   title={`:${name}:`}
                 >
-                  <img src={url} alt={name} className="h-6 w-6 object-contain" />
+                  <img src={emoji.image_url} alt={name} className="h-6 w-6 object-contain" />
                 </button>
               ))}
             </div>

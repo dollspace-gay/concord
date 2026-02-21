@@ -11,6 +11,8 @@ pub struct Claims {
     pub sub: String, // user_id
     pub exp: i64,    // expiry (unix timestamp)
     pub iat: i64,    // issued at
+    #[serde(default)]
+    pub jti: String, // JWT ID (for revocation)
 }
 
 /// Create a JWT session token for a user.
@@ -20,10 +22,12 @@ pub fn create_session_token(
     expiry_hours: i64,
 ) -> Result<String, jsonwebtoken::errors::Error> {
     let now = Utc::now();
+    let jti = uuid::Uuid::new_v4().to_string();
     let claims = Claims {
         sub: user_id.to_string(),
         exp: (now + Duration::hours(expiry_hours)).timestamp(),
         iat: now.timestamp(),
+        jti,
     };
 
     encode(
@@ -47,6 +51,51 @@ pub fn validate_session_token(
         &validation,
     )?;
     Ok(token_data.claims)
+}
+
+/// In-memory JWT revocation blocklist. Entries auto-expire when the JWT would have expired.
+pub struct JwtBlocklist {
+    /// Map from jti -> expiry timestamp (unix seconds)
+    entries: std::sync::Mutex<std::collections::HashMap<String, i64>>,
+}
+
+impl Default for JwtBlocklist {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl JwtBlocklist {
+    pub fn new() -> Self {
+        Self {
+            entries: std::sync::Mutex::new(std::collections::HashMap::new()),
+        }
+    }
+
+    /// Revoke a JWT by adding its jti and expiry to the blocklist.
+    pub fn revoke(&self, jti: &str, exp: i64) {
+        if jti.is_empty() {
+            return;
+        }
+        let mut entries = self.entries.lock().unwrap();
+        entries.insert(jti.to_string(), exp);
+    }
+
+    /// Check if a JWT is revoked.
+    pub fn is_revoked(&self, jti: &str) -> bool {
+        if jti.is_empty() {
+            return false; // Legacy tokens without jti are not revocable
+        }
+        let entries = self.entries.lock().unwrap();
+        entries.contains_key(jti)
+    }
+
+    /// Remove expired entries from the blocklist.
+    pub fn cleanup(&self) {
+        let now = Utc::now().timestamp();
+        let mut entries = self.entries.lock().unwrap();
+        entries.retain(|_, exp| *exp > now);
+    }
 }
 
 /// Generate a random IRC access token (64 hex characters).

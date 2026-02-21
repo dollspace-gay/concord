@@ -5,6 +5,9 @@ import { listServerEmoji, createServerEmoji, deleteServerEmoji, syncBlueskyProfi
 import { channelKey } from '../api/types';
 import { WebSocketManager } from '../api/websocket';
 
+/** Maximum messages retained per channel to prevent unbounded memory growth. */
+const MAX_MESSAGES_PER_CHANNEL = 1000;
+
 // Stable empty references to prevent zustand selector re-render loops.
 // Inline [] / {} in selectors create new references on every evaluation,
 // failing Object.is comparison and causing infinite re-renders with React 19.
@@ -16,7 +19,7 @@ const EMPTY_HAS_MORE: Record<string, boolean> = {};
 const EMPTY_AVATARS: Record<string, string> = {};
 const EMPTY_TYPING: Record<string, string[]> = {};
 const EMPTY_UNREAD: Record<string, number> = {};
-const EMPTY_EMOJI: Record<string, Record<string, string>> = {};
+const EMPTY_EMOJI: Record<string, Record<string, { id: string; image_url: string }>> = {};
 const EMPTY_ROLES: Record<string, RoleInfo[]> = {};
 const EMPTY_CATEGORIES: Record<string, CategoryInfo[]> = {};
 const EMPTY_PRESENCES: Record<string, Record<string, PresenceInfo>> = {};
@@ -36,6 +39,9 @@ const EMPTY_BOT_TOKENS: BotTokenInfo[] = [];
 const EMPTY_OAUTH2_APPS: OAuth2AppInfo[] = [];
 const EMPTY_BLUESKY_IDENTITIES: Record<string, BlueskyIdentityInfo> = {};
 
+/** Tracks per-user typing indicator timeouts so they can be cleared on re-type. */
+const typingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+
 interface ChatState {
   connected: boolean;
   nickname: string | null;
@@ -52,8 +58,8 @@ interface ChatState {
   replyingTo: ReplyInfo | null;
   /** channelKey -> unread message count */
   unreadCounts: Record<string, number>;
-  /** server_id -> { emoji_name -> image_url } */
-  customEmoji: Record<string, Record<string, string>>;
+  /** server_id -> { emoji_name -> { id, image_url } } */
+  customEmoji: Record<string, Record<string, { id: string; image_url: string }>>;
   /** server_id -> roles sorted by position desc */
   roles: Record<string, RoleInfo[]>;
   /** server_id -> categories sorted by position */
@@ -112,6 +118,8 @@ interface ChatState {
   maxMessageLength: number;
   /** Configurable max file size in MB */
   maxFileSizeMb: number;
+  /** Error toast message (auto-clears) */
+  errorToast: string | null;
   ws: WebSocketManager | null;
 
   connect: (nickname: string) => void;
@@ -293,6 +301,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   serverAvatars: {} as Record<string, Record<string, string>>,
   maxMessageLength: 4000,
   maxFileSizeMb: 100,
+  errorToast: null,
   ws: null,
 
   connect: (nickname: string) => {
@@ -311,6 +320,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       (connected) => {
         set({ connected });
         if (connected) {
+          // Clear stale ephemeral state on reconnect
+          set({ typingUsers: EMPTY_TYPING, replyingTo: null });
           ws.send({ type: 'list_servers' });
           ws.send({ type: 'get_server_limits' });
         }
@@ -383,10 +394,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (event.from !== s.nickname) {
             newUnread[key] = (newUnread[key] || 0) + 1;
           }
+          const updated = [...(s.messages[key] || []), msg];
+          const trimmed = updated.length > MAX_MESSAGES_PER_CHANNEL
+            ? updated.slice(updated.length - MAX_MESSAGES_PER_CHANNEL)
+            : updated;
           return {
             messages: {
               ...s.messages,
-              [key]: [...(s.messages[key] || []), msg],
+              [key]: trimmed,
             },
             avatars: cacheAvatar(s.avatars, event.from, event.avatar_url),
             unreadCounts: newUnread,
@@ -506,8 +521,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
             typingUsers: { ...s.typingUsers, [key]: [...current, event.nickname] },
           };
         });
-        // Auto-expire after 8 seconds
-        setTimeout(() => {
+        // Clear any previous timeout for this user+channel, then set a new one
+        const timeoutKey = `${key}:${event.nickname}`;
+        const prev = typingTimeouts.get(timeoutKey);
+        if (prev) clearTimeout(prev);
+        typingTimeouts.set(timeoutKey, setTimeout(() => {
+          typingTimeouts.delete(timeoutKey);
           set((s) => {
             const current = s.typingUsers[key] || [];
             const filtered = current.filter((n) => n !== event.nickname);
@@ -515,7 +534,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               typingUsers: { ...s.typingUsers, [key]: filtered },
             };
           });
-        }, 8000);
+        }, 8000));
         break;
       }
 
@@ -615,16 +634,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       case 'history': {
         const key = channelKey(event.server_id, event.channel);
-        set((s) => ({
-          messages: {
-            ...s.messages,
-            [key]: [
-              ...event.messages.reverse(),
-              ...(s.messages[key] || []),
-            ],
-          },
-          hasMore: { ...s.hasMore, [key]: event.has_more },
-        }));
+        set((s) => {
+          const combined = [
+            ...event.messages.reverse(),
+            ...(s.messages[key] || []),
+          ];
+          // Deduplicate by message ID
+          const seen = new Set<string>();
+          const deduped = combined.filter(m => {
+            if (seen.has(m.id)) return false;
+            seen.add(m.id);
+            return true;
+          });
+          const trimmed = deduped.length > MAX_MESSAGES_PER_CHANNEL
+            ? deduped.slice(deduped.length - MAX_MESSAGES_PER_CHANNEL)
+            : deduped;
+          return {
+            messages: {
+              ...s.messages,
+              [key]: trimmed,
+            },
+            hasMore: { ...s.hasMore, [key]: event.has_more },
+          };
+        });
         break;
       }
 
@@ -1153,6 +1185,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       case 'error': {
         console.error(`Server error [${event.code}]: ${event.message}`);
+        set({ errorToast: event.message });
+        setTimeout(() => set({ errorToast: null }), 5000);
         break;
       }
     }
@@ -1175,13 +1209,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       reply_to: replyingTo,
       attachments: attachments || null,
     };
-    set((s) => ({
-      messages: {
-        ...s.messages,
-        [key]: [...(s.messages[key] || []), msg],
-      },
-      replyingTo: null,
-    }));
+    set((s) => {
+      const updated = [...(s.messages[key] || []), msg];
+      const trimmed = updated.length > MAX_MESSAGES_PER_CHANNEL
+        ? updated.slice(updated.length - MAX_MESSAGES_PER_CHANNEL)
+        : updated;
+      return {
+        messages: {
+          ...s.messages,
+          [key]: trimmed,
+        },
+        replyingTo: null,
+      };
+    });
 
     ws.send({
       type: 'send_message',
@@ -1292,9 +1332,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadServerEmoji: (serverId) => {
     listServerEmoji(serverId)
       .then((emojis) => {
-        const map: Record<string, string> = {};
+        const map: Record<string, { id: string; image_url: string }> = {};
         for (const e of emojis) {
-          map[e.name] = e.image_url;
+          map[e.name] = { id: e.id, image_url: e.image_url };
         }
         set((s) => ({
           customEmoji: { ...s.customEmoji, [serverId]: map },

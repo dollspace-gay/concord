@@ -2,18 +2,12 @@ use sqlx::SqlitePool;
 
 use crate::db::models::MessageRow;
 
-/// Sanitize a search query for FTS5 MATCH by quoting each term.
-/// This prevents FTS5 operator injection (AND, OR, NOT, NEAR, *, etc.).
+/// Sanitize a search query for FTS5 MATCH by wrapping in double quotes
+/// for literal matching. This prevents FTS5 operator injection (AND, OR,
+/// NOT, NEAR, *, etc.).
 fn sanitize_fts5_query(query: &str) -> String {
-    query
-        .split_whitespace()
-        .map(|term| {
-            // Escape internal double quotes and wrap each term
-            let escaped = term.replace('"', "\"\"");
-            format!("\"{escaped}\"")
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
+    let safe_query = query.replace('"', "");
+    format!("\"{safe_query}\"")
 }
 
 /// Full-text search messages within a server, optionally filtered by channel.

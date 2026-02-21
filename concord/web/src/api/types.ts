@@ -19,6 +19,7 @@ export interface ServerInfo {
   icon_url?: string | null;
   member_count: number;
   role?: string | null;
+  my_permissions?: number;
 }
 
 export interface ChannelInfo {

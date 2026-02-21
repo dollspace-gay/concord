@@ -3,6 +3,7 @@ use std::sync::Arc;
 use sqlx::SqlitePool;
 
 use crate::auth::config::AuthConfig;
+use crate::auth::token::JwtBlocklist;
 use crate::engine::chat_engine::ChatEngine;
 
 use super::atproto::AtprotoOAuth;
@@ -15,4 +16,5 @@ pub struct AppState {
     pub atproto: AtprotoOAuth,
     pub max_file_size: u64,
     pub max_message_length: usize,
+    pub jwt_blocklist: JwtBlocklist,
 }

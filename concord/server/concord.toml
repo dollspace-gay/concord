@@ -1,6 +1,6 @@
 [auth]
 public_url = ""
-jwt_secret = "smoke-test-secret-do-not-use-in-production"
+jwt_secret = ""
 
 [admin]
 admin_users = [""]

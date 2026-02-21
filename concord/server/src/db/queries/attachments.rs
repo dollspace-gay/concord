@@ -85,9 +85,8 @@ pub async fn get_attachments_for_message(
          FROM attachments WHERE message_id = ? ORDER BY created_at",
     )
     .bind(message_id)
-    .fetch_optional(pool)
+    .fetch_all(pool)
     .await
-    .map(|opt| opt.into_iter().collect())
 }
 
 /// Get all attachments for a batch of message IDs.

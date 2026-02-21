@@ -34,6 +34,11 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
                 (StatusCode::UNAUTHORIZED, "Invalid or expired session").into_response()
             })?;
 
+        // Check JWT revocation blocklist
+        if state.jwt_blocklist.is_revoked(&claims.jti) {
+            return Err((StatusCode::UNAUTHORIZED, "Session has been revoked").into_response());
+        }
+
         Ok(AuthUser {
             user_id: claims.sub,
         })

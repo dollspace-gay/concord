@@ -33,7 +33,7 @@ mod tests {
     /// Create a ChatEngine backed by a fresh in-memory database.
     async fn setup_engine() -> (ChatEngine, SqlitePool) {
         let pool = setup_db().await;
-        let engine = ChatEngine::new(Some(pool.clone()), 4000);
+        let engine = ChatEngine::new(Some(pool.clone()), 4000, 100);
         (engine, pool)
     }
 
@@ -94,7 +94,7 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(max_version, 15, "All 15 migrations should be recorded");
+        assert_eq!(max_version, 16, "All 16 migrations should be recorded");
     }
 
     #[tokio::test]
@@ -109,7 +109,7 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count, 15, "No duplicate migration entries after re-run");
+        assert_eq!(count, 16, "No duplicate migration entries after re-run");
     }
 
     #[tokio::test]
@@ -1793,7 +1793,7 @@ mod tests {
         }
 
         // List servers for the user
-        let servers = engine.list_servers_for_user(&user_id);
+        let servers = engine.list_servers_for_user(&user_id).await;
         assert_eq!(servers.len(), 3, "User should be a member of 3 servers");
 
         // Check each server has the correct role

@@ -1,6 +1,7 @@
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
 
 use dashmap::DashMap;
 use sqlx::SqlitePool;
@@ -15,6 +16,9 @@ use super::connection::handle_irc_connection;
 
 /// Maximum concurrent IRC connections per IP address.
 const MAX_CONNECTIONS_PER_IP: u32 = 5;
+
+/// Timeout for TLS handshake — prevents malicious clients from holding connections indefinitely.
+const TLS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Start the IRC TCP listener. Accepts connections and spawns a handler task for each.
 /// If a TLS acceptor is provided, connections are wrapped in TLS.
@@ -69,12 +73,20 @@ pub async fn start_irc_listener(
                         if let Some(ref acceptor) = tls_acceptor {
                             let acceptor = acceptor.clone();
                             tokio::spawn(async move {
-                                match acceptor.accept(stream).await {
-                                    Ok(tls_stream) => {
+                                match tokio::time::timeout(
+                                    TLS_HANDSHAKE_TIMEOUT,
+                                    acceptor.accept(stream),
+                                )
+                                .await
+                                {
+                                    Ok(Ok(tls_stream)) => {
                                         handle_irc_connection(tls_stream, peer, engine, db).await;
                                     }
-                                    Err(e) => {
+                                    Ok(Err(e)) => {
                                         warn!(%peer, error = %e, "TLS handshake failed");
+                                    }
+                                    Err(_) => {
+                                        warn!(%peer, "TLS handshake timed out");
                                     }
                                 }
                                 decrement_ip_count(&ip_counts, ip);

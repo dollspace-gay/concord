@@ -54,9 +54,14 @@ pub async fn insert_sticker(
     Ok(())
 }
 
-pub async fn delete_sticker(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query("DELETE FROM stickers WHERE id = ?")
+pub async fn delete_sticker(
+    pool: &SqlitePool,
+    id: &str,
+    server_id: &str,
+) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM stickers WHERE id = ? AND server_id = ?")
         .bind(id)
+        .bind(server_id)
         .execute(pool)
         .await?;
     Ok(result.rows_affected() > 0)
@@ -187,13 +192,13 @@ mod tests {
         .await
         .unwrap();
 
-        let deleted = delete_sticker(&pool, "st1").await.unwrap();
+        let deleted = delete_sticker(&pool, "st1", "s1").await.unwrap();
         assert!(deleted);
 
         let stickers = list_stickers(&pool, "s1").await.unwrap();
         assert!(stickers.is_empty());
 
-        let deleted_again = delete_sticker(&pool, "st1").await.unwrap();
+        let deleted_again = delete_sticker(&pool, "st1", "s1").await.unwrap();
         assert!(!deleted_again);
     }
 

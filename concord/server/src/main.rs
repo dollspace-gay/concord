@@ -76,6 +76,7 @@ async fn main() {
     let engine = Arc::new(ChatEngine::new(
         Some(pool.clone()),
         config.storage.max_message_length,
+        config.storage.max_file_size_mb,
     ));
 
     // Load persisted servers and channels into memory
@@ -88,6 +89,17 @@ async fn main() {
         .load_channels_from_db()
         .await
         .expect("failed to load channels from database");
+
+    // Spawn background task to periodically clean up stale rate-limiter buckets
+    let engine_cleanup = engine.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
+        loop {
+            interval.tick().await;
+            engine_cleanup.cleanup_rate_limiter();
+            engine_cleanup.cleanup_slowmode_cache();
+        }
+    });
 
     // Cancellation token for graceful shutdown
     let cancel = CancellationToken::new();
@@ -144,6 +156,17 @@ async fn main() {
         atproto,
         max_file_size,
         max_message_length,
+        jwt_blocklist: concord_server::auth::token::JwtBlocklist::new(),
+    });
+
+    // Periodically clean up expired entries from the JWT revocation blocklist
+    let app_state_cleanup2 = app_state.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
+        loop {
+            interval.tick().await;
+            app_state_cleanup2.jwt_blocklist.cleanup();
+        }
     });
 
     let app = build_router(app_state);
@@ -159,16 +182,19 @@ async fn main() {
 
     // Serve with graceful shutdown on Ctrl+C
     let shutdown_cancel = cancel.clone();
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            tokio::signal::ctrl_c()
-                .await
-                .expect("failed to listen for Ctrl+C");
-            info!("Shutdown signal received, stopping gracefully...");
-            shutdown_cancel.cancel();
-        })
-        .await
-        .expect("server error");
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to listen for Ctrl+C");
+        info!("Shutdown signal received, stopping gracefully...");
+        shutdown_cancel.cancel();
+    })
+    .await
+    .expect("server error");
 
     info!("Concord server stopped");
 }

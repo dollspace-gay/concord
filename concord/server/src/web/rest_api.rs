@@ -109,6 +109,16 @@ where
             .await
             .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Database error"))?;
 
+        if user_tokens.is_empty() {
+            // Constant-time: always perform one argon2 verify even when no tokens exist
+            // to prevent timing side-channel that could enumerate valid bot user_ids.
+            let _ = verify_irc_token(
+                "dummy",
+                "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$invaliddummyhashvalue",
+            );
+            return Err((StatusCode::UNAUTHORIZED, "Invalid bot token"));
+        }
+
         let row = user_tokens
             .into_iter()
             .find(|t| verify_irc_token(token, &t.token_hash))
@@ -172,7 +182,13 @@ pub async fn get_channel_history(
 
     match state
         .engine
-        .fetch_history(&server_id, &channel, params.before.as_deref(), limit)
+        .fetch_history(
+            &server_id,
+            &channel,
+            params.before.as_deref(),
+            limit,
+            Some(&_auth.user_id),
+        )
         .await
     {
         Ok((messages, has_more)) => Json(HistoryResponse {
@@ -207,7 +223,7 @@ pub async fn get_channels(
 
 /// GET /api/servers — list the current user's servers.
 pub async fn list_servers(State(state): State<Arc<AppState>>, auth: AuthUser) -> impl IntoResponse {
-    Json(state.engine.list_servers_for_user(&auth.user_id))
+    Json(state.engine.list_servers_for_user(&auth.user_id).await)
 }
 
 #[derive(Deserialize)]
@@ -222,6 +238,24 @@ pub async fn create_server(
     auth: AuthUser,
     Json(body): Json<CreateServerRequest>,
 ) -> impl IntoResponse {
+    // Validate field lengths
+    if body.name.is_empty() || body.name.len() > 100 {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Server name must be between 1 and 100 characters",
+        )
+            .into_response();
+    }
+    if let Some(ref icon_url) = body.icon_url
+        && icon_url.len() > 2000
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Icon URL must be 2000 characters or less",
+        )
+            .into_response();
+    }
+
     match state
         .engine
         .create_server(body.name, auth.user_id, body.icon_url)
@@ -242,9 +276,16 @@ pub async fn create_server(
 /// GET /api/servers/:id — get server info.
 pub async fn get_server(
     State(state): State<Arc<AppState>>,
-    _auth: AuthUser,
+    auth: AuthUser,
     Path(server_id): Path<String>,
 ) -> impl IntoResponse {
+    let is_member = servers::is_server_member(&state.db, &server_id, &auth.user_id)
+        .await
+        .unwrap_or(false);
+    if !is_member {
+        return (StatusCode::FORBIDDEN, "Not a member of this server").into_response();
+    }
+
     match state
         .engine
         .list_all_servers()
@@ -274,19 +315,33 @@ pub async fn delete_server(
 /// GET /api/servers/:id/channels — list channels in a server.
 pub async fn list_server_channels(
     State(state): State<Arc<AppState>>,
-    _auth: AuthUser,
+    auth: AuthUser,
     Path(server_id): Path<String>,
 ) -> impl IntoResponse {
-    Json(state.engine.list_channels(&server_id))
+    let is_member = servers::is_server_member(&state.db, &server_id, &auth.user_id)
+        .await
+        .unwrap_or(false);
+    if !is_member {
+        return (StatusCode::FORBIDDEN, "Not a member of this server").into_response();
+    }
+
+    Json(state.engine.list_channels(&server_id)).into_response()
 }
 
 /// GET /api/servers/:id/channels/:name/messages — channel history within a server.
 pub async fn get_server_channel_history(
     State(state): State<Arc<AppState>>,
-    _auth: AuthUser,
+    auth: AuthUser,
     Path((server_id, channel_name)): Path<(String, String)>,
     Query(params): Query<HistoryParams>,
 ) -> impl IntoResponse {
+    let is_member = servers::is_server_member(&state.db, &server_id, &auth.user_id)
+        .await
+        .unwrap_or(false);
+    if !is_member {
+        return (StatusCode::FORBIDDEN, "Not a member of this server").into_response();
+    }
+
     let channel = if channel_name.starts_with('#') {
         channel_name
     } else {
@@ -297,7 +352,13 @@ pub async fn get_server_channel_history(
 
     match state
         .engine
-        .fetch_history(&server_id, &channel, params.before.as_deref(), limit)
+        .fetch_history(
+            &server_id,
+            &channel,
+            params.before.as_deref(),
+            limit,
+            Some(&auth.user_id),
+        )
         .await
     {
         Ok((messages, has_more)) => Json(HistoryResponse {
@@ -316,9 +377,16 @@ pub async fn get_server_channel_history(
 /// GET /api/servers/:id/members — list server members.
 pub async fn list_server_members(
     State(state): State<Arc<AppState>>,
-    _auth: AuthUser,
+    auth: AuthUser,
     Path(server_id): Path<String>,
 ) -> impl IntoResponse {
+    let is_member = servers::is_server_member(&state.db, &server_id, &auth.user_id)
+        .await
+        .unwrap_or(false);
+    if !is_member {
+        return (StatusCode::FORBIDDEN, "Not a member of this server").into_response();
+    }
+
     match servers::get_server_members(&state.db, &server_id).await {
         Ok(rows) => {
             let members: Vec<serde_json::Value> = rows
@@ -511,6 +579,23 @@ pub async fn create_irc_token(
     auth: AuthUser,
     Json(body): Json<CreateTokenRequest>,
 ) -> impl IntoResponse {
+    // Enforce per-user token limit (max 25 active tokens)
+    const MAX_TOKENS_PER_USER: usize = 25;
+    match users::list_irc_tokens(&state.db, &auth.user_id).await {
+        Ok(existing) if existing.len() >= MAX_TOKENS_PER_USER => {
+            return (
+                StatusCode::BAD_REQUEST,
+                "Maximum number of IRC tokens reached (25). Delete unused tokens first.",
+            )
+                .into_response();
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to check existing IRC tokens");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
+        }
+        _ => {}
+    }
+
     let token = generate_irc_token();
     let hash = match hash_irc_token(&token) {
         Ok(h) => h,
@@ -595,6 +680,37 @@ pub struct UploadResponse {
     pub url: String,
 }
 
+/// Check whether a Content-Type is allowed for file uploads.
+/// Rejects types that could execute scripts when rendered inline by a browser
+/// (e.g., text/html, application/javascript, SVG) and malformed MIME strings.
+fn is_allowed_upload_content_type(content_type: &str) -> bool {
+    // Must look like a MIME type (contains '/') and be reasonably short
+    if !content_type.contains('/') || content_type.len() > 255 {
+        return false;
+    }
+
+    // Blocklist: types that browsers may execute as active content
+    const BLOCKED: &[&str] = &[
+        "text/html",
+        "text/javascript",
+        "application/javascript",
+        "application/xhtml+xml",
+        "image/svg+xml",
+        "text/xml",
+        "application/xml",
+    ];
+
+    // Compare only the base type (strip parameters like "; charset=utf-8")
+    let base = content_type
+        .split(';')
+        .next()
+        .unwrap_or(content_type)
+        .trim()
+        .to_ascii_lowercase();
+
+    !BLOCKED.contains(&base.as_str())
+}
+
 /// POST /api/uploads — upload a file (multipart form data).
 pub async fn upload_file(
     State(state): State<Arc<AppState>>,
@@ -637,6 +753,11 @@ pub async fn upload_file(
     let Some((original_filename, content_type, bytes)) = file_data else {
         return (StatusCode::BAD_REQUEST, "No file field in upload").into_response();
     };
+
+    // Validate Content-Type: must look like a MIME type and not be on the blocklist.
+    if !is_allowed_upload_content_type(&content_type) {
+        return (StatusCode::BAD_REQUEST, "File type not allowed").into_response();
+    }
 
     let file_size = bytes.len() as i64;
     let attachment_id = Uuid::new_v4().to_string();
@@ -747,7 +868,7 @@ pub async fn get_upload(
     info!(attachment_id = %attachment_id, blob_url = %blob_url, "Proxying PDS blob");
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
-        .redirect(reqwest::redirect::Policy::none())
+        .redirect(reqwest::redirect::Policy::limited(5))
         .build()
         .unwrap_or_default();
     match client.get(blob_url.as_str()).send().await {
@@ -763,7 +884,17 @@ pub async fn get_upload(
             } else {
                 safe_filename
             };
-            let content_disposition = format!("inline; filename=\"{safe_filename}\"");
+            // Only allow inline rendering for safe media types to prevent stored XSS
+            // (e.g., a file with content_type: text/html containing <script> tags)
+            let is_safe_inline = attachment.content_type.starts_with("image/")
+                || attachment.content_type.starts_with("video/")
+                || attachment.content_type.starts_with("audio/")
+                || attachment.content_type == "application/pdf";
+            let content_disposition = if is_safe_inline {
+                format!("inline; filename=\"{safe_filename}\"")
+            } else {
+                format!("attachment; filename=\"{safe_filename}\"")
+            };
             let body = Body::from_stream(resp.bytes_stream());
             (
                 [
@@ -805,8 +936,16 @@ pub struct EmojiResponse {
 
 pub async fn list_server_emoji(
     State(state): State<Arc<AppState>>,
+    auth: AuthUser,
     Path(server_id): Path<String>,
 ) -> impl IntoResponse {
+    let is_member = servers::is_server_member(&state.db, &server_id, &auth.user_id)
+        .await
+        .unwrap_or(false);
+    if !is_member {
+        return (StatusCode::FORBIDDEN, "Not a member of this server").into_response();
+    }
+
     match emoji::list_emoji(&state.db, &server_id).await {
         Ok(rows) => {
             let list: Vec<EmojiResponse> = rows
@@ -909,7 +1048,7 @@ pub async fn delete_server_emoji(
         return resp.into_response();
     }
 
-    match emoji::delete_emoji(&state.db, &emoji_id).await {
+    match emoji::delete_emoji(&state.db, &emoji_id, &server_id).await {
         Ok(true) => StatusCode::NO_CONTENT.into_response(),
         Ok(false) => (StatusCode::NOT_FOUND, "Emoji not found").into_response(),
         Err(e) => {
@@ -970,6 +1109,35 @@ pub async fn update_profile(
     auth: AuthUser,
     Json(body): Json<UpdateProfileRequest>,
 ) -> impl IntoResponse {
+    // Validate field lengths
+    if let Some(ref bio) = body.bio
+        && bio.len() > 2000
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Bio must be 2000 characters or less",
+        )
+            .into_response();
+    }
+    if let Some(ref pronouns) = body.pronouns
+        && pronouns.len() > 100
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Pronouns must be 100 characters or less",
+        )
+            .into_response();
+    }
+    if let Some(ref banner_url) = body.banner_url
+        && banner_url.len() > 2000
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Banner URL must be 2000 characters or less",
+        )
+            .into_response();
+    }
+
     match profiles::upsert_profile(
         &state.db,
         &auth.user_id,
@@ -1001,9 +1169,21 @@ pub struct SearchParams {
 /// GET /api/search — search messages
 pub async fn search_messages(
     State(state): State<Arc<AppState>>,
-    _auth: AuthUser,
+    auth: AuthUser,
     Query(params): Query<SearchParams>,
 ) -> impl IntoResponse {
+    let is_member = servers::is_server_member(&state.db, &params.server_id, &auth.user_id)
+        .await
+        .unwrap_or(false);
+    if !is_member {
+        return (StatusCode::FORBIDDEN, "Not a member of this server").into_response();
+    }
+
+    let q_len = params.q.len();
+    if q_len == 0 || q_len > 200 {
+        return (StatusCode::BAD_REQUEST, "Query must be 1-200 characters").into_response();
+    }
+
     let limit = params.limit.unwrap_or(25).min(50);
     let offset = params.offset.unwrap_or(0);
 
@@ -1486,8 +1666,16 @@ pub async fn update_atproto_sync_setting(
 
 pub async fn list_server_stickers(
     State(state): State<Arc<AppState>>,
+    auth: AuthUser,
     Path(server_id): Path<String>,
 ) -> impl IntoResponse {
+    let is_member = servers::is_server_member(&state.db, &server_id, &auth.user_id)
+        .await
+        .unwrap_or(false);
+    if !is_member {
+        return (StatusCode::FORBIDDEN, "Not a member of this server").into_response();
+    }
+
     match stickers::list_stickers(&state.db, &server_id).await {
         Ok(rows) => {
             let result: Vec<serde_json::Value> = rows
@@ -1599,7 +1787,7 @@ pub async fn delete_server_sticker(
         return resp.into_response();
     }
 
-    match stickers::delete_sticker(&state.db, &sticker_id).await {
+    match stickers::delete_sticker(&state.db, &sticker_id, &server_id).await {
         Ok(true) => StatusCode::NO_CONTENT.into_response(),
         Ok(false) => (StatusCode::NOT_FOUND, "Sticker not found").into_response(),
         Err(e) => {
@@ -2091,5 +2279,57 @@ mod tests {
         };
         let json = serde_json::to_value(&resp).unwrap();
         assert_eq!(json["has_more"], true);
+    }
+
+    // ── Content-Type upload validation ──
+
+    #[test]
+    fn test_allowed_upload_content_types() {
+        assert!(is_allowed_upload_content_type("image/jpeg"));
+        assert!(is_allowed_upload_content_type("image/png"));
+        assert!(is_allowed_upload_content_type("image/gif"));
+        assert!(is_allowed_upload_content_type("image/webp"));
+        assert!(is_allowed_upload_content_type("video/mp4"));
+        assert!(is_allowed_upload_content_type("audio/mpeg"));
+        assert!(is_allowed_upload_content_type("application/pdf"));
+        assert!(is_allowed_upload_content_type("application/octet-stream"));
+        assert!(is_allowed_upload_content_type("text/plain"));
+        assert!(is_allowed_upload_content_type("text/css"));
+    }
+
+    #[test]
+    fn test_blocked_upload_content_types() {
+        assert!(!is_allowed_upload_content_type("text/html"));
+        assert!(!is_allowed_upload_content_type("text/javascript"));
+        assert!(!is_allowed_upload_content_type("application/javascript"));
+        assert!(!is_allowed_upload_content_type("application/xhtml+xml"));
+        assert!(!is_allowed_upload_content_type("image/svg+xml"));
+        assert!(!is_allowed_upload_content_type("text/xml"));
+        assert!(!is_allowed_upload_content_type("application/xml"));
+    }
+
+    #[test]
+    fn test_blocked_content_type_with_params() {
+        // Should still block even with charset parameters
+        assert!(!is_allowed_upload_content_type("text/html; charset=utf-8"));
+        assert!(!is_allowed_upload_content_type(
+            "application/javascript; charset=utf-8"
+        ));
+    }
+
+    #[test]
+    fn test_blocked_content_type_case_insensitive() {
+        assert!(!is_allowed_upload_content_type("Text/HTML"));
+        assert!(!is_allowed_upload_content_type("APPLICATION/JAVASCRIPT"));
+        assert!(!is_allowed_upload_content_type("Image/SVG+XML"));
+    }
+
+    #[test]
+    fn test_malformed_content_type_rejected() {
+        assert!(!is_allowed_upload_content_type("notamimetype"));
+        assert!(!is_allowed_upload_content_type(""));
+        // Excessively long content type
+        let long_type = format!("image/{}", "x".repeat(300));
+        assert!(!is_allowed_upload_content_type(&long_type));
     }
 }

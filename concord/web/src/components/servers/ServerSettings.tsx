@@ -8,7 +8,7 @@ import { uploadFile } from '../../api/client';
 const EMPTY_ROLES: RoleInfo[] = [];
 const EMPTY_CATEGORIES: CategoryInfo[] = [];
 const EMPTY_CHANNELS: ChannelInfo[] = [];
-const EMPTY_EMOJI: Record<string, string> = {};
+const EMPTY_EMOJI: Record<string, { id: string; image_url: string }> = {};
 const EMPTY_STICKERS: StickerInfo[] = [];
 
 type Tab = 'overview' | 'channels' | 'roles' | 'categories' | 'emoji' | 'stickers';
@@ -661,7 +661,7 @@ function EmojiTab({
   deleteEmoji,
 }: {
   serverId: string;
-  emoji: Record<string, string>;
+  emoji: Record<string, { id: string; image_url: string }>;
   createEmoji: (serverId: string, name: string, imageUrl: string) => Promise<void>;
   deleteEmoji: (serverId: string, emojiId: string) => Promise<void>;
 }) {
@@ -733,14 +733,14 @@ function EmojiTab({
 
       {/* Emoji list */}
       <div className="space-y-1">
-        {emojiEntries.map(([name, url]) => (
+        {emojiEntries.map(([name, emoji]) => (
           <div key={name} className="flex items-center justify-between rounded-md bg-bg-tertiary px-3 py-2">
             <div className="flex items-center gap-3">
-              <img src={url} alt={name} className="h-8 w-8 object-contain" />
+              <img src={emoji.image_url} alt={name} className="h-8 w-8 object-contain" />
               <span className="text-sm text-text-primary">:{name}:</span>
             </div>
             <button
-              onClick={() => deleteEmoji(serverId, name)}
+              onClick={() => deleteEmoji(serverId, emoji.id)}
               className="rounded px-2 py-1 text-xs text-bg-danger hover:bg-bg-danger/10"
             >
               Delete

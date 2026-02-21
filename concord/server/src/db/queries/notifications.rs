@@ -3,30 +3,64 @@ use sqlx::SqlitePool;
 use crate::db::models::{NotificationSettingRow, UpsertNotificationParams};
 
 /// Upsert a notification setting for a user (server-level or channel-level).
+///
+/// SQLite's UNIQUE constraint does not enforce uniqueness when any column is NULL
+/// (because NULL != NULL). For server-level settings (channel_id = NULL), we use a
+/// DELETE + INSERT pattern to prevent duplicate rows. For channel-level settings,
+/// ON CONFLICT works normally.
 pub async fn upsert_notification_setting(
     pool: &SqlitePool,
     params: &UpsertNotificationParams<'_>,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "INSERT INTO notification_settings (id, user_id, server_id, channel_id, level, \
-         suppress_everyone, suppress_roles, muted, mute_until, updated_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) \
-         ON CONFLICT(user_id, server_id, channel_id) DO UPDATE SET \
-         level = excluded.level, suppress_everyone = excluded.suppress_everyone, \
-         suppress_roles = excluded.suppress_roles, muted = excluded.muted, \
-         mute_until = excluded.mute_until, updated_at = datetime('now')",
-    )
-    .bind(params.id)
-    .bind(params.user_id)
-    .bind(params.server_id)
-    .bind(params.channel_id)
-    .bind(params.level)
-    .bind(params.suppress_everyone as i32)
-    .bind(params.suppress_roles as i32)
-    .bind(params.muted as i32)
-    .bind(params.mute_until)
-    .execute(pool)
-    .await?;
+    if params.channel_id.is_none() {
+        // Server-level setting: DELETE existing row first to avoid duplicates
+        sqlx::query(
+            "DELETE FROM notification_settings \
+             WHERE user_id = ? AND server_id = ? AND channel_id IS NULL",
+        )
+        .bind(params.user_id)
+        .bind(params.server_id)
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            "INSERT INTO notification_settings (id, user_id, server_id, channel_id, level, \
+             suppress_everyone, suppress_roles, muted, mute_until, updated_at) \
+             VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, datetime('now'))",
+        )
+        .bind(params.id)
+        .bind(params.user_id)
+        .bind(params.server_id)
+        .bind(params.level)
+        .bind(params.suppress_everyone as i32)
+        .bind(params.suppress_roles as i32)
+        .bind(params.muted as i32)
+        .bind(params.mute_until)
+        .execute(pool)
+        .await?;
+    } else {
+        // Channel-level setting: ON CONFLICT works because channel_id is non-NULL
+        sqlx::query(
+            "INSERT INTO notification_settings (id, user_id, server_id, channel_id, level, \
+             suppress_everyone, suppress_roles, muted, mute_until, updated_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) \
+             ON CONFLICT(user_id, server_id, channel_id) DO UPDATE SET \
+             level = excluded.level, suppress_everyone = excluded.suppress_everyone, \
+             suppress_roles = excluded.suppress_roles, muted = excluded.muted, \
+             mute_until = excluded.mute_until, updated_at = datetime('now')",
+        )
+        .bind(params.id)
+        .bind(params.user_id)
+        .bind(params.server_id)
+        .bind(params.channel_id)
+        .bind(params.level)
+        .bind(params.suppress_everyone as i32)
+        .bind(params.suppress_roles as i32)
+        .bind(params.muted as i32)
+        .bind(params.mute_until)
+        .execute(pool)
+        .await?;
+    }
     Ok(())
 }
 
@@ -112,12 +146,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_upsert_server_level_no_duplicates() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+
+        // Insert server-level setting (channel_id = NULL)
+        upsert_notification_setting(
+            &pool,
+            &UpsertNotificationParams {
+                id: "ns1",
+                user_id: "u1",
+                server_id: Some("s1"),
+                channel_id: None,
+                level: "all",
+                suppress_everyone: false,
+                suppress_roles: false,
+                muted: false,
+                mute_until: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        // Upsert again with different values — should replace, not duplicate
+        upsert_notification_setting(
+            &pool,
+            &UpsertNotificationParams {
+                id: "ns2",
+                user_id: "u1",
+                server_id: Some("s1"),
+                channel_id: None,
+                level: "none",
+                suppress_everyone: true,
+                suppress_roles: true,
+                muted: true,
+                mute_until: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        let settings = get_notification_settings(&pool, "u1", "s1").await.unwrap();
+        assert_eq!(
+            settings.len(),
+            1,
+            "Should have exactly 1 server-level row, not duplicates"
+        );
+        assert_eq!(settings[0].level, "none");
+        assert_eq!(settings[0].suppress_everyone, 1);
+        assert_eq!(settings[0].muted, 1);
+    }
+
+    #[tokio::test]
     async fn test_upsert_updates_existing() {
         let pool = setup_db().await;
         setup_server(&pool).await;
 
-        // Use a channel_id so the UNIQUE index can detect duplicates
-        // (SQLite treats NULL as distinct in UNIQUE constraints)
         crate::db::queries::channels::ensure_channel(&pool, "c1", "s1", "#general")
             .await
             .unwrap();

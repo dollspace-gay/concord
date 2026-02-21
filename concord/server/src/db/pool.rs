@@ -1,3 +1,4 @@
+use sqlx::Connection;
 use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use std::str::FromStr;
@@ -8,7 +9,8 @@ pub async fn create_pool(database_url: &str) -> Result<SqlitePool, sqlx::Error> 
     let options = SqliteConnectOptions::from_str(database_url)?
         .journal_mode(SqliteJournalMode::Wal)
         .synchronous(SqliteSynchronous::Normal)
-        .create_if_missing(true);
+        .create_if_missing(true)
+        .busy_timeout(std::time::Duration::from_secs(5));
 
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
@@ -127,6 +129,10 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             15,
             include_str!("../../migrations/015_premium_for_free.sql"),
         ),
+        (
+            16,
+            include_str!("../../migrations/016_fts_delete_trigger.sql"),
+        ),
     ];
 
     for &(version, sql) in migrations {
@@ -139,20 +145,32 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::query("PRAGMA foreign_keys = OFF")
             .execute(&mut *conn)
             .await?;
-        for statement in split_sql_statements(sql) {
-            if !statement.is_empty() {
-                sqlx::query(&statement).execute(&mut *conn).await?;
+        // Run the migration in an inner block so we can always re-enable
+        // foreign keys even if the migration fails.
+        let result: Result<(), sqlx::Error> = async {
+            // Wrap all migration statements + version recording in a transaction
+            // so a partial failure cannot leave the schema in an inconsistent state.
+            let mut tx = conn.begin().await?;
+            for statement in split_sql_statements(sql) {
+                if !statement.is_empty() {
+                    sqlx::query(&statement).execute(&mut *tx).await?;
+                }
             }
+            // Record the migration version inside the same transaction
+            sqlx::query("INSERT OR IGNORE INTO schema_version (version) VALUES (?)")
+                .bind(version)
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await?;
+            Ok(())
         }
+        .await;
+        // Always re-enable foreign keys, even if the migration failed
         sqlx::query("PRAGMA foreign_keys = ON")
             .execute(&mut *conn)
             .await?;
-        // Record the migration version (some older migrations do this themselves,
-        // but we always do it here to ensure it's tracked)
-        sqlx::query("INSERT OR IGNORE INTO schema_version (version) VALUES (?)")
-            .bind(version)
-            .execute(&mut *conn)
-            .await?;
+        // Now propagate any migration error
+        result?;
     }
 
     // Rebuild FTS index to fix any duplicates from prior migration re-runs
@@ -268,7 +286,7 @@ END;";
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count, 15);
+        assert_eq!(count, 16);
 
         // Running again should not duplicate (INSERT OR IGNORE)
         run_migrations(&pool).await.unwrap();
@@ -277,7 +295,7 @@ END;";
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count_after, 15, "No duplicate version rows after re-run");
+        assert_eq!(count_after, 16, "No duplicate version rows after re-run");
     }
 
     #[tokio::test]
@@ -329,7 +347,7 @@ END;";
                 .fetch_all(&pool)
                 .await
                 .unwrap();
-        let expected: Vec<i64> = (1..=15).collect();
+        let expected: Vec<i64> = (1..=16).collect();
         assert_eq!(
             versions, expected,
             "Migration versions should be 1 through 12"

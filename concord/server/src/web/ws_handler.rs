@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
@@ -526,10 +527,10 @@ pub async fn ws_upgrade(
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
     // Try cookie-based auth first
-    let (nickname, user_id) = if let Some(cookie) = jar.get("concord_session") {
+    let (nickname, user_id, avatar_url) = if let Some(cookie) = jar.get("concord_session") {
         if let Ok(claims) = validate_session_token(cookie.value(), &state.auth_config.jwt_secret) {
             match users::get_user(&state.db, &claims.sub).await {
-                Ok(Some((id, username, _email, _avatar))) => (username, Some(id)),
+                Ok(Some((id, username, _email, avatar))) => (username, Some(id), avatar),
                 _ => {
                     return (axum::http::StatusCode::UNAUTHORIZED, "User not found")
                         .into_response();
@@ -548,23 +549,6 @@ pub async fn ws_upgrade(
             "Not authenticated. Provide a valid session cookie.",
         )
             .into_response();
-    };
-
-    // Look up avatar_url from DB if authenticated via cookie
-    let avatar_url = if jar.get("concord_session").is_some() {
-        if let Ok(claims) = validate_session_token(
-            jar.get("concord_session").unwrap().value(),
-            &state.auth_config.jwt_secret,
-        ) {
-            match users::get_user(&state.db, &claims.sub).await {
-                Ok(Some((_id, _username, _email, avatar))) => avatar,
-                _ => None,
-            }
-        } else {
-            None
-        }
-    } else {
-        None
     };
 
     let engine = state.engine.clone();
@@ -609,17 +593,41 @@ async fn handle_ws_connection(
     });
 
     let engine_ref = engine.clone();
-    while let Some(msg_result) = ws_receiver.next().await {
-        let msg = match msg_result {
-            Ok(msg) => msg,
-            Err(e) => {
+    let mut ws_command_count: u32 = 0;
+    let mut ws_command_window_start = Instant::now();
+    const WS_COMMANDS_PER_SECOND: u32 = 30;
+
+    loop {
+        let msg = match tokio::time::timeout(std::time::Duration::from_secs(90), ws_receiver.next())
+            .await
+        {
+            Ok(Some(Ok(msg))) => msg,
+            Ok(Some(Err(e))) => {
                 warn!(error = %e, "WebSocket read error");
+                break;
+            }
+            Ok(None) => break, // Stream closed
+            Err(_) => {
+                info!(%session_id, %nickname, "WebSocket idle timeout, disconnecting");
                 break;
             }
         };
 
         match msg {
             Message::Text(text) => {
+                ws_command_count += 1;
+                if ws_command_window_start.elapsed() >= std::time::Duration::from_secs(1) {
+                    ws_command_count = 1;
+                    ws_command_window_start = Instant::now();
+                } else if ws_command_count > WS_COMMANDS_PER_SECOND {
+                    if let Some(session) = engine_ref.get_session(session_id) {
+                        let _ = session.send(ChatEvent::Error {
+                            code: "RATE_LIMITED".to_string(),
+                            message: "Rate limited: too many commands per second".to_string(),
+                        });
+                    }
+                    continue;
+                }
                 handle_client_message(&engine_ref, session_id, &text).await;
             }
             Message::Close(_) => break,
@@ -693,9 +701,18 @@ async fn handle_client_message(
             if !is_member {
                 Err("You are not a member of this server".into())
             } else {
-                let limit = limit.unwrap_or(50).min(200);
+                let user_id = engine
+                    .get_session(session_id)
+                    .and_then(|s| s.user_id.clone());
+                let limit = limit.unwrap_or(50).clamp(1, 200);
                 match engine
-                    .fetch_history(&server_id, &channel, before.as_deref(), limit)
+                    .fetch_history(
+                        &server_id,
+                        &channel,
+                        before.as_deref(),
+                        limit,
+                        user_id.as_deref(),
+                    )
                     .await
                 {
                     Ok((messages, has_more)) => {
@@ -767,7 +784,7 @@ async fn handle_client_message(
         ClientMessage::ListServers => {
             if let Some(session) = engine.get_session(session_id) {
                 let servers = if let Some(ref uid) = session.user_id {
-                    engine.list_servers_for_user(uid)
+                    engine.list_servers_for_user(uid).await
                 } else {
                     vec![] // unauthenticated sessions see no servers
                 };
@@ -791,7 +808,7 @@ async fn handle_client_message(
                     if let Some(session) = engine.get_session(session_id)
                         && let Some(ref uid) = session.user_id
                     {
-                        let servers = engine.list_servers_for_user(uid);
+                        let servers = engine.list_servers_for_user(uid).await;
                         let _ = session.send(ChatEvent::ServerList { servers });
                     }
                     Ok(())
@@ -815,7 +832,7 @@ async fn handle_client_message(
                     if let Some(session) = engine.get_session(session_id)
                         && let Some(ref uid) = session.user_id
                     {
-                        let servers = engine.list_servers_for_user(uid);
+                        let servers = engine.list_servers_for_user(uid).await;
                         let _ = session.send(ChatEvent::ServerList { servers });
                     }
                     Ok(())
@@ -839,7 +856,7 @@ async fn handle_client_message(
                     if let Some(session) = engine.get_session(session_id)
                         && let Some(ref uid) = session.user_id
                     {
-                        let servers = engine.list_servers_for_user(uid);
+                        let servers = engine.list_servers_for_user(uid).await;
                         let _ = session.send(ChatEvent::ServerList { servers });
                     }
                     Ok(())
@@ -926,7 +943,7 @@ async fn handle_client_message(
                     if let Some(session) = engine.get_session(session_id)
                         && let Some(ref uid) = session.user_id
                     {
-                        let servers = engine.list_servers_for_user(uid);
+                        let servers = engine.list_servers_for_user(uid).await;
                         let _ = session.send(ChatEvent::ServerList { servers });
                     }
                     Ok(())
@@ -953,7 +970,7 @@ async fn handle_client_message(
                             if let Some(session) = engine.get_session(session_id)
                                 && let Some(ref uid) = session.user_id
                             {
-                                let servers = engine.list_servers_for_user(uid);
+                                let servers = engine.list_servers_for_user(uid).await;
                                 let _ = session.send(ChatEvent::ServerList { servers });
                             }
                             Ok(())
@@ -1143,18 +1160,34 @@ async fn handle_client_message(
                     )
                     .await
                 {
-                    Ok(_) => match engine
-                        .update_role(&server_id, &role_id, &name, color.as_deref(), permissions)
-                        .await
-                    {
-                        Ok(role) => {
-                            if let Some(session) = engine.get_session(session_id) {
-                                let _ = session.send(ChatEvent::RoleUpdate { server_id, role });
-                            }
-                            Ok(())
+                    Ok(actor_uid) => {
+                        // Role hierarchy: can't edit roles at or above your own
+                        match engine
+                            .check_role_hierarchy(&server_id, &actor_uid, &role_id)
+                            .await
+                        {
+                            Err(e) => Err(e),
+                            Ok(()) => match engine
+                                .update_role(
+                                    &server_id,
+                                    &role_id,
+                                    &name,
+                                    color.as_deref(),
+                                    permissions,
+                                )
+                                .await
+                            {
+                                Ok(role) => {
+                                    if let Some(session) = engine.get_session(session_id) {
+                                        let _ =
+                                            session.send(ChatEvent::RoleUpdate { server_id, role });
+                                    }
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            },
                         }
-                        Err(e) => Err(e),
-                    },
+                    }
                     Err(e) => Err(e),
                 }
             }
@@ -1169,15 +1202,25 @@ async fn handle_client_message(
                 )
                 .await
             {
-                Ok(_) => match engine.delete_role(&server_id, &role_id).await {
-                    Ok(()) => {
-                        if let Some(session) = engine.get_session(session_id) {
-                            let _ = session.send(ChatEvent::RoleDelete { server_id, role_id });
-                        }
-                        Ok(())
+                Ok(actor_uid) => {
+                    // Role hierarchy: can't delete roles at or above your own
+                    match engine
+                        .check_role_hierarchy(&server_id, &actor_uid, &role_id)
+                        .await
+                    {
+                        Err(e) => Err(e),
+                        Ok(()) => match engine.delete_role(&server_id, &role_id).await {
+                            Ok(()) => {
+                                if let Some(session) = engine.get_session(session_id) {
+                                    let _ =
+                                        session.send(ChatEvent::RoleDelete { server_id, role_id });
+                                }
+                                Ok(())
+                            }
+                            Err(e) => Err(e),
+                        },
                     }
-                    Err(e) => Err(e),
-                },
+                }
                 Err(e) => Err(e),
             }
         }
@@ -1195,7 +1238,10 @@ async fn handle_client_message(
                 )
                 .await
             {
-                Ok(_) => match engine.assign_role(&server_id, &user_id, &role_id).await {
+                Ok(actor_uid) => match engine
+                    .assign_role(&server_id, &actor_uid, &user_id, &role_id)
+                    .await
+                {
                     Ok(role_ids) => {
                         if let Some(session) = engine.get_session(session_id) {
                             let _ = session.send(ChatEvent::MemberRoleUpdate {
@@ -1225,7 +1271,10 @@ async fn handle_client_message(
                 )
                 .await
             {
-                Ok(_) => match engine.remove_role(&server_id, &user_id, &role_id).await {
+                Ok(actor_uid) => match engine
+                    .remove_role(&server_id, &actor_uid, &user_id, &role_id)
+                    .await
+                {
                     Ok(role_ids) => {
                         if let Some(session) = engine.get_session(session_id) {
                             let _ = session.send(ChatEvent::MemberRoleUpdate {
@@ -1629,7 +1678,7 @@ async fn handle_client_message(
             limit,
             before,
         } => {
-            let limit = limit.unwrap_or(50);
+            let limit = limit.unwrap_or(50).clamp(1, 200);
             engine
                 .get_audit_log(
                     session_id,
@@ -2011,34 +2060,47 @@ async fn handle_client_message(
             server_id,
             avatar_url,
         } => {
-            let user_id = engine
-                .get_session_user_id(session_id)
-                .ok_or_else(|| "Not authenticated".to_string());
-            match user_id {
+            match engine
+                .require_permission(
+                    session_id,
+                    &server_id,
+                    None,
+                    crate::engine::permissions::Permissions::MANAGE_SERVER,
+                )
+                .await
+            {
                 Err(e) => Err(e),
-                Ok(user_id) => {
-                    let pool = engine.get_db().ok_or("No database".to_string());
-                    match pool {
+                Ok(_) => {
+                    let user_id = engine
+                        .get_session_user_id(session_id)
+                        .ok_or_else(|| "Not authenticated".to_string());
+                    match user_id {
                         Err(e) => Err(e),
-                        Ok(pool) => {
-                            match crate::db::queries::servers::set_server_avatar(
-                                &pool,
-                                &server_id,
-                                &user_id,
-                                avatar_url.as_deref(),
-                            )
-                            .await
-                            {
-                                Ok(()) => {
-                                    let event = ChatEvent::ServerAvatarUpdate {
-                                        server_id: server_id.clone(),
-                                        user_id,
-                                        avatar_url,
-                                    };
-                                    engine.broadcast_to_server(&server_id, &event);
-                                    Ok(())
+                        Ok(user_id) => {
+                            let pool = engine.get_db().ok_or("No database".to_string());
+                            match pool {
+                                Err(e) => Err(e),
+                                Ok(pool) => {
+                                    match crate::db::queries::servers::set_server_avatar(
+                                        &pool,
+                                        &server_id,
+                                        &user_id,
+                                        avatar_url.as_deref(),
+                                    )
+                                    .await
+                                    {
+                                        Ok(()) => {
+                                            let event = ChatEvent::ServerAvatarUpdate {
+                                                server_id: server_id.clone(),
+                                                user_id,
+                                                avatar_url,
+                                            };
+                                            engine.broadcast_to_server(&server_id, &event);
+                                            Ok(())
+                                        }
+                                        Err(e) => Err(format!("Failed to set server avatar: {e}")),
+                                    }
                                 }
-                                Err(e) => Err(format!("Failed to set server avatar: {e}")),
                             }
                         }
                     }
@@ -2092,7 +2154,7 @@ async fn handle_client_message(
             if let Some(session) = engine.get_session(session_id) {
                 let _ = session.send(ChatEvent::ServerLimits {
                     max_message_length: engine.max_message_length(),
-                    max_file_size_mb: 100,
+                    max_file_size_mb: engine.max_file_size_mb(),
                 });
             }
             Ok(())

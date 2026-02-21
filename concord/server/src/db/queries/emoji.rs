@@ -75,9 +75,14 @@ pub async fn list_emoji_for_user_servers(
     .await
 }
 
-pub async fn delete_emoji(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query("DELETE FROM custom_emoji WHERE id = ?")
+pub async fn delete_emoji(
+    pool: &SqlitePool,
+    id: &str,
+    server_id: &str,
+) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM custom_emoji WHERE id = ? AND server_id = ?")
         .bind(id)
+        .bind(server_id)
         .execute(pool)
         .await?;
     Ok(result.rows_affected() > 0)
@@ -187,13 +192,13 @@ mod tests {
         .await
         .unwrap();
 
-        let deleted = delete_emoji(&pool, "e1").await.unwrap();
+        let deleted = delete_emoji(&pool, "e1", "s1").await.unwrap();
         assert!(deleted);
 
         let emojis = list_emoji(&pool, "s1").await.unwrap();
         assert!(emojis.is_empty());
 
-        let deleted_again = delete_emoji(&pool, "e1").await.unwrap();
+        let deleted_again = delete_emoji(&pool, "e1", "s1").await.unwrap();
         assert!(!deleted_again);
     }
 

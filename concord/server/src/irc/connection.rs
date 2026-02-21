@@ -69,7 +69,8 @@ use crate::engine::chat_engine::{ChatEngine, DEFAULT_SERVER_ID};
 use crate::engine::events::{ChatEvent, SessionId};
 use crate::engine::user_session::Protocol;
 
-use super::commands::{self, to_irc_channel};
+use super::commands::{self, parse_irc_channel, to_irc_channel};
+use crate::engine::permissions::Permissions;
 use super::formatter;
 use super::parser::IrcMessage;
 
@@ -137,8 +138,9 @@ pub async fn handle_irc_connection<S>(
     let mut reader = BufReader::new(reader);
     let mut writer = writer;
 
-    // Channel for outbound lines (from event loop and command handlers)
-    let (out_tx, mut out_rx) = mpsc::unbounded_channel::<String>();
+    // Bounded channel for outbound lines — prevents unbounded memory growth
+    // if a slow client can't keep up. Messages are dropped via try_send.
+    let (out_tx, mut out_rx) = mpsc::channel::<String>(1024);
 
     // Spawn writer task
     let write_handle = tokio::spawn(async move {
@@ -218,12 +220,14 @@ pub async fn handle_irc_connection<S>(
                         }
 
                         // Async commands — need DB lookups or engine async methods
-                        if matches!(msg.command.as_str(), "KICK" | "AWAY" | "INVITE" | "WHOIS") {
+                        if matches!(msg.command.as_str(), "KICK" | "AWAY" | "INVITE" | "WHOIS" | "NAMES" | "WHO") {
                             let replies = match msg.command.as_str() {
                                 "KICK" => handle_kick(&engine, &db, *session_id, nick, &msg).await,
                                 "AWAY" => handle_away(&engine, *session_id, nick, &msg).await,
                                 "INVITE" => handle_invite(&engine, &db, *session_id, nick, &msg).await,
                                 "WHOIS" => handle_whois(&engine, &db, nick, &msg).await,
+                                "NAMES" => handle_names_async(&engine, nick, &msg).await,
+                                "WHO" => handle_who_async(&engine, nick, &msg).await,
                                 _ => unreachable!(),
                             };
                             for reply in replies {
@@ -458,7 +462,16 @@ pub async fn handle_irc_connection<S>(
                         }
                     }
                 } else {
-                    None
+                    // No PASS provided — reject anonymous connections
+                    send_line(
+                        &out_tx,
+                        &format!(
+                            ":{} 464 {} :You must provide a password (PASS) to connect. Generate an IRC token in the web UI.",
+                            formatter::server_name(),
+                            nick_val,
+                        ),
+                    );
+                    break;
                 };
 
                 // Try to register with the engine
@@ -560,7 +573,10 @@ async fn handle_kick(
         return vec![formatter::err_nosuchchannel(nick, target_channel)];
     }
 
-    let (server_id, _channel_name) = commands::parse_irc_channel(engine, target_channel);
+    let (server_id, channel_name) = commands::parse_irc_channel(engine, target_channel);
+
+    // Resolve channel name → channel_id for channel-scoped permission check
+    let channel_id = engine.resolve_channel_id(&server_id, &channel_name).ok();
 
     // Resolve target nickname → user_id via DB
     let target_user_id = match users::get_user_by_nickname(db, target_nick).await {
@@ -573,7 +589,13 @@ async fn handle_kick(
     };
 
     match engine
-        .kick_member(session_id, &server_id, &target_user_id, reason)
+        .kick_member_in_channel(
+            session_id,
+            &server_id,
+            &target_user_id,
+            reason,
+            channel_id.as_deref(),
+        )
         .await
     {
         Ok(()) => vec![],
@@ -717,6 +739,110 @@ async fn handle_whois(
 
     lines.push(formatter::rpl_endofwhois(nick, target));
     lines
+}
+
+/// Determine the IRC prefix character (@, +, or none) for a user in a server.
+/// @ = operator (MANAGE_CHANNELS, KICK_MEMBERS, BAN_MEMBERS, or ADMINISTRATOR)
+/// + = voice (MANAGE_MESSAGES but not operator-level)
+async fn irc_prefix_for_user(engine: &ChatEngine, server_id: &str, user_id: &str) -> &'static str {
+    let perms = engine.get_effective_permissions(server_id, None, user_id).await;
+    if perms.contains(Permissions::ADMINISTRATOR)
+        || perms.contains(Permissions::MANAGE_CHANNELS)
+        || perms.contains(Permissions::KICK_MEMBERS)
+        || perms.contains(Permissions::BAN_MEMBERS)
+    {
+        "@"
+    } else if perms.contains(Permissions::MANAGE_MESSAGES) {
+        "+"
+    } else {
+        ""
+    }
+}
+
+/// Handle IRC NAMES command with role-based prefixes (@/+).
+async fn handle_names_async(
+    engine: &ChatEngine,
+    nick: &str,
+    msg: &IrcMessage,
+) -> Vec<String> {
+    let Some(channel_param) = msg.params.first() else {
+        return vec![formatter::err_needmoreparams(nick, "NAMES")];
+    };
+
+    let (server_id, channel_name) = parse_irc_channel(engine, channel_param);
+    let irc_channel = to_irc_channel(engine, &server_id, &channel_name);
+
+    match engine.get_members(&server_id, &channel_name) {
+        Ok(member_infos) => {
+            let mut nicks = Vec::with_capacity(member_infos.len());
+            for m in &member_infos {
+                let uid = m.user_id.as_deref().unwrap_or("");
+                let prefix = irc_prefix_for_user(engine, &server_id, uid).await;
+                nicks.push(format!("{prefix}{}", m.nickname));
+            }
+            vec![
+                formatter::rpl_namreply(nick, &irc_channel, &nicks),
+                formatter::rpl_endofnames(nick, &irc_channel),
+            ]
+        }
+        Err(_) => vec![formatter::rpl_endofnames(nick, &irc_channel)],
+    }
+}
+
+/// Handle IRC WHO command with role-based prefixes (@/+).
+async fn handle_who_async(
+    engine: &ChatEngine,
+    nick: &str,
+    msg: &IrcMessage,
+) -> Vec<String> {
+    let Some(target) = msg.params.first() else {
+        return vec![formatter::err_needmoreparams(nick, "WHO")];
+    };
+
+    let mut replies = Vec::new();
+
+    if target.starts_with('#') {
+        let (server_id, channel_name) = parse_irc_channel(engine, target);
+        let irc_channel = to_irc_channel(engine, &server_id, &channel_name);
+
+        if let Ok(members) = engine.get_members(&server_id, &channel_name) {
+            for member in &members {
+                let uid = member.user_id.as_deref().unwrap_or("");
+                let prefix = irc_prefix_for_user(engine, &server_id, uid).await;
+                // RFC 2812: 352 <requestor> <channel> <user> <host> <server> <nick> <H|G>[*][@|+] :<hopcount> <realname>
+                replies.push(format!(
+                    ":{} {} {} {} {} {} {} {} H{prefix} :0 {}",
+                    formatter::server_name(),
+                    super::numerics::RPL_WHOREPLY,
+                    nick,
+                    irc_channel,
+                    member.nickname,          // user (ident)
+                    formatter::server_name(), // host
+                    formatter::server_name(), // server
+                    member.nickname,          // nick
+                    member.nickname,          // realname
+                ));
+            }
+        }
+
+        replies.push(format!(
+            ":{} {} {} {} :End of /WHO list",
+            formatter::server_name(),
+            super::numerics::RPL_ENDOFWHO,
+            nick,
+            irc_channel,
+        ));
+    } else {
+        replies.push(format!(
+            ":{} {} {} {} :End of /WHO list",
+            formatter::server_name(),
+            super::numerics::RPL_ENDOFWHO,
+            nick,
+            target,
+        ));
+    }
+
+    replies
 }
 
 /// Build an IRCv3 tag prefix string based on event metadata and negotiated caps.
@@ -1083,8 +1209,8 @@ fn event_to_irc_lines_inner(engine: &ChatEngine, my_nick: &str, event: &ChatEven
     }
 }
 
-fn send_line(tx: &mpsc::UnboundedSender<String>, line: &str) {
-    let _ = tx.send(line.to_string());
+fn send_line(tx: &mpsc::Sender<String>, line: &str) {
+    let _ = tx.try_send(line.to_string());
 }
 
 #[cfg(test)]
@@ -1097,7 +1223,7 @@ mod tests {
 
     /// Create a minimal ChatEngine with no database for unit tests.
     fn test_engine() -> Arc<ChatEngine> {
-        Arc::new(ChatEngine::new(None, 4000))
+        Arc::new(ChatEngine::new(None, 4000, 100))
     }
 
     /// Test helper — calls the inner (tag-free) event formatter.
@@ -1788,7 +1914,7 @@ mod tests {
 
     #[test]
     fn test_send_line_sends_to_channel() {
-        let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+        let (tx, mut rx) = mpsc::channel::<String>(1024);
         send_line(&tx, "PRIVMSG #test :Hello");
         let received = rx.try_recv().unwrap();
         assert_eq!(received, "PRIVMSG #test :Hello");
@@ -1796,7 +1922,7 @@ mod tests {
 
     #[test]
     fn test_send_line_closed_channel_does_not_panic() {
-        let (tx, rx) = mpsc::unbounded_channel::<String>();
+        let (tx, rx) = mpsc::channel::<String>(1024);
         drop(rx); // Close the receiver
         // Should not panic
         send_line(&tx, "PRIVMSG #test :Hello");

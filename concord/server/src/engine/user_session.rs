@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use chrono::{DateTime, Utc};
 use tokio::sync::mpsc;
 
@@ -26,8 +24,6 @@ pub struct UserSession {
     pub protocol: Protocol,
     /// Send outbound events to this session's write loop (bounded to prevent memory exhaustion).
     pub outbound: mpsc::Sender<ChatEvent>,
-    /// Channels this session is currently in.
-    pub channels: HashSet<String>,
     pub connected_at: DateTime<Utc>,
     /// Avatar URL (from Bluesky profile or other source).
     pub avatar_url: Option<String>,
@@ -48,7 +44,6 @@ impl UserSession {
             nickname,
             protocol,
             outbound,
-            channels: HashSet::new(),
             connected_at: Utc::now(),
             avatar_url,
         }

@@ -1,3 +1,4 @@
+import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
 import { ServerList } from '../servers/ServerList';
 import { ChannelList } from '../channels/ChannelList';
@@ -36,6 +37,7 @@ export function AppLayout() {
   const showIntegrationsPanel = useUiStore((s) => s.showIntegrationsPanel);
   const setShowIntegrationsPanel = useUiStore((s) => s.setShowIntegrationsPanel);
   const activeServer = useUiStore((s) => s.activeServer);
+  const errorToast = useChatStore((s) => s.errorToast);
 
   return (
     <div className="flex h-full">
@@ -173,6 +175,13 @@ export function AppLayout() {
 
       {/* User profile modal */}
       <UserProfileModal />
+
+      {/* Error toast */}
+      {errorToast && (
+        <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-red-600 px-4 py-2 text-sm text-white shadow-lg">
+          {errorToast}
+        </div>
+      )}
     </div>
   );
 }

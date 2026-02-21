@@ -134,6 +134,22 @@ pub async fn get_server_member(
     .await
 }
 
+/// Check if a user is a member of a server.
+pub async fn is_server_member(
+    pool: &SqlitePool,
+    server_id: &str,
+    user_id: &str,
+) -> Result<bool, sqlx::Error> {
+    let row = sqlx::query_scalar::<_, i32>(
+        "SELECT 1 FROM server_members WHERE server_id = ? AND user_id = ?",
+    )
+    .bind(server_id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.is_some())
+}
+
 /// Get all members of a server.
 pub async fn get_server_members(
     pool: &SqlitePool,

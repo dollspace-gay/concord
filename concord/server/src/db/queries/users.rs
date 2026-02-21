@@ -30,16 +30,19 @@ pub async fn find_by_oauth(
 }
 
 /// Create a new user and link an OAuth account.
+/// All inserts are wrapped in a transaction so a partial failure cannot leave orphaned rows.
 pub async fn create_with_oauth(
     pool: &SqlitePool,
     params: &CreateOAuthUser<'_>,
 ) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
     sqlx::query("INSERT INTO users (id, username, email, avatar_url) VALUES (?, ?, ?, ?)")
         .bind(params.user_id)
         .bind(params.username)
         .bind(params.email)
         .bind(params.avatar_url)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
 
     sqlx::query(
@@ -49,7 +52,7 @@ pub async fn create_with_oauth(
     .bind(params.user_id)
     .bind(params.provider)
     .bind(params.provider_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
 
     // Register primary nickname
@@ -58,9 +61,10 @@ pub async fn create_with_oauth(
     )
     .bind(params.user_id)
     .bind(params.username)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
 
+    tx.commit().await?;
     Ok(())
 }
 
@@ -258,22 +262,27 @@ pub async fn get_atproto_credentials(
 }
 
 /// Update a user's username (e.g., when their Bluesky handle changes on re-login).
+/// Both updates are wrapped in a transaction to prevent partial state.
 pub async fn update_username(
     pool: &SqlitePool,
     user_id: &str,
     new_username: &str,
 ) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
     sqlx::query("UPDATE users SET username = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(new_username)
         .bind(user_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     // Update primary nickname to match
     sqlx::query("UPDATE user_nicknames SET nickname = ? WHERE user_id = ? AND is_primary = 1")
         .bind(new_username)
         .bind(user_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+
+    tx.commit().await?;
     Ok(())
 }
 

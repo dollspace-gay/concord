@@ -8,16 +8,47 @@ pub struct AuthConfig {
 
 impl AuthConfig {
     /// Load auth config from environment variables.
+    ///
+    /// In production, `JWT_SECRET` must be set. In development (PUBLIC_URL
+    /// pointing at localhost), a random secret is generated if not provided.
     pub fn from_env() -> Self {
+        let public_url =
+            std::env::var("PUBLIC_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+        let is_dev = public_url.starts_with("http://localhost")
+            || public_url.starts_with("http://127.0.0.1");
+
+        let jwt_secret = match std::env::var("JWT_SECRET") {
+            Ok(s) if !s.is_empty() => s,
+            _ if is_dev => {
+                use std::collections::hash_map::DefaultHasher;
+                use std::hash::{Hash, Hasher};
+                // Generate a per-process random-ish secret for dev
+                let mut h = DefaultHasher::new();
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos()
+                    .hash(&mut h);
+                std::process::id().hash(&mut h);
+                format!("dev-auto-{:x}", h.finish())
+            }
+            _ => {
+                eprintln!(
+                    "FATAL: JWT_SECRET environment variable is required in production.\n\
+                     Set JWT_SECRET to a strong random string (e.g., `openssl rand -hex 32`).\n\
+                     For local development, use PUBLIC_URL=http://localhost:8080 to auto-generate."
+                );
+                std::process::exit(1);
+            }
+        };
+
         Self {
-            jwt_secret: std::env::var("JWT_SECRET")
-                .unwrap_or_else(|_| "concord-dev-secret-change-me".to_string()),
+            jwt_secret,
             session_expiry_hours: std::env::var("SESSION_EXPIRY_HOURS")
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(720), // 30 days
-            public_url: std::env::var("PUBLIC_URL")
-                .unwrap_or_else(|_| "http://localhost:8080".to_string()),
+            public_url,
         }
     }
 }
@@ -61,7 +92,12 @@ mod tests {
     fn test_defaults_when_no_env_vars() {
         with_env(&[], || {
             let config = AuthConfig::from_env();
-            assert_eq!(config.jwt_secret, "concord-dev-secret-change-me");
+            // In dev mode (localhost), a random secret is auto-generated
+            assert!(
+                config.jwt_secret.starts_with("dev-auto-"),
+                "Dev mode should auto-generate a secret, got: {}",
+                config.jwt_secret
+            );
             assert_eq!(config.session_expiry_hours, 720);
             assert_eq!(config.public_url, "http://localhost:8080");
         });
@@ -93,15 +129,21 @@ mod tests {
 
     #[test]
     fn test_public_url_from_env() {
-        with_env(&[("PUBLIC_URL", "https://chat.example.com")], || {
-            let config = AuthConfig::from_env();
-            assert_eq!(config.public_url, "https://chat.example.com");
-        });
+        with_env(
+            &[
+                ("PUBLIC_URL", "https://chat.example.com"),
+                ("JWT_SECRET", "test-secret-for-prod-url"),
+            ],
+            || {
+                let config = AuthConfig::from_env();
+                assert_eq!(config.public_url, "https://chat.example.com");
+            },
+        );
     }
 
     #[test]
     fn test_auth_config_clone() {
-        with_env(&[], || {
+        with_env(&[("JWT_SECRET", "clone-test-secret")], || {
             let config = AuthConfig::from_env();
             let cloned = config.clone();
             assert_eq!(cloned.jwt_secret, config.jwt_secret);

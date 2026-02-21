@@ -23,6 +23,7 @@ export function MessageList() {
   const loadServerEmoji = useChatStore((s) => s.loadServerEmoji);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const prevLengthRef = useRef(0);
+  const isFetchingRef = useRef(false);
 
   // Load custom emoji when active server changes
   useEffect(() => {
@@ -41,15 +42,18 @@ export function MessageList() {
       }
     }
     prevLengthRef.current = messages.length;
+    // Reset fetch guard when messages change (history response arrived)
+    isFetchingRef.current = false;
   }, [messages.length]);
 
-  const handleLoadMore = () => {
-    if (!activeServer || !activeChannel || !hasMore || messages.length === 0) return;
+  const handleLoadMore = useCallback(() => {
+    if (isFetchingRef.current || !activeServer || !activeChannel || !hasMore || messages.length === 0) return;
     const oldest = messages[0];
     if (oldest) {
+      isFetchingRef.current = true;
       fetchHistory(activeServer, activeChannel, oldest.id);
     }
-  };
+  }, [activeServer, activeChannel, hasMore, messages, fetchHistory]);
 
   if (!activeChannel) {
     return (
@@ -108,7 +112,7 @@ function TypingIndicator({ users }: { users: string[] }) {
 }
 
 function MessageItem({ message }: { message: HistoryMessage }) {
-  const avatars = useChatStore((s) => s.avatars);
+  const avatarUrl = useChatStore((s) => s.avatars[message.from]);
   const nickname = useChatStore((s) => s.nickname);
   const editMessage = useChatStore((s) => s.editMessage);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
@@ -120,7 +124,6 @@ function MessageItem({ message }: { message: HistoryMessage }) {
   const shareToBlueskyAction = useChatStore((s) => s.shareToBluesky);
   const activeServer = useUiStore((s) => s.activeServer);
   const activeChannel = useUiStore((s) => s.activeChannel);
-  const avatarUrl = avatars[message.from];
   const time = new Date(message.timestamp);
   const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const [showPopup, setShowPopup] = useState(false);

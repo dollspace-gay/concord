@@ -260,18 +260,19 @@ pub async fn fetch_channel_history(
 }
 
 /// Get the timestamp of the last message sent by a user in a channel (for slow mode enforcement).
+/// Uses `sender_id` (permanent user DID) instead of nickname to prevent bypass via handle changes.
 pub async fn get_last_user_message_time(
     pool: &SqlitePool,
     channel_id: &str,
-    sender_nick: &str,
+    sender_id: &str,
 ) -> Result<Option<String>, sqlx::Error> {
     let result: Option<(String,)> = sqlx::query_as(
         "SELECT created_at FROM messages \
-         WHERE channel_id = ? AND sender_nick = ? AND deleted_at IS NULL \
+         WHERE channel_id = ? AND sender_id = ? AND deleted_at IS NULL \
          ORDER BY created_at DESC LIMIT 1",
     )
     .bind(channel_id)
-    .bind(sender_nick)
+    .bind(sender_id)
     .fetch_optional(pool)
     .await?;
     Ok(result.map(|r| r.0))

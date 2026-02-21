@@ -59,9 +59,9 @@ pub fn handle_command(
         "PART" => handle_part(engine, session_id, nick, msg),
         "PRIVMSG" => handle_privmsg(engine, session_id, nick, msg),
         "TOPIC" => handle_topic(engine, session_id, nick, msg),
-        "NAMES" => handle_names(engine, nick, msg),
+        "NAMES" => vec![], // Handled async in connection.rs
         "LIST" => handle_list(engine, nick, msg),
-        "WHO" => handle_who(engine, nick, msg),
+        "WHO" => vec![],   // Handled async in connection.rs
         "WHOIS" => vec![], // Handled async in connection.rs
         "QUIT" => vec![],  // Handled at connection level
         "PING" => {
@@ -83,14 +83,15 @@ pub fn handle_command(
         "MODE" => {
             if let Some(target) = msg.params.first() {
                 if target.starts_with('#') {
-                    // Translate channel name for display
                     let (server_id, channel_name) = parse_irc_channel(engine, target);
                     let irc_channel = to_irc_channel(engine, &server_id, &channel_name);
+                    let modes = engine.get_channel_modes(&server_id, &channel_name);
                     vec![format!(
-                        ":{} 324 {} {} +",
+                        ":{} 324 {} {} {}",
                         formatter::server_name(),
                         nick,
-                        irc_channel
+                        irc_channel,
+                        modes
                     )]
                 } else {
                     vec![format!(":{} 221 {} +", formatter::server_name(), nick)]
@@ -345,26 +346,6 @@ fn handle_topic(
     }
 }
 
-fn handle_names(engine: &ChatEngine, nick: &str, msg: &IrcMessage) -> Vec<String> {
-    let Some(channel_param) = msg.params.first() else {
-        return vec![formatter::err_needmoreparams(nick, "NAMES")];
-    };
-
-    let (server_id, channel_name) = parse_irc_channel(engine, channel_param);
-    let irc_channel = to_irc_channel(engine, &server_id, &channel_name);
-
-    match engine.get_members(&server_id, &channel_name) {
-        Ok(member_infos) => {
-            let nicks: Vec<String> = member_infos.iter().map(|m| m.nickname.clone()).collect();
-            vec![
-                formatter::rpl_namreply(nick, &irc_channel, &nicks),
-                formatter::rpl_endofnames(nick, &irc_channel),
-            ]
-        }
-        Err(_) => vec![formatter::rpl_endofnames(nick, &irc_channel)],
-    }
-}
-
 fn handle_list(engine: &ChatEngine, nick: &str, msg: &IrcMessage) -> Vec<String> {
     // LIST with no args: show default server channels
     // LIST #server-name/* : show channels for a specific server
@@ -401,50 +382,3 @@ fn handle_list(engine: &ChatEngine, nick: &str, msg: &IrcMessage) -> Vec<String>
     replies
 }
 
-fn handle_who(engine: &ChatEngine, nick: &str, msg: &IrcMessage) -> Vec<String> {
-    let Some(target) = msg.params.first() else {
-        return vec![formatter::err_needmoreparams(nick, "WHO")];
-    };
-
-    let mut replies = Vec::new();
-
-    if target.starts_with('#') {
-        let (server_id, channel_name) = parse_irc_channel(engine, target);
-        let irc_channel = to_irc_channel(engine, &server_id, &channel_name);
-
-        if let Ok(members) = engine.get_members(&server_id, &channel_name) {
-            for member in &members {
-                replies.push(format!(
-                    ":{} {} {} {} {} {} {} {} H :0 {}",
-                    formatter::server_name(),
-                    super::numerics::RPL_WHOREPLY,
-                    nick,
-                    irc_channel,
-                    member.nickname,
-                    formatter::server_name(),
-                    formatter::server_name(),
-                    member.nickname,
-                    member.nickname,
-                ));
-            }
-        }
-
-        replies.push(format!(
-            ":{} {} {} {} :End of /WHO list",
-            formatter::server_name(),
-            super::numerics::RPL_ENDOFWHO,
-            nick,
-            irc_channel,
-        ));
-    } else {
-        replies.push(format!(
-            ":{} {} {} {} :End of /WHO list",
-            formatter::server_name(),
-            super::numerics::RPL_ENDOFWHO,
-            nick,
-            target,
-        ));
-    }
-
-    replies
-}

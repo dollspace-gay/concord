@@ -133,6 +133,17 @@ pub async fn list_channel_follows(
     .await
 }
 
+/// Get a channel follow by ID.
+pub async fn get_channel_follow(
+    pool: &SqlitePool,
+    follow_id: &str,
+) -> Result<Option<ChannelFollowRow>, sqlx::Error> {
+    sqlx::query_as::<_, ChannelFollowRow>("SELECT * FROM channel_follows WHERE id = ?")
+        .bind(follow_id)
+        .fetch_optional(pool)
+        .await
+}
+
 /// Delete a channel follow.
 pub async fn delete_channel_follow(pool: &SqlitePool, follow_id: &str) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM channel_follows WHERE id = ?")

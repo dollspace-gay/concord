@@ -3,18 +3,39 @@ use std::sync::Arc;
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::http::HeaderValue;
+use axum::middleware::Next;
+use axum::response::Response;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
 use super::app_state::AppState;
-use super::rate_limit::{ApiRateLimiters, api_rate_limit, auth_rate_limit, ws_rate_limit};
+use super::rate_limit::{
+    ApiRateLimiters, api_rate_limit, auth_rate_limit, webhook_rate_limit, ws_rate_limit,
+};
 use super::{atproto, oauth, rest_api, ws_handler};
+
+/// Middleware that adds security response headers to every response.
+async fn security_headers(req: axum::extract::Request, next: Next) -> Response {
+    let mut resp = next.run(req).await;
+    let headers = resp.headers_mut();
+    headers.insert("x-content-type-options", "nosniff".parse().unwrap());
+    headers.insert("x-frame-options", "DENY".parse().unwrap());
+    headers.insert(
+        "referrer-policy",
+        "strict-origin-when-cross-origin".parse().unwrap(),
+    );
+    resp
+}
 
 /// Build the axum router with all HTTP and WebSocket routes.
 pub fn build_router(state: Arc<AppState>) -> Router {
     // Restrict CORS to the configured public_url origin (or allow any for localhost dev)
     let public_url = &state.auth_config.public_url;
-    let cors = if public_url.contains("localhost") || public_url.contains("127.0.0.1") {
+    let is_dev = public_url.starts_with("http://localhost")
+        || public_url.starts_with("http://127.0.0.1")
+        || public_url.starts_with("https://localhost")
+        || public_url.starts_with("https://127.0.0.1");
+    let cors = if is_dev {
         CorsLayer::new()
             .allow_origin(Any)
             .allow_methods(Any)
@@ -158,11 +179,6 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/api/discover",
             axum::routing::get(rest_api::discover_servers),
         )
-        // Webhook incoming execution (public, token in URL)
-        .route(
-            "/api/webhooks/{id}/{token}",
-            axum::routing::post(rest_api::execute_webhook),
-        )
         // Bluesky / AT Protocol integration
         .route(
             "/api/bluesky/sync-profile",
@@ -209,12 +225,22 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         .layer(axum::middleware::from_fn(api_rate_limit));
 
+    // Webhook execution — dedicated tighter rate limit (argon2 token verification is CPU-expensive)
+    let webhook_routes = Router::new()
+        .route(
+            "/api/webhooks/{id}/{token}",
+            axum::routing::post(rest_api::execute_webhook),
+        )
+        .layer(axum::middleware::from_fn(webhook_rate_limit));
+
     Router::new()
         .merge(ws_routes)
         .merge(auth_routes)
+        .merge(webhook_routes)
         .merge(api_routes)
         // Static files with SPA fallback — unmatched routes serve index.html
         .fallback_service(ServeDir::new("static").fallback(ServeFile::new("static/index.html")))
+        .layer(axum::middleware::from_fn(security_headers))
         .layer(cors)
         // Inject rate limiters into all request extensions
         .layer(axum::Extension(rate_limiters))

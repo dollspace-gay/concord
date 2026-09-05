@@ -1,11 +1,12 @@
 {
-  "next_display_id": 5,
+  "next_display_id": 6,
   "next_comment_id": 2,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
     "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981": 1,
-    "822ad84b-9eb1-4bd6-800e-d603bde6468a": 3
+    "822ad84b-9eb1-4bd6-800e-d603bde6468a": 3,
+    "a6aa4117-4a65-44a5-814a-48f3d82a9089": 5
   },
   "locks": {
     "1": {
@@ -83,12 +84,24 @@
       "labels": [
         "feature"
       ]
+    },
+    "a6aa4117-4a65-44a5-814a-48f3d82a9089": {
+      "uuid": "a6aa4117-4a65-44a5-814a-48f3d82a9089",
+      "display_id": 5,
+      "title": "S2 durable credential and identity authority",
+      "description": "Implement R01/R07/R12 authentication foundation and M2: durable recorded JWT issuance/revocation; shared HTTP WS IRC bot credential validation and scope identity; active expiry/revocation; indexed bounded hashing; stable IDs; encrypted external credentials; origin CSRF and OAuth state identity checks; validated config/bootstrap. Integrate existing real routes and fault/restart tests. G01/G12 remain broad until full integrations.",
+      "status": "open",
+      "priority": "medium",
+      "parent_uuid": "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981",
+      "created_by": "sooH",
+      "created_at": "2026-09-05T23:59:06.171796194Z",
+      "updated_at": "2026-09-05T23:59:06.171796194Z"
     }
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-05T23:57:13.045778206Z",
+    "timestamp": "2026-09-05T23:59:06.171796194Z",
     "agent_id": "sooH",
-    "agent_seq": 10
+    "agent_seq": 11
   }
 }

@@ -1,13 +1,27 @@
 {
-  "next_display_id": 1,
+  "next_display_id": 2,
   "next_comment_id": 1,
-  "display_id_map": {},
+  "display_id_map": {
+    "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981": 1
+  },
   "locks": {},
-  "issues": {},
+  "issues": {
+    "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981": {
+      "uuid": "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981",
+      "display_id": 1,
+      "title": "Implement full Concord remediation design",
+      "description": "Complete all coding in .design/concord-remediation.md using GPT-5.6 Sol implementation agents, then Daybreak Blue security review and Carmilla correctness review. Preserve all R01-R24, G01-G24, F01-F26 and S0-S9 scope; record partial evidence honestly.",
+      "status": "open",
+      "priority": "high",
+      "created_by": "sooH",
+      "created_at": "2026-09-05T23:54:17.412118203Z",
+      "updated_at": "2026-09-05T23:54:17.412118203Z"
+    }
+  },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "1970-01-01T00:00:00Z",
-    "agent_id": "hub-v3-genesis",
-    "agent_seq": 0
+    "timestamp": "2026-09-05T23:54:17.412118203Z",
+    "agent_id": "sooH",
+    "agent_seq": 1
   }
 }

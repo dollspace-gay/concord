@@ -52,13 +52,16 @@
       "parent_uuid": "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981",
       "created_by": "sooH",
       "created_at": "2026-09-05T23:54:42.889192130Z",
-      "updated_at": "2026-09-05T23:54:42.889192130Z"
+      "updated_at": "2026-09-05T23:54:46.147936419Z",
+      "labels": [
+        "feature"
+      ]
     }
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-05T23:54:42.889192130Z",
+    "timestamp": "2026-09-05T23:54:46.147936419Z",
     "agent_id": "sooH",
-    "agent_seq": 6
+    "agent_seq": 7
   }
 }

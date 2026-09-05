@@ -1,6 +1,6 @@
 {
   "next_display_id": 5,
-  "next_comment_id": 1,
+  "next_comment_id": 2,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
@@ -53,10 +53,21 @@
       "priority": "high",
       "created_by": "sooH",
       "created_at": "2026-09-05T23:54:17.412118203Z",
-      "updated_at": "2026-09-05T23:54:20.641403668Z",
+      "updated_at": "2026-09-05T23:57:13.045778206Z",
       "labels": [
         "feature"
-      ]
+      ],
+      "comments": {
+        "ae619f8b-ee3e-4114-a577-63fd483007d5": {
+          "display_id": 1,
+          "author": "sooH",
+          "content": "Implementation started with three GPT-5.6 Sol slices: #2 S0 verification/contracts, #3 migration017 integrity foundation, #4 IRC stream correctness. Full requirement ledger is .design/concord-remediation/implementation-ledger.md; no broad acceptance gate passed yet. Final order remains Sol implementation, Daybreak Blue security, Carmilla correctness.",
+          "created_at": "2026-09-05T23:57:13.042578954Z",
+          "kind": "note",
+          "signed_by": "SHA256:vSvLFVVvxeXZ2zdt51iBf/d9/mqC7DX2RDgTAqewsvA",
+          "signature": "U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgI9W61IujvruBcNoIuYpXT9mJq/xROI741mkuv3/UlMYAAAARY3Jvc3NsaW5rLWNvbW1lbnQAAAAAAAAABnNoYTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABA8Dqw1jhKT3Ic9IT48172Lvwhve1mt4k8r5XBTruxqXLd/FFJk7kgJlXZpcUwx4GnvjJVNvVz7zlIt0Y0JQR0DQ=="
+        }
+      }
     },
     "822ad84b-9eb1-4bd6-800e-d603bde6468a": {
       "uuid": "822ad84b-9eb1-4bd6-800e-d603bde6468a",
@@ -76,8 +87,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-05T23:54:52.529721321Z",
+    "timestamp": "2026-09-05T23:57:13.045778206Z",
     "agent_id": "sooH",
-    "agent_seq": 9
+    "agent_seq": 10
   }
 }

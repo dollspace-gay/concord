@@ -95,13 +95,16 @@
       "parent_uuid": "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981",
       "created_by": "sooH",
       "created_at": "2026-09-05T23:59:06.171796194Z",
-      "updated_at": "2026-09-05T23:59:06.171796194Z"
+      "updated_at": "2026-09-05T23:59:09.211812965Z",
+      "labels": [
+        "feature"
+      ]
     }
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-05T23:59:06.171796194Z",
+    "timestamp": "2026-09-05T23:59:09.211812965Z",
     "agent_id": "sooH",
-    "agent_seq": 11
+    "agent_seq": 12
   }
 }

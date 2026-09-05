@@ -15,13 +15,16 @@
       "priority": "high",
       "created_by": "sooH",
       "created_at": "2026-09-05T23:54:17.412118203Z",
-      "updated_at": "2026-09-05T23:54:17.412118203Z"
+      "updated_at": "2026-09-05T23:54:20.641403668Z",
+      "labels": [
+        "feature"
+      ]
     }
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-05T23:54:17.412118203Z",
+    "timestamp": "2026-09-05T23:54:20.641403668Z",
     "agent_id": "sooH",
-    "agent_seq": 1
+    "agent_seq": 2
   }
 }

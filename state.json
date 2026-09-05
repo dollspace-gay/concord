@@ -1,12 +1,13 @@
 {
-  "next_display_id": 6,
+  "next_display_id": 7,
   "next_comment_id": 2,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
     "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981": 1,
     "822ad84b-9eb1-4bd6-800e-d603bde6468a": 3,
-    "a6aa4117-4a65-44a5-814a-48f3d82a9089": 5
+    "a6aa4117-4a65-44a5-814a-48f3d82a9089": 5,
+    "c9d6f431-a8ea-4a17-94fb-ebea139fc292": 6
   },
   "locks": {
     "1": {
@@ -99,12 +100,24 @@
       "labels": [
         "feature"
       ]
+    },
+    "c9d6f431-a8ea-4a17-94fb-ebea139fc292": {
+      "uuid": "c9d6f431-a8ea-4a17-94fb-ebea139fc292",
+      "display_id": 6,
+      "title": "S1-S2 actor-scoped authorization and private thread persistence",
+      "description": "Implement R02 R11 M3 across query read/mutation/fanout families; nonmembership and bans deny before roles, DB failures closed, private channel creation grants, persisted private thread parent and membership, role hierarchy, scope relationships, policy versions, permission-change delivery tests. Shared domain APIs replace independent adapter permission math; correct E01 E10 E12.",
+      "status": "open",
+      "priority": "medium",
+      "parent_uuid": "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981",
+      "created_by": "sooH",
+      "created_at": "2026-09-05T23:59:12.393488693Z",
+      "updated_at": "2026-09-05T23:59:12.393488693Z"
     }
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-05T23:59:09.211812965Z",
+    "timestamp": "2026-09-05T23:59:12.393488693Z",
     "agent_id": "sooH",
-    "agent_seq": 12
+    "agent_seq": 13
   }
 }

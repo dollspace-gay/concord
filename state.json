@@ -24,7 +24,10 @@
       "parent_uuid": "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981",
       "created_by": "sooH",
       "created_at": "2026-09-05T23:54:49.493007967Z",
-      "updated_at": "2026-09-05T23:54:49.493007967Z"
+      "updated_at": "2026-09-05T23:54:52.529721321Z",
+      "labels": [
+        "feature"
+      ]
     },
     "22b78555-b3df-4e8c-ad98-0000c10939cc": {
       "uuid": "22b78555-b3df-4e8c-ad98-0000c10939cc",
@@ -73,8 +76,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-05T23:54:49.493007967Z",
+    "timestamp": "2026-09-05T23:54:52.529721321Z",
     "agent_id": "sooH",
-    "agent_seq": 8
+    "agent_seq": 9
   }
 }

@@ -1,11 +1,12 @@
 {
-  "next_display_id": 7,
+  "next_display_id": 8,
   "next_comment_id": 2,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
     "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981": 1,
     "822ad84b-9eb1-4bd6-800e-d603bde6468a": 3,
+    "99e382c4-348a-45ab-b9f8-7cb30dc3de83": 7,
     "a6aa4117-4a65-44a5-814a-48f3d82a9089": 5,
     "c9d6f431-a8ea-4a17-94fb-ebea139fc292": 6
   },
@@ -86,6 +87,18 @@
         "feature"
       ]
     },
+    "99e382c4-348a-45ab-b9f8-7cb30dc3de83": {
+      "uuid": "99e382c4-348a-45ab-b9f8-7cb30dc3de83",
+      "display_id": 7,
+      "title": "S3 transactional message acceptance and recoverable delivery",
+      "description": "Implement M4-M5 R05 R06 R10: canonical conversations messages sequences; transactional receipts events attachment claims; commit before ack; idempotency; durable replay snapshot and queue resync; v2 correlated handshake errors generated contract integration; all adapters converge. Preserve full design failure matrix and load constraints.",
+      "status": "open",
+      "priority": "medium",
+      "parent_uuid": "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981",
+      "created_by": "sooH",
+      "created_at": "2026-09-05T23:59:18.447682488Z",
+      "updated_at": "2026-09-05T23:59:18.447682488Z"
+    },
     "a6aa4117-4a65-44a5-814a-48f3d82a9089": {
       "uuid": "a6aa4117-4a65-44a5-814a-48f3d82a9089",
       "display_id": 5,
@@ -119,8 +132,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-05T23:59:15.381599855Z",
+    "timestamp": "2026-09-05T23:59:18.447682488Z",
     "agent_id": "sooH",
-    "agent_seq": 14
+    "agent_seq": 15
   }
 }

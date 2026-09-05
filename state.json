@@ -1,0 +1,13 @@
+{
+  "next_display_id": 1,
+  "next_comment_id": 1,
+  "display_id_map": {},
+  "locks": {},
+  "issues": {},
+  "next_milestone_id": 1,
+  "watermark": {
+    "timestamp": "1970-01-01T00:00:00Z",
+    "agent_id": "hub-v3-genesis",
+    "agent_seq": 0
+  }
+}

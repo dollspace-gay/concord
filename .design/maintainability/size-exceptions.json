@@ -1,0 +1,18 @@
+{
+  "concord/server/src/engine/events/protocol.rs": {
+    "maximum_lines": 693,
+    "reason": "One flat public ChatEvent wire enum. Keeping its variants and serde attributes together preserves protocol review and exact contract generation; model payloads live in adjacent domain modules."
+  },
+  "concord/server/src/web/ws_handler/protocol.rs": {
+    "maximum_lines": 659,
+    "reason": "One flat ClientMessage wire enum and its serde defaults. Changing its representation would complicate wire compatibility and generated schemas; execution belongs to domain handlers."
+  },
+  "concord/server/src/web/ws_handler/dispatch.rs": {
+    "maximum_lines": 980,
+    "reason": "Exhaustive typed routing for all 124 wire commands. This table only unpacks payloads and calls domain handlers. Keeping one exhaustive match gives compiler coverage without duplicated domain enums, partial routing, or a dispatch macro. No business or authorization logic belongs here."
+  },
+  "concord/server/src/engine/chat_engine/legacy_send.rs": {
+    "maximum_lines": 556,
+    "reason": "One cfg(test)-only legacy send compatibility path retained as a regression oracle. Production sends use the canonical messaging service; new behavior must not be added to this fixture."
+  }
+}

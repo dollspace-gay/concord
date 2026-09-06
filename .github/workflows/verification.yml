@@ -21,6 +21,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: concord
+      - run: python3 ../scripts/check-maintainability.py
+      - run: python3 ../scripts/test-maintainability.py
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: cargo test --workspace --locked

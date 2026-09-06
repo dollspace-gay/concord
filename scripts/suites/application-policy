@@ -10,8 +10,8 @@ test_source="${repository_root}/concord/server/tests/session_authority.rs"
   exit 2
 }
 
-grep -Fq "search_excludes_channels_without_history_permission" \
-  "${repository_root}/concord/server/src/engine/authorization.rs" || {
+grep -R -Fq "search_excludes_channels_without_history_permission" \
+  "${repository_root}/concord/server/src/engine/authorization/tests" || {
   echo "authorized-search regression coverage is missing" >&2
   exit 2
 }
@@ -27,9 +27,9 @@ python3 "${repository_root}/scripts/test-actor-service-boundaries.py"
 "${run_tests}" --locked -p concord-server engine::organization::tests --lib
 "${run_tests}" --locked -p concord-server engine::community_service::tests --lib
 "${run_tests}" --locked -p concord-server \
-  engine::chat_engine::tests::forum_tags_enforce_parent_ownership_and_moderated_authority --lib
+  engine::chat_engine::tests::forum_tags::forum_tags_enforce_parent_ownership_and_moderated_authority --lib
 "${run_tests}" --locked -p concord-server \
-  engine::chat_engine::tests::ban_commits_membership_ban_and_audit_then_evicts_subscriptions --lib
+  engine::chat_engine::tests::moderation::ban_commits_membership_ban_and_audit_then_evicts_subscriptions --lib
 "${run_tests}" --locked -p concord-server engine::integrations::tests --lib
 "${run_tests}" --locked -p concord-server web::rest_api::tests --lib
 

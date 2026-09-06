@@ -1,5 +1,5 @@
 {
-  "next_display_id": 11,
+  "next_display_id": 12,
   "next_comment_id": 6,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
@@ -11,6 +11,7 @@
     "99e382c4-348a-45ab-b9f8-7cb30dc3de83": 7,
     "a6aa4117-4a65-44a5-814a-48f3d82a9089": 5,
     "c9d6f431-a8ea-4a17-94fb-ebea139fc292": 6,
+    "fb0f7c8f-b44a-4947-a5b6-dd4ea1b43c71": 11,
     "fb0f8763-ab3c-4c63-822a-cf9a3a2fde3f": 8
   },
   "locks": {},
@@ -198,6 +199,18 @@
         "feature"
       ]
     },
+    "fb0f7c8f-b44a-4947-a5b6-dd4ea1b43c71": {
+      "uuid": "fb0f7c8f-b44a-4947-a5b6-dd4ea1b43c71",
+      "display_id": 11,
+      "title": "S7 complete integrations and deliberate AT publication",
+      "description": "Complete the full design F21-F25 and G20-G21 coding: transactional webhook lifecycle, canonical incoming sends, signed durable outgoing delivery, bot installations/scopes and revocation, commands/interactions, OAuth applications and grants, explicit versioned publication with uncertain-outcome reconciliation. Owner: verification_contracts. Integration findings I27, I39 and I40 remain required; test every full journey and repair before security review.",
+      "status": "open",
+      "priority": "medium",
+      "parent_uuid": "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981",
+      "created_by": "sooH",
+      "created_at": "2026-09-06T04:02:58.721118849Z",
+      "updated_at": "2026-09-06T04:02:58.721118849Z"
+    },
     "fb0f8763-ab3c-4c63-822a-cf9a3a2fde3f": {
       "uuid": "fb0f8763-ab3c-4c63-822a-cf9a3a2fde3f",
       "display_id": 8,
@@ -216,8 +229,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-06T03:57:32.578740261Z",
+    "timestamp": "2026-09-06T04:02:58.721118849Z",
     "agent_id": "sooH",
-    "agent_seq": 27
+    "agent_seq": 28
   }
 }

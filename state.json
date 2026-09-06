@@ -1,6 +1,6 @@
 {
   "next_display_id": 8,
-  "next_comment_id": 2,
+  "next_comment_id": 3,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
@@ -27,10 +27,21 @@
       "parent_uuid": "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981",
       "created_by": "sooH",
       "created_at": "2026-09-05T23:54:49.493007967Z",
-      "updated_at": "2026-09-05T23:54:52.529721321Z",
+      "updated_at": "2026-09-06T00:06:35.108875430Z",
       "labels": [
         "feature"
-      ]
+      ],
+      "comments": {
+        "6e1e0654-5470-41eb-a9e3-bb090d648b8d": {
+          "display_id": 2,
+          "author": "sooH",
+          "content": "Sol implemented bounded decoder and connection/listener lifecycle; root reran 7 stream tests successfully. Early integration review found a per-IP accounting removal race and stronger cancellation-fragment test requirements; returned to Sol for repair while next auth slice begins. This is partial G08 evidence, not complete client qualification.",
+          "created_at": "2026-09-06T00:06:35.103506749Z",
+          "kind": "note",
+          "signed_by": "SHA256:vSvLFVVvxeXZ2zdt51iBf/d9/mqC7DX2RDgTAqewsvA",
+          "signature": "U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgI9W61IujvruBcNoIuYpXT9mJq/xROI741mkuv3/UlMYAAAARY3Jvc3NsaW5rLWNvbW1lbnQAAAAAAAAABnNoYTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABAmFbbyy6ALruKL9fJ8rJKkAoKAlb2GsPV4CXbzVck1MEnjpSSXOmESw82hnh/O21l05Oed1KwleyugIDeQm9XAg=="
+        }
+      }
     },
     "22b78555-b3df-4e8c-ad98-0000c10939cc": {
       "uuid": "22b78555-b3df-4e8c-ad98-0000c10939cc",
@@ -135,8 +146,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-05T23:59:21.365451691Z",
+    "timestamp": "2026-09-06T00:06:35.108875430Z",
     "agent_id": "sooH",
-    "agent_seq": 16
+    "agent_seq": 17
   }
 }

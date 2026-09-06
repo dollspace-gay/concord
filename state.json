@@ -1,6 +1,6 @@
 {
   "next_display_id": 13,
-  "next_comment_id": 10,
+  "next_comment_id": 11,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
@@ -72,7 +72,7 @@
       "priority": "high",
       "created_by": "sooH",
       "created_at": "2026-09-05T23:54:17.412118203Z",
-      "updated_at": "2026-09-06T05:36:51.073621848Z",
+      "updated_at": "2026-09-06T06:04:09.012012699Z",
       "labels": [
         "feature"
       ],
@@ -103,6 +103,15 @@
           "kind": "note",
           "signed_by": "SHA256:vSvLFVVvxeXZ2zdt51iBf/d9/mqC7DX2RDgTAqewsvA",
           "signature": "U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgI9W61IujvruBcNoIuYpXT9mJq/xROI741mkuv3/UlMYAAAARY3Jvc3NsaW5rLWNvbW1lbnQAAAAAAAAABnNoYTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABAHrzfw1OPdphe5UKcwNBhu/HmHrlWTRLQSGrSIbPCBOPF3AMCcpbit1W/Y1/g+4rMwhMCQ0ZWX3l2O2zy26fZDA=="
+        },
+        "5205e07e-a439-46d3-9a02-0edcdf1ab806": {
+          "display_id": 10,
+          "author": "sooH",
+          "content": "[action] Parent passed real offline-DM commit and multi-tab restart/revocation journeys; store separation handed exclusively to IRC owner, domain/integration agents continue other files. Latest full Rust and strict Clippy are running after Actor-bound server lifecycle and component fixes. All coding still active; no security review yet.",
+          "created_at": "2026-09-06T06:04:09.005821224Z",
+          "kind": "note",
+          "signed_by": "SHA256:vSvLFVVvxeXZ2zdt51iBf/d9/mqC7DX2RDgTAqewsvA",
+          "signature": "U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgI9W61IujvruBcNoIuYpXT9mJq/xROI741mkuv3/UlMYAAAARY3Jvc3NsaW5rLWNvbW1lbnQAAAAAAAAABnNoYTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABAfZHvCBw0YAw+ZVnkh3FHxj+FDHIhy5EF3oUQxpsjZ+KC9ehsFyp+bbInHdPePqUQSSrO7KQHddT9dJlmqKNUAw=="
         },
         "7a57b612-5544-4eb3-b1e1-49d1af8d5ce7": {
           "display_id": 4,
@@ -283,8 +292,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-06T05:36:51.073621848Z",
+    "timestamp": "2026-09-06T06:04:09.012012699Z",
     "agent_id": "sooH",
-    "agent_seq": 34
+    "agent_seq": 35
   }
 }

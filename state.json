@@ -1,6 +1,6 @@
 {
   "next_display_id": 15,
-  "next_comment_id": 44,
+  "next_comment_id": 45,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
@@ -549,7 +549,7 @@
       "priority": "high",
       "created_by": "sooH",
       "created_at": "2026-09-06T17:14:00.164104118Z",
-      "updated_at": "2026-09-06T18:24:12.347421706Z",
+      "updated_at": "2026-09-06T18:26:54.447255997Z",
       "labels": [
         "maintenance"
       ],
@@ -589,6 +589,15 @@
           "kind": "result",
           "signed_by": "SHA256:vSvLFVVvxeXZ2zdt51iBf/d9/mqC7DX2RDgTAqewsvA",
           "signature": "U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgI9W61IujvruBcNoIuYpXT9mJq/xROI741mkuv3/UlMYAAAARY3Jvc3NsaW5rLWNvbW1lbnQAAAAAAAAABnNoYTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABAOnvTF1/9en8s7TlO7kdOfrNPPVv6tTs21221yXKWObRqh6ylAD469svrlIWRnSLylGaBbxaBdDjRjm/dMX4OAQ=="
+        },
+        "8960a8cf-0c4b-4f20-808a-71941b7aed26": {
+          "display_id": 44,
+          "author": "sooH",
+          "content": "Commit the user-approved architecture refactor so domain ownership and local guidance are reviewable together. Cohesive modules and a reviewed 500-line budget reduce navigation and maintenance cost while retaining the validated wire, authorization, transaction, and cancellation behavior. Include code, tests, CI, guidance, and design evidence; exclude unrelated local configuration and caches.",
+          "created_at": "2026-09-06T18:26:54.444058313Z",
+          "kind": "plan",
+          "signed_by": "SHA256:vSvLFVVvxeXZ2zdt51iBf/d9/mqC7DX2RDgTAqewsvA",
+          "signature": "U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgI9W61IujvruBcNoIuYpXT9mJq/xROI741mkuv3/UlMYAAAARY3Jvc3NsaW5rLWNvbW1lbnQAAAAAAAAABnNoYTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABAlY4ju473vyekw12X06kKxwlcWdnJkYjfqcZT7A4qN7L+7jyOQjbCwVvzbfq3EuCYMfxxahCa1YEAybwFFyqwDg=="
         }
       }
     },
@@ -622,8 +631,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-06T18:25:13.702158935Z",
+    "timestamp": "2026-09-06T18:26:54.447255997Z",
     "agent_id": "sooH",
-    "agent_seq": 84
+    "agent_seq": 85
   }
 }

@@ -1,6 +1,6 @@
 {
   "next_display_id": 14,
-  "next_comment_id": 36,
+  "next_comment_id": 37,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
@@ -400,8 +400,17 @@
       "priority": "high",
       "created_by": "sooH",
       "created_at": "2026-09-06T16:16:48.937261477Z",
-      "updated_at": "2026-09-06T16:35:00.852018441Z",
+      "updated_at": "2026-09-06T16:36:40.791320563Z",
       "comments": {
+        "13e4b9a4-2147-4af5-95bd-687c743db4ec": {
+          "display_id": 36,
+          "author": "sooH",
+          "content": "Dependency update complete. Refreshed 38 Cargo direct requirements and all npm dependencies/lockfiles, migrated major APIs, preserved old Argon2 hashes and encrypted vault envelopes with fixed legacy-version vectors, and fixed React lint/initial chat scroll compatibility. Validation: 1,072 default Rust tests; all-feature coverage 1,075 tests across workspace run plus isolated operator/remaining integration rerun and 2 new crypto vectors; Clippy all-target/all-feature -D warnings; fmt; generated contracts and all 229 variants; 51 browser harness tests; 20 authenticated browser tests; production SQLite WAL/FULL xSync and crash probes; clean npm ci, npm ls, lint, build, and zero npm audit findings. The all-feature operator rerun corrects verified interference from overlapping Cargo feature builds; the previously failing rotation SIGKILL recovery now passes. Cargo retains two upstream Hickory advisories and one LRU warning; dependency-audit.md records parent constraints, SQLite 0.37 compatibility, and TypeScript 7/TS6 API alias. Build retains Tailwind source-map and chunk-size warnings. Changes left uncommitted; unrelated local configuration/caches preserved. Logs and input fingerprints: /home/doll/.cache/concord-dependency-update/.",
+          "created_at": "2026-09-06T16:36:40.786206507Z",
+          "kind": "note",
+          "signed_by": "SHA256:vSvLFVVvxeXZ2zdt51iBf/d9/mqC7DX2RDgTAqewsvA",
+          "signature": "U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgI9W61IujvruBcNoIuYpXT9mJq/xROI741mkuv3/UlMYAAAARY3Jvc3NsaW5rLWNvbW1lbnQAAAAAAAAABnNoYTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABAZYi5LMwBPV9EjvvrtWf19GoppDV0F56ydmz32YJbXZ07cxTYxV4SAyUGDC/XJE1o2Gi3L73UP8zy+WZ6pKK8CA=="
+        },
         "2f5bca65-d63a-41f6-9747-5496b2ca8ad3": {
           "display_id": 33,
           "author": "sooH",
@@ -533,8 +542,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-06T16:35:00.852018441Z",
+    "timestamp": "2026-09-06T16:36:40.791320563Z",
     "agent_id": "sooH",
-    "agent_seq": 67
+    "agent_seq": 68
   }
 }

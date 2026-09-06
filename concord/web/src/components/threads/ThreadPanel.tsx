@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
 import { channelKey } from '../../api/types';
-import type { HistoryMessage, ThreadInfo } from '../../api/types';
+import type { ForumTagInfo, HistoryMessage, ThreadInfo } from '../../api/types';
 import { FormattedMessage } from '../chat/FormattedMessage';
 
 const EMPTY_MESSAGES: HistoryMessage[] = [];
 const EMPTY_THREADS: ThreadInfo[] = [];
+const EMPTY_FORUM_TAGS: ForumTagInfo[] = [];
 
 export function ThreadPanel() {
   const activeServer = useUiStore((s) => s.activeServer);
@@ -26,7 +27,12 @@ export function ThreadPanel() {
   const fetchHistory = useChatStore((s) => s.fetchHistory);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const archiveThread = useChatStore((s) => s.archiveThread);
+  const unarchiveThread = useChatStore((s) => s.unarchiveThread);
   const joinChannel = useChatStore((s) => s.joinChannel);
+  const forumTags = useChatStore((s) => (parentKey ? s.forumTags[parentKey] ?? EMPTY_FORUM_TAGS : EMPTY_FORUM_TAGS));
+  const listForumTags = useChatStore((s) => s.listForumTags);
+  const getThreadTags = useChatStore((s) => s.getThreadTags);
+  const setThreadTags = useChatStore((s) => s.setThreadTags);
   const avatars = useChatStore((s) => s.avatars);
 
   const [input, setInput] = useState('');
@@ -37,8 +43,10 @@ export function ThreadPanel() {
     if (activeServer && thread) {
       joinChannel(activeServer, thread.name);
       fetchHistory(activeServer, thread.name);
+      getThreadTags(activeServer, thread.id);
+      if (activeChannel) listForumTags(activeServer, activeChannel);
     }
-  }, [activeServer, thread, joinChannel, fetchHistory]);
+  }, [activeServer, activeChannel, thread, joinChannel, fetchHistory, getThreadTags, listForumTags]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -65,9 +73,24 @@ export function ThreadPanel() {
     }
   };
 
+  const handleUnarchive = () => {
+    if (activeServer && activeThreadId) {
+      unarchiveThread(activeServer, activeThreadId);
+    }
+  };
+
   const handleClose = () => {
     setActiveThreadId(null);
     setShowThreadPanel(false);
+  };
+
+  const toggleTag = (tagId: string) => {
+    if (!activeServer || !thread) return;
+    const selected = thread.tag_ids ?? [];
+    const next = selected.includes(tagId)
+      ? selected.filter((id) => id !== tagId)
+      : [...selected, tagId];
+    if (next.length <= 5) setThreadTags(activeServer, thread.id, next);
   };
 
   if (!thread) {
@@ -118,6 +141,15 @@ export function ThreadPanel() {
               </svg>
             </button>
           )}
+          {thread.archived && (
+            <button
+              onClick={handleUnarchive}
+              className="rounded px-2 py-1 text-xs text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary"
+              title="Unarchive thread"
+            >
+              Unarchive
+            </button>
+          )}
           <button onClick={handleClose} className="rounded p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -125,6 +157,28 @@ export function ThreadPanel() {
           </button>
         </div>
       </div>
+
+      {forumTags.length > 0 && (
+        <div className="flex flex-wrap gap-1 border-b border-border px-3 py-2" aria-label="Thread tags">
+          {forumTags.map((tag) => {
+            const selected = (thread.tag_ids ?? []).includes(tag.id);
+            return (
+              <button
+                key={tag.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => toggleTag(tag.id)}
+                className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${selected
+                  ? 'border-accent bg-accent/20 text-text-primary'
+                  : 'border-border text-text-muted hover:border-accent hover:text-text-primary'}`}
+                title={tag.moderated ? 'Moderator-controlled tag' : undefined}
+              >
+                {tag.emoji ? `${tag.emoji} ` : ''}{tag.name}{tag.moderated ? ' ◆' : ''}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-2">

@@ -1,0 +1,7087 @@
+{
+  "client_messages": [
+    {
+      "canonical_edge": {
+        "command": {
+          "icon_url": "fixture",
+          "name": "fixture",
+          "type": "create_server"
+        },
+        "request_id": "fixture",
+        "type": "lifecycle_command"
+      },
+      "canonical_minimal": {
+        "command": {
+          "icon_url": null,
+          "name": "fixture",
+          "type": "create_server"
+        },
+        "request_id": "fixture",
+        "type": "lifecycle_command"
+      },
+      "edge": {
+        "command": {
+          "icon_url": "fixture",
+          "name": "fixture",
+          "type": "create_server"
+        },
+        "request_id": "fixture",
+        "type": "lifecycle_command"
+      },
+      "minimal": {
+        "command": {
+          "name": "fixture",
+          "type": "create_server"
+        },
+        "request_id": "fixture",
+        "type": "lifecycle_command"
+      }
+    },
+    {
+      "canonical_edge": {
+        "cursor": null,
+        "limit": null,
+        "protocol_version": 4294967295,
+        "request_id": "fixture",
+        "subscriptions": [
+          "fixture"
+        ],
+        "type": "sync"
+      },
+      "canonical_minimal": {
+        "cursor": null,
+        "limit": null,
+        "protocol_version": 0,
+        "request_id": "fixture",
+        "subscriptions": [],
+        "type": "sync"
+      },
+      "edge": {
+        "cursor": null,
+        "limit": null,
+        "protocol_version": 4294967295,
+        "request_id": "fixture",
+        "subscriptions": [
+          "fixture"
+        ],
+        "type": "sync"
+      },
+      "minimal": {
+        "protocol_version": 0,
+        "request_id": "fixture",
+        "subscriptions": [],
+        "type": "sync"
+      }
+    },
+    {
+      "canonical_edge": {
+        "attachment_ids": null,
+        "channel": "fixture",
+        "client_message_id": null,
+        "content": "fixture",
+        "content_format": "markdown",
+        "conversation_id": null,
+        "mentions": [
+          {
+            "end_byte": 9007199254740991,
+            "kind": "everyone",
+            "start_byte": 9007199254740991,
+            "target_id": null
+          }
+        ],
+        "nonce": null,
+        "operation_generation": "fixture",
+        "reply_to": null,
+        "request_id": null,
+        "server_id": "fixture",
+        "type": "send_message"
+      },
+      "canonical_minimal": {
+        "attachment_ids": null,
+        "channel": "fixture",
+        "client_message_id": null,
+        "content": "fixture",
+        "content_format": "markdown",
+        "conversation_id": null,
+        "mentions": [],
+        "nonce": null,
+        "operation_generation": "fixture",
+        "reply_to": null,
+        "request_id": null,
+        "server_id": "default",
+        "type": "send_message"
+      },
+      "edge": {
+        "attachment_ids": null,
+        "channel": "fixture",
+        "client_message_id": null,
+        "content": "fixture",
+        "content_format": "markdown",
+        "conversation_id": null,
+        "mentions": [
+          {
+            "end_byte": 9007199254740991,
+            "kind": "everyone",
+            "start_byte": 9007199254740991,
+            "target_id": null
+          }
+        ],
+        "nonce": null,
+        "operation_generation": "fixture",
+        "reply_to": null,
+        "request_id": null,
+        "server_id": "fixture",
+        "type": "send_message"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "content": "fixture",
+        "operation_generation": "fixture",
+        "type": "send_message"
+      }
+    },
+    {
+      "canonical_edge": {
+        "attachment_ids": null,
+        "client_message_id": null,
+        "content": "fixture",
+        "content_format": "markdown",
+        "nonce": null,
+        "operation_generation": "fixture",
+        "recipient": "fixture",
+        "reply_to": null,
+        "request_id": null,
+        "type": "send_direct_message"
+      },
+      "canonical_minimal": {
+        "attachment_ids": null,
+        "client_message_id": null,
+        "content": "fixture",
+        "content_format": "markdown",
+        "nonce": null,
+        "operation_generation": "fixture",
+        "recipient": "fixture",
+        "reply_to": null,
+        "request_id": null,
+        "type": "send_direct_message"
+      },
+      "edge": {
+        "attachment_ids": null,
+        "client_message_id": null,
+        "content": "fixture",
+        "content_format": "markdown",
+        "nonce": null,
+        "operation_generation": "fixture",
+        "recipient": "fixture",
+        "reply_to": null,
+        "request_id": null,
+        "type": "send_direct_message"
+      },
+      "minimal": {
+        "content": "fixture",
+        "operation_generation": "fixture",
+        "recipient": "fixture",
+        "type": "send_direct_message"
+      }
+    },
+    {
+      "canonical_edge": {
+        "type": "list_direct_conversations"
+      },
+      "canonical_minimal": {
+        "type": "list_direct_conversations"
+      },
+      "edge": {
+        "type": "list_direct_conversations"
+      },
+      "minimal": {
+        "type": "list_direct_conversations"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "join_channel"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "default",
+        "type": "join_channel"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "join_channel"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "type": "join_channel"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "reason": null,
+        "server_id": "fixture",
+        "type": "part_channel"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "reason": null,
+        "server_id": "default",
+        "type": "part_channel"
+      },
+      "edge": {
+        "channel": "fixture",
+        "reason": null,
+        "server_id": "fixture",
+        "type": "part_channel"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "type": "part_channel"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "topic": "fixture",
+        "type": "set_topic"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "default",
+        "topic": "fixture",
+        "type": "set_topic"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "topic": "fixture",
+        "type": "set_topic"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "topic": "fixture",
+        "type": "set_topic"
+      }
+    },
+    {
+      "canonical_edge": {
+        "before": null,
+        "channel": "fixture",
+        "limit": null,
+        "server_id": "fixture",
+        "type": "fetch_history"
+      },
+      "canonical_minimal": {
+        "before": null,
+        "channel": "fixture",
+        "limit": null,
+        "server_id": "default",
+        "type": "fetch_history"
+      },
+      "edge": {
+        "before": null,
+        "channel": "fixture",
+        "limit": null,
+        "server_id": "fixture",
+        "type": "fetch_history"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "type": "fetch_history"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "list_channels"
+      },
+      "canonical_minimal": {
+        "server_id": "default",
+        "type": "list_channels"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "list_channels"
+      },
+      "minimal": {
+        "type": "list_channels"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "get_members"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "default",
+        "type": "get_members"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "get_members"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "type": "get_members"
+      }
+    },
+    {
+      "canonical_edge": {
+        "type": "list_servers"
+      },
+      "canonical_minimal": {
+        "type": "list_servers"
+      },
+      "edge": {
+        "type": "list_servers"
+      },
+      "minimal": {
+        "type": "list_servers"
+      }
+    },
+    {
+      "canonical_edge": {
+        "icon_url": null,
+        "name": "fixture",
+        "type": "create_server"
+      },
+      "canonical_minimal": {
+        "icon_url": null,
+        "name": "fixture",
+        "type": "create_server"
+      },
+      "edge": {
+        "icon_url": null,
+        "name": "fixture",
+        "type": "create_server"
+      },
+      "minimal": {
+        "name": "fixture",
+        "type": "create_server"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "join_server"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "join_server"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "join_server"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "join_server"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "leave_server"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "leave_server"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "leave_server"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "leave_server"
+      }
+    },
+    {
+      "canonical_edge": {
+        "category_id": null,
+        "channel_type": null,
+        "is_private": null,
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_channel"
+      },
+      "canonical_minimal": {
+        "category_id": null,
+        "channel_type": null,
+        "is_private": null,
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_channel"
+      },
+      "edge": {
+        "category_id": null,
+        "channel_type": null,
+        "is_private": null,
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_channel"
+      },
+      "minimal": {
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_channel"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "delete_channel"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "delete_channel"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "delete_channel"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "delete_channel"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "delete_server"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "delete_server"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "delete_server"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "delete_server"
+      }
+    },
+    {
+      "canonical_edge": {
+        "icon_url": null,
+        "name": null,
+        "server_id": "fixture",
+        "type": "update_server"
+      },
+      "canonical_minimal": {
+        "icon_url": null,
+        "name": null,
+        "server_id": "fixture",
+        "type": "update_server"
+      },
+      "edge": {
+        "icon_url": null,
+        "name": null,
+        "server_id": "fixture",
+        "type": "update_server"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "update_server"
+      }
+    },
+    {
+      "canonical_edge": {
+        "role": "fixture",
+        "server_id": "fixture",
+        "type": "update_member_role",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "role": "fixture",
+        "server_id": "fixture",
+        "type": "update_member_role",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "role": "fixture",
+        "server_id": "fixture",
+        "type": "update_member_role",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "role": "fixture",
+        "server_id": "fixture",
+        "type": "update_member_role",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "client_message_id": null,
+        "content": "fixture",
+        "content_format": "markdown",
+        "mentions": [
+          {
+            "end_byte": 9007199254740991,
+            "kind": "everyone",
+            "start_byte": 9007199254740991,
+            "target_id": null
+          }
+        ],
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "edit_message"
+      },
+      "canonical_minimal": {
+        "client_message_id": null,
+        "content": "fixture",
+        "content_format": "markdown",
+        "mentions": [],
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "edit_message"
+      },
+      "edge": {
+        "client_message_id": null,
+        "content": "fixture",
+        "content_format": "markdown",
+        "mentions": [
+          {
+            "end_byte": 9007199254740991,
+            "kind": "everyone",
+            "start_byte": 9007199254740991,
+            "target_id": null
+          }
+        ],
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "edit_message"
+      },
+      "minimal": {
+        "content": "fixture",
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "type": "edit_message"
+      }
+    },
+    {
+      "canonical_edge": {
+        "client_message_id": null,
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "delete_message"
+      },
+      "canonical_minimal": {
+        "client_message_id": null,
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "delete_message"
+      },
+      "edge": {
+        "client_message_id": null,
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "delete_message"
+      },
+      "minimal": {
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "type": "delete_message"
+      }
+    },
+    {
+      "canonical_edge": {
+        "client_message_id": null,
+        "emoji": "fixture",
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "add_reaction"
+      },
+      "canonical_minimal": {
+        "client_message_id": null,
+        "emoji": "fixture",
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "add_reaction"
+      },
+      "edge": {
+        "client_message_id": null,
+        "emoji": "fixture",
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "add_reaction"
+      },
+      "minimal": {
+        "emoji": "fixture",
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "type": "add_reaction"
+      }
+    },
+    {
+      "canonical_edge": {
+        "client_message_id": null,
+        "emoji": "fixture",
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "remove_reaction"
+      },
+      "canonical_minimal": {
+        "client_message_id": null,
+        "emoji": "fixture",
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "remove_reaction"
+      },
+      "edge": {
+        "client_message_id": null,
+        "emoji": "fixture",
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "type": "remove_reaction"
+      },
+      "minimal": {
+        "emoji": "fixture",
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "type": "remove_reaction"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "typing"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "default",
+        "type": "typing"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "typing"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "type": "typing"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "client_message_id": null,
+        "conversation_id": null,
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "server_id": "fixture",
+        "type": "mark_read"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "client_message_id": null,
+        "conversation_id": null,
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "server_id": "default",
+        "type": "mark_read"
+      },
+      "edge": {
+        "channel": "fixture",
+        "client_message_id": null,
+        "conversation_id": null,
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "request_id": null,
+        "server_id": "fixture",
+        "type": "mark_read"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "operation_generation": "fixture",
+        "type": "mark_read"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "get_unread_counts"
+      },
+      "canonical_minimal": {
+        "server_id": "default",
+        "type": "get_unread_counts"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "get_unread_counts"
+      },
+      "minimal": {
+        "type": "get_unread_counts"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "list_roles"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "list_roles"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "list_roles"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "list_roles"
+      }
+    },
+    {
+      "canonical_edge": {
+        "color": null,
+        "name": "fixture",
+        "permissions": null,
+        "server_id": "fixture",
+        "type": "create_role"
+      },
+      "canonical_minimal": {
+        "color": null,
+        "name": "fixture",
+        "permissions": null,
+        "server_id": "fixture",
+        "type": "create_role"
+      },
+      "edge": {
+        "color": null,
+        "name": "fixture",
+        "permissions": null,
+        "server_id": "fixture",
+        "type": "create_role"
+      },
+      "minimal": {
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_role"
+      }
+    },
+    {
+      "canonical_edge": {
+        "color": null,
+        "name": "fixture",
+        "permissions": 9007199254740991,
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "update_role"
+      },
+      "canonical_minimal": {
+        "color": null,
+        "name": "fixture",
+        "permissions": 0,
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "update_role"
+      },
+      "edge": {
+        "color": null,
+        "name": "fixture",
+        "permissions": 9007199254740991,
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "update_role"
+      },
+      "minimal": {
+        "name": "fixture",
+        "permissions": 0,
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "update_role"
+      }
+    },
+    {
+      "canonical_edge": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_role"
+      },
+      "canonical_minimal": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_role"
+      },
+      "edge": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_role"
+      },
+      "minimal": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_role"
+      }
+    },
+    {
+      "canonical_edge": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "assign_role",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "assign_role",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "assign_role",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "assign_role",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_role",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_role",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_role",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_role",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel_id": "fixture",
+        "server_id": "fixture",
+        "type": "list_channel_permission_overrides"
+      },
+      "canonical_minimal": {
+        "channel_id": "fixture",
+        "server_id": "fixture",
+        "type": "list_channel_permission_overrides"
+      },
+      "edge": {
+        "channel_id": "fixture",
+        "server_id": "fixture",
+        "type": "list_channel_permission_overrides"
+      },
+      "minimal": {
+        "channel_id": "fixture",
+        "server_id": "fixture",
+        "type": "list_channel_permission_overrides"
+      }
+    },
+    {
+      "canonical_edge": {
+        "allow_bits": 9007199254740991,
+        "channel_id": "fixture",
+        "deny_bits": 9007199254740991,
+        "server_id": "fixture",
+        "target_id": "fixture",
+        "target_type": "user",
+        "type": "set_channel_permission_override"
+      },
+      "canonical_minimal": {
+        "allow_bits": 0,
+        "channel_id": "fixture",
+        "deny_bits": 0,
+        "server_id": "fixture",
+        "target_id": "fixture",
+        "target_type": "role",
+        "type": "set_channel_permission_override"
+      },
+      "edge": {
+        "allow_bits": 9007199254740991,
+        "channel_id": "fixture",
+        "deny_bits": 9007199254740991,
+        "server_id": "fixture",
+        "target_id": "fixture",
+        "target_type": "user",
+        "type": "set_channel_permission_override"
+      },
+      "minimal": {
+        "allow_bits": 0,
+        "channel_id": "fixture",
+        "deny_bits": 0,
+        "server_id": "fixture",
+        "target_id": "fixture",
+        "target_type": "role",
+        "type": "set_channel_permission_override"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel_id": "fixture",
+        "server_id": "fixture",
+        "target_id": "fixture",
+        "target_type": "user",
+        "type": "delete_channel_permission_override"
+      },
+      "canonical_minimal": {
+        "channel_id": "fixture",
+        "server_id": "fixture",
+        "target_id": "fixture",
+        "target_type": "role",
+        "type": "delete_channel_permission_override"
+      },
+      "edge": {
+        "channel_id": "fixture",
+        "server_id": "fixture",
+        "target_id": "fixture",
+        "target_type": "user",
+        "type": "delete_channel_permission_override"
+      },
+      "minimal": {
+        "channel_id": "fixture",
+        "server_id": "fixture",
+        "target_id": "fixture",
+        "target_type": "role",
+        "type": "delete_channel_permission_override"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "list_categories"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "list_categories"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "list_categories"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "list_categories"
+      }
+    },
+    {
+      "canonical_edge": {
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_category"
+      },
+      "canonical_minimal": {
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_category"
+      },
+      "edge": {
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_category"
+      },
+      "minimal": {
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_category"
+      }
+    },
+    {
+      "canonical_edge": {
+        "category_id": "fixture",
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "update_category"
+      },
+      "canonical_minimal": {
+        "category_id": "fixture",
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "update_category"
+      },
+      "edge": {
+        "category_id": "fixture",
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "update_category"
+      },
+      "minimal": {
+        "category_id": "fixture",
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "update_category"
+      }
+    },
+    {
+      "canonical_edge": {
+        "category_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_category"
+      },
+      "canonical_minimal": {
+        "category_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_category"
+      },
+      "edge": {
+        "category_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_category"
+      },
+      "minimal": {
+        "category_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_category"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channels": [
+          {
+            "id": "fixture",
+            "position": 2147483647
+          }
+        ],
+        "server_id": "fixture",
+        "type": "reorder_channels"
+      },
+      "canonical_minimal": {
+        "channels": [],
+        "server_id": "fixture",
+        "type": "reorder_channels"
+      },
+      "edge": {
+        "channels": [
+          {
+            "category_id": null,
+            "id": "fixture",
+            "position": 2147483647
+          }
+        ],
+        "server_id": "fixture",
+        "type": "reorder_channels"
+      },
+      "minimal": {
+        "channels": [],
+        "server_id": "fixture",
+        "type": "reorder_channels"
+      }
+    },
+    {
+      "canonical_edge": {
+        "custom_status": null,
+        "status": "fixture",
+        "status_emoji": null,
+        "type": "set_presence"
+      },
+      "canonical_minimal": {
+        "custom_status": null,
+        "status": "fixture",
+        "status_emoji": null,
+        "type": "set_presence"
+      },
+      "edge": {
+        "custom_status": null,
+        "status": "fixture",
+        "status_emoji": null,
+        "type": "set_presence"
+      },
+      "minimal": {
+        "status": "fixture",
+        "type": "set_presence"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "get_presences"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "get_presences"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "get_presences"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "get_presences"
+      }
+    },
+    {
+      "canonical_edge": {
+        "nickname": null,
+        "server_id": "fixture",
+        "type": "set_server_nickname"
+      },
+      "canonical_minimal": {
+        "nickname": null,
+        "server_id": "fixture",
+        "type": "set_server_nickname"
+      },
+      "edge": {
+        "nickname": null,
+        "server_id": "fixture",
+        "type": "set_server_nickname"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "set_server_nickname"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": null,
+        "limit": null,
+        "offset": null,
+        "query": "fixture",
+        "server_id": "fixture",
+        "type": "search_messages"
+      },
+      "canonical_minimal": {
+        "channel": null,
+        "limit": null,
+        "offset": null,
+        "query": "fixture",
+        "server_id": "fixture",
+        "type": "search_messages"
+      },
+      "edge": {
+        "channel": null,
+        "limit": null,
+        "offset": null,
+        "query": "fixture",
+        "server_id": "fixture",
+        "type": "search_messages"
+      },
+      "minimal": {
+        "query": "fixture",
+        "server_id": "fixture",
+        "type": "search_messages"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel_id": null,
+        "level": "fixture",
+        "mute_until": null,
+        "muted": null,
+        "server_id": "fixture",
+        "suppress_everyone": null,
+        "suppress_roles": null,
+        "type": "update_notification_settings"
+      },
+      "canonical_minimal": {
+        "channel_id": null,
+        "level": "fixture",
+        "mute_until": null,
+        "muted": null,
+        "server_id": "fixture",
+        "suppress_everyone": null,
+        "suppress_roles": null,
+        "type": "update_notification_settings"
+      },
+      "edge": {
+        "channel_id": null,
+        "level": "fixture",
+        "mute_until": null,
+        "muted": null,
+        "server_id": "fixture",
+        "suppress_everyone": null,
+        "suppress_roles": null,
+        "type": "update_notification_settings"
+      },
+      "minimal": {
+        "level": "fixture",
+        "server_id": "fixture",
+        "type": "update_notification_settings"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "get_notification_settings"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "get_notification_settings"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "get_notification_settings"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "get_notification_settings"
+      }
+    },
+    {
+      "canonical_edge": {
+        "type": "get_user_profile",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "type": "get_user_profile",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "type": "get_user_profile",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "type": "get_user_profile",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "pin_message"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "pin_message"
+      },
+      "edge": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "pin_message"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "pin_message"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "unpin_message"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "unpin_message"
+      },
+      "edge": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "unpin_message"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "unpin_message"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "get_pinned_messages"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "get_pinned_messages"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "get_pinned_messages"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "get_pinned_messages"
+      }
+    },
+    {
+      "canonical_edge": {
+        "is_private": true,
+        "message_id": "fixture",
+        "name": "fixture",
+        "parent_channel": "fixture",
+        "server_id": "fixture",
+        "type": "create_thread"
+      },
+      "canonical_minimal": {
+        "is_private": false,
+        "message_id": "fixture",
+        "name": "fixture",
+        "parent_channel": "fixture",
+        "server_id": "fixture",
+        "type": "create_thread"
+      },
+      "edge": {
+        "is_private": true,
+        "message_id": "fixture",
+        "name": "fixture",
+        "parent_channel": "fixture",
+        "server_id": "fixture",
+        "type": "create_thread"
+      },
+      "minimal": {
+        "message_id": "fixture",
+        "name": "fixture",
+        "parent_channel": "fixture",
+        "server_id": "fixture",
+        "type": "create_thread"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "archive_thread"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "archive_thread"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "archive_thread"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "archive_thread"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "unarchive_thread"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "unarchive_thread"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "unarchive_thread"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "unarchive_thread"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "list_threads"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "list_threads"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "list_threads"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "list_threads"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "emoji": null,
+        "moderated": true,
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_forum_tag"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "emoji": null,
+        "moderated": false,
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_forum_tag"
+      },
+      "edge": {
+        "channel": "fixture",
+        "emoji": null,
+        "moderated": true,
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_forum_tag"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_forum_tag"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "emoji": null,
+        "moderated": true,
+        "name": "fixture",
+        "position": 2147483647,
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "update_forum_tag"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "emoji": null,
+        "moderated": false,
+        "name": "fixture",
+        "position": 0,
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "update_forum_tag"
+      },
+      "edge": {
+        "channel": "fixture",
+        "emoji": null,
+        "moderated": true,
+        "name": "fixture",
+        "position": 2147483647,
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "update_forum_tag"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "moderated": false,
+        "name": "fixture",
+        "position": 0,
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "update_forum_tag"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "delete_forum_tag"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "delete_forum_tag"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "delete_forum_tag"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "delete_forum_tag"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "list_forum_tags"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "list_forum_tags"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "list_forum_tags"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "type": "list_forum_tags"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "tag_ids": [
+          "fixture"
+        ],
+        "thread_id": "fixture",
+        "type": "set_thread_tags"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "tag_ids": [],
+        "thread_id": "fixture",
+        "type": "set_thread_tags"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "tag_ids": [
+          "fixture"
+        ],
+        "thread_id": "fixture",
+        "type": "set_thread_tags"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "tag_ids": [],
+        "thread_id": "fixture",
+        "type": "set_thread_tags"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "get_thread_tags"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "get_thread_tags"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "get_thread_tags"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "thread_id": "fixture",
+        "type": "get_thread_tags"
+      }
+    },
+    {
+      "canonical_edge": {
+        "message_id": "fixture",
+        "note": null,
+        "type": "add_bookmark"
+      },
+      "canonical_minimal": {
+        "message_id": "fixture",
+        "note": null,
+        "type": "add_bookmark"
+      },
+      "edge": {
+        "message_id": "fixture",
+        "note": null,
+        "type": "add_bookmark"
+      },
+      "minimal": {
+        "message_id": "fixture",
+        "type": "add_bookmark"
+      }
+    },
+    {
+      "canonical_edge": {
+        "message_id": "fixture",
+        "type": "remove_bookmark"
+      },
+      "canonical_minimal": {
+        "message_id": "fixture",
+        "type": "remove_bookmark"
+      },
+      "edge": {
+        "message_id": "fixture",
+        "type": "remove_bookmark"
+      },
+      "minimal": {
+        "message_id": "fixture",
+        "type": "remove_bookmark"
+      }
+    },
+    {
+      "canonical_edge": {
+        "type": "list_bookmarks"
+      },
+      "canonical_minimal": {
+        "type": "list_bookmarks"
+      },
+      "edge": {
+        "type": "list_bookmarks"
+      },
+      "minimal": {
+        "type": "list_bookmarks"
+      }
+    },
+    {
+      "canonical_edge": {
+        "reason": null,
+        "server_id": "fixture",
+        "type": "kick_member",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "reason": null,
+        "server_id": "fixture",
+        "type": "kick_member",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "reason": null,
+        "server_id": "fixture",
+        "type": "kick_member",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "kick_member",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "delete_message_days": 2147483647,
+        "reason": null,
+        "server_id": "fixture",
+        "type": "ban_member",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "delete_message_days": 0,
+        "reason": null,
+        "server_id": "fixture",
+        "type": "ban_member",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "delete_message_days": 2147483647,
+        "reason": null,
+        "server_id": "fixture",
+        "type": "ban_member",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "ban_member",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "unban_member",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "unban_member",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "unban_member",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "unban_member",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "list_bans"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "list_bans"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "list_bans"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "list_bans"
+      }
+    },
+    {
+      "canonical_edge": {
+        "reason": null,
+        "server_id": "fixture",
+        "timeout_until": null,
+        "type": "timeout_member",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "reason": null,
+        "server_id": "fixture",
+        "timeout_until": null,
+        "type": "timeout_member",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "reason": null,
+        "server_id": "fixture",
+        "timeout_until": null,
+        "type": "timeout_member",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "timeout_member",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "seconds": 2147483647,
+        "server_id": "fixture",
+        "type": "set_slow_mode"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "seconds": 0,
+        "server_id": "fixture",
+        "type": "set_slow_mode"
+      },
+      "edge": {
+        "channel": "fixture",
+        "seconds": 2147483647,
+        "server_id": "fixture",
+        "type": "set_slow_mode"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "seconds": 0,
+        "server_id": "fixture",
+        "type": "set_slow_mode"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "is_nsfw": true,
+        "server_id": "fixture",
+        "type": "set_nsfw"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "is_nsfw": false,
+        "server_id": "fixture",
+        "type": "set_nsfw"
+      },
+      "edge": {
+        "channel": "fixture",
+        "is_nsfw": true,
+        "server_id": "fixture",
+        "type": "set_nsfw"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "is_nsfw": false,
+        "server_id": "fixture",
+        "type": "set_nsfw"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "message_ids": [
+          "fixture"
+        ],
+        "server_id": "fixture",
+        "type": "bulk_delete_messages"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "message_ids": [],
+        "server_id": "fixture",
+        "type": "bulk_delete_messages"
+      },
+      "edge": {
+        "channel": "fixture",
+        "message_ids": [
+          "fixture"
+        ],
+        "server_id": "fixture",
+        "type": "bulk_delete_messages"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "message_ids": [],
+        "server_id": "fixture",
+        "type": "bulk_delete_messages"
+      }
+    },
+    {
+      "canonical_edge": {
+        "action_type": null,
+        "before": null,
+        "limit": null,
+        "server_id": "fixture",
+        "type": "get_audit_log"
+      },
+      "canonical_minimal": {
+        "action_type": null,
+        "before": null,
+        "limit": null,
+        "server_id": "fixture",
+        "type": "get_audit_log"
+      },
+      "edge": {
+        "action_type": null,
+        "before": null,
+        "limit": null,
+        "server_id": "fixture",
+        "type": "get_audit_log"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "get_audit_log"
+      }
+    },
+    {
+      "canonical_edge": {
+        "action_type": "fixture",
+        "config": "fixture",
+        "name": "fixture",
+        "rule_type": "fixture",
+        "server_id": "fixture",
+        "timeout_duration_seconds": null,
+        "type": "create_automod_rule"
+      },
+      "canonical_minimal": {
+        "action_type": "fixture",
+        "config": "fixture",
+        "name": "fixture",
+        "rule_type": "fixture",
+        "server_id": "fixture",
+        "timeout_duration_seconds": null,
+        "type": "create_automod_rule"
+      },
+      "edge": {
+        "action_type": "fixture",
+        "config": "fixture",
+        "name": "fixture",
+        "rule_type": "fixture",
+        "server_id": "fixture",
+        "timeout_duration_seconds": null,
+        "type": "create_automod_rule"
+      },
+      "minimal": {
+        "action_type": "fixture",
+        "config": "fixture",
+        "name": "fixture",
+        "rule_type": "fixture",
+        "server_id": "fixture",
+        "type": "create_automod_rule"
+      }
+    },
+    {
+      "canonical_edge": {
+        "action_type": "fixture",
+        "config": "fixture",
+        "enabled": true,
+        "name": "fixture",
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "timeout_duration_seconds": null,
+        "type": "update_automod_rule"
+      },
+      "canonical_minimal": {
+        "action_type": "fixture",
+        "config": "fixture",
+        "enabled": false,
+        "name": "fixture",
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "timeout_duration_seconds": null,
+        "type": "update_automod_rule"
+      },
+      "edge": {
+        "action_type": "fixture",
+        "config": "fixture",
+        "enabled": true,
+        "name": "fixture",
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "timeout_duration_seconds": null,
+        "type": "update_automod_rule"
+      },
+      "minimal": {
+        "action_type": "fixture",
+        "config": "fixture",
+        "enabled": false,
+        "name": "fixture",
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "type": "update_automod_rule"
+      }
+    },
+    {
+      "canonical_edge": {
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_automod_rule"
+      },
+      "canonical_minimal": {
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_automod_rule"
+      },
+      "edge": {
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_automod_rule"
+      },
+      "minimal": {
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_automod_rule"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "list_automod_rules"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "list_automod_rules"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "list_automod_rules"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "list_automod_rules"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel_id": null,
+        "expires_at": null,
+        "max_uses": null,
+        "server_id": "fixture",
+        "type": "create_invite"
+      },
+      "canonical_minimal": {
+        "channel_id": null,
+        "expires_at": null,
+        "max_uses": null,
+        "server_id": "fixture",
+        "type": "create_invite"
+      },
+      "edge": {
+        "channel_id": null,
+        "expires_at": null,
+        "max_uses": null,
+        "server_id": "fixture",
+        "type": "create_invite"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "create_invite"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "list_invites"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "list_invites"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "list_invites"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "list_invites"
+      }
+    },
+    {
+      "canonical_edge": {
+        "invite_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_invite"
+      },
+      "canonical_minimal": {
+        "invite_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_invite"
+      },
+      "edge": {
+        "invite_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_invite"
+      },
+      "minimal": {
+        "invite_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_invite"
+      }
+    },
+    {
+      "canonical_edge": {
+        "code": "fixture",
+        "type": "use_invite"
+      },
+      "canonical_minimal": {
+        "code": "fixture",
+        "type": "use_invite"
+      },
+      "edge": {
+        "code": "fixture",
+        "type": "use_invite"
+      },
+      "minimal": {
+        "code": "fixture",
+        "type": "use_invite"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel_id": null,
+        "description": null,
+        "end_time": null,
+        "image_url": null,
+        "name": "fixture",
+        "server_id": "fixture",
+        "start_time": "fixture",
+        "type": "create_event"
+      },
+      "canonical_minimal": {
+        "channel_id": null,
+        "description": null,
+        "end_time": null,
+        "image_url": null,
+        "name": "fixture",
+        "server_id": "fixture",
+        "start_time": "fixture",
+        "type": "create_event"
+      },
+      "edge": {
+        "channel_id": null,
+        "description": null,
+        "end_time": null,
+        "image_url": null,
+        "name": "fixture",
+        "server_id": "fixture",
+        "start_time": "fixture",
+        "type": "create_event"
+      },
+      "minimal": {
+        "name": "fixture",
+        "server_id": "fixture",
+        "start_time": "fixture",
+        "type": "create_event"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "list_events"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "list_events"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "list_events"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "list_events"
+      }
+    },
+    {
+      "canonical_edge": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "status": "fixture",
+        "type": "update_event_status"
+      },
+      "canonical_minimal": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "status": "fixture",
+        "type": "update_event_status"
+      },
+      "edge": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "status": "fixture",
+        "type": "update_event_status"
+      },
+      "minimal": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "status": "fixture",
+        "type": "update_event_status"
+      }
+    },
+    {
+      "canonical_edge": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_event"
+      },
+      "canonical_minimal": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_event"
+      },
+      "edge": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_event"
+      },
+      "minimal": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "delete_event"
+      }
+    },
+    {
+      "canonical_edge": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "status": "fixture",
+        "type": "set_rsvp"
+      },
+      "canonical_minimal": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "status": "fixture",
+        "type": "set_rsvp"
+      },
+      "edge": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "status": "fixture",
+        "type": "set_rsvp"
+      },
+      "minimal": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "status": "fixture",
+        "type": "set_rsvp"
+      }
+    },
+    {
+      "canonical_edge": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_rsvp"
+      },
+      "canonical_minimal": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_rsvp"
+      },
+      "edge": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_rsvp"
+      },
+      "minimal": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_rsvp"
+      }
+    },
+    {
+      "canonical_edge": {
+        "event_id": "fixture",
+        "type": "list_rsvps"
+      },
+      "canonical_minimal": {
+        "event_id": "fixture",
+        "type": "list_rsvps"
+      },
+      "edge": {
+        "event_id": "fixture",
+        "type": "list_rsvps"
+      },
+      "minimal": {
+        "event_id": "fixture",
+        "type": "list_rsvps"
+      }
+    },
+    {
+      "canonical_edge": {
+        "category": null,
+        "description": null,
+        "is_discoverable": true,
+        "rules_text": null,
+        "server_id": "fixture",
+        "type": "update_community_settings",
+        "welcome_message": null
+      },
+      "canonical_minimal": {
+        "category": null,
+        "description": null,
+        "is_discoverable": false,
+        "rules_text": null,
+        "server_id": "fixture",
+        "type": "update_community_settings",
+        "welcome_message": null
+      },
+      "edge": {
+        "category": null,
+        "description": null,
+        "is_discoverable": true,
+        "rules_text": null,
+        "server_id": "fixture",
+        "type": "update_community_settings",
+        "welcome_message": null
+      },
+      "minimal": {
+        "is_discoverable": false,
+        "server_id": "fixture",
+        "type": "update_community_settings"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "get_community_settings"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "get_community_settings"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "get_community_settings"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "get_community_settings"
+      }
+    },
+    {
+      "canonical_edge": {
+        "category": null,
+        "type": "discover_servers"
+      },
+      "canonical_minimal": {
+        "category": null,
+        "type": "discover_servers"
+      },
+      "edge": {
+        "category": null,
+        "type": "discover_servers"
+      },
+      "minimal": {
+        "type": "discover_servers"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "accept_rules"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "accept_rules"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "accept_rules"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "accept_rules"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "is_announcement": true,
+        "server_id": "fixture",
+        "type": "set_announcement_channel"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "is_announcement": false,
+        "server_id": "fixture",
+        "type": "set_announcement_channel"
+      },
+      "edge": {
+        "channel": "fixture",
+        "is_announcement": true,
+        "server_id": "fixture",
+        "type": "set_announcement_channel"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "is_announcement": false,
+        "server_id": "fixture",
+        "type": "set_announcement_channel"
+      }
+    },
+    {
+      "canonical_edge": {
+        "source_channel_id": "fixture",
+        "target_channel_id": "fixture",
+        "type": "follow_channel"
+      },
+      "canonical_minimal": {
+        "source_channel_id": "fixture",
+        "target_channel_id": "fixture",
+        "type": "follow_channel"
+      },
+      "edge": {
+        "source_channel_id": "fixture",
+        "target_channel_id": "fixture",
+        "type": "follow_channel"
+      },
+      "minimal": {
+        "source_channel_id": "fixture",
+        "target_channel_id": "fixture",
+        "type": "follow_channel"
+      }
+    },
+    {
+      "canonical_edge": {
+        "follow_id": "fixture",
+        "type": "unfollow_channel"
+      },
+      "canonical_minimal": {
+        "follow_id": "fixture",
+        "type": "unfollow_channel"
+      },
+      "edge": {
+        "follow_id": "fixture",
+        "type": "unfollow_channel"
+      },
+      "minimal": {
+        "follow_id": "fixture",
+        "type": "unfollow_channel"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel_id": "fixture",
+        "type": "list_channel_follows"
+      },
+      "canonical_minimal": {
+        "channel_id": "fixture",
+        "type": "list_channel_follows"
+      },
+      "edge": {
+        "channel_id": "fixture",
+        "type": "list_channel_follows"
+      },
+      "minimal": {
+        "channel_id": "fixture",
+        "type": "list_channel_follows"
+      }
+    },
+    {
+      "canonical_edge": {
+        "message_id": "fixture",
+        "type": "publish_announcement"
+      },
+      "canonical_minimal": {
+        "message_id": "fixture",
+        "type": "publish_announcement"
+      },
+      "edge": {
+        "message_id": "fixture",
+        "type": "publish_announcement"
+      },
+      "minimal": {
+        "message_id": "fixture",
+        "type": "publish_announcement"
+      }
+    },
+    {
+      "canonical_edge": {
+        "description": null,
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_template"
+      },
+      "canonical_minimal": {
+        "description": null,
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_template"
+      },
+      "edge": {
+        "description": null,
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_template"
+      },
+      "minimal": {
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_template"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "list_templates"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "list_templates"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "list_templates"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "list_templates"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "delete_template"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "delete_template"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "delete_template"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "delete_template"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_name": "fixture",
+        "template_id": "fixture",
+        "type": "instantiate_template"
+      },
+      "canonical_minimal": {
+        "server_name": "fixture",
+        "template_id": "fixture",
+        "type": "instantiate_template"
+      },
+      "edge": {
+        "server_name": "fixture",
+        "template_id": "fixture",
+        "type": "instantiate_template"
+      },
+      "minimal": {
+        "server_name": "fixture",
+        "template_id": "fixture",
+        "type": "instantiate_template"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel_id": "fixture",
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_webhook",
+        "url": null,
+        "webhook_type": "fixture"
+      },
+      "canonical_minimal": {
+        "channel_id": "fixture",
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_webhook",
+        "url": null,
+        "webhook_type": "fixture"
+      },
+      "edge": {
+        "channel_id": "fixture",
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_webhook",
+        "url": null,
+        "webhook_type": "fixture"
+      },
+      "minimal": {
+        "channel_id": "fixture",
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "create_webhook",
+        "webhook_type": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "list_webhooks"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "list_webhooks"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "list_webhooks"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "list_webhooks"
+      }
+    },
+    {
+      "canonical_edge": {
+        "avatar_url": null,
+        "channel_id": "fixture",
+        "name": "fixture",
+        "type": "update_webhook",
+        "webhook_id": "fixture"
+      },
+      "canonical_minimal": {
+        "avatar_url": null,
+        "channel_id": "fixture",
+        "name": "fixture",
+        "type": "update_webhook",
+        "webhook_id": "fixture"
+      },
+      "edge": {
+        "avatar_url": null,
+        "channel_id": "fixture",
+        "name": "fixture",
+        "type": "update_webhook",
+        "webhook_id": "fixture"
+      },
+      "minimal": {
+        "channel_id": "fixture",
+        "name": "fixture",
+        "type": "update_webhook",
+        "webhook_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "type": "delete_webhook",
+        "webhook_id": "fixture"
+      },
+      "canonical_minimal": {
+        "type": "delete_webhook",
+        "webhook_id": "fixture"
+      },
+      "edge": {
+        "type": "delete_webhook",
+        "webhook_id": "fixture"
+      },
+      "minimal": {
+        "type": "delete_webhook",
+        "webhook_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "avatar_url": null,
+        "type": "create_bot",
+        "username": "fixture"
+      },
+      "canonical_minimal": {
+        "avatar_url": null,
+        "type": "create_bot",
+        "username": "fixture"
+      },
+      "edge": {
+        "avatar_url": null,
+        "type": "create_bot",
+        "username": "fixture"
+      },
+      "minimal": {
+        "type": "create_bot",
+        "username": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "type": "list_owned_bots"
+      },
+      "canonical_minimal": {
+        "type": "list_owned_bots"
+      },
+      "edge": {
+        "type": "list_owned_bots"
+      },
+      "minimal": {
+        "type": "list_owned_bots"
+      }
+    },
+    {
+      "canonical_edge": {
+        "bot_user_id": "fixture",
+        "name": "fixture",
+        "scopes": null,
+        "type": "create_bot_token"
+      },
+      "canonical_minimal": {
+        "bot_user_id": "fixture",
+        "name": "fixture",
+        "scopes": null,
+        "type": "create_bot_token"
+      },
+      "edge": {
+        "bot_user_id": "fixture",
+        "name": "fixture",
+        "scopes": null,
+        "type": "create_bot_token"
+      },
+      "minimal": {
+        "bot_user_id": "fixture",
+        "name": "fixture",
+        "type": "create_bot_token"
+      }
+    },
+    {
+      "canonical_edge": {
+        "bot_user_id": "fixture",
+        "type": "list_bot_tokens"
+      },
+      "canonical_minimal": {
+        "bot_user_id": "fixture",
+        "type": "list_bot_tokens"
+      },
+      "edge": {
+        "bot_user_id": "fixture",
+        "type": "list_bot_tokens"
+      },
+      "minimal": {
+        "bot_user_id": "fixture",
+        "type": "list_bot_tokens"
+      }
+    },
+    {
+      "canonical_edge": {
+        "token_id": "fixture",
+        "type": "delete_bot_token"
+      },
+      "canonical_minimal": {
+        "token_id": "fixture",
+        "type": "delete_bot_token"
+      },
+      "edge": {
+        "token_id": "fixture",
+        "type": "delete_bot_token"
+      },
+      "minimal": {
+        "token_id": "fixture",
+        "type": "delete_bot_token"
+      }
+    },
+    {
+      "canonical_edge": {
+        "bot_user_id": "fixture",
+        "server_id": "fixture",
+        "type": "add_bot_to_server"
+      },
+      "canonical_minimal": {
+        "bot_user_id": "fixture",
+        "server_id": "fixture",
+        "type": "add_bot_to_server"
+      },
+      "edge": {
+        "bot_user_id": "fixture",
+        "server_id": "fixture",
+        "type": "add_bot_to_server"
+      },
+      "minimal": {
+        "bot_user_id": "fixture",
+        "server_id": "fixture",
+        "type": "add_bot_to_server"
+      }
+    },
+    {
+      "canonical_edge": {
+        "bot_user_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_bot_from_server"
+      },
+      "canonical_minimal": {
+        "bot_user_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_bot_from_server"
+      },
+      "edge": {
+        "bot_user_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_bot_from_server"
+      },
+      "minimal": {
+        "bot_user_id": "fixture",
+        "server_id": "fixture",
+        "type": "remove_bot_from_server"
+      }
+    },
+    {
+      "canonical_edge": {
+        "description": "fixture",
+        "name": "fixture",
+        "options_json": null,
+        "server_id": "fixture",
+        "type": "register_slash_command"
+      },
+      "canonical_minimal": {
+        "description": "fixture",
+        "name": "fixture",
+        "options_json": null,
+        "server_id": "fixture",
+        "type": "register_slash_command"
+      },
+      "edge": {
+        "description": "fixture",
+        "name": "fixture",
+        "options_json": null,
+        "server_id": "fixture",
+        "type": "register_slash_command"
+      },
+      "minimal": {
+        "description": "fixture",
+        "name": "fixture",
+        "server_id": "fixture",
+        "type": "register_slash_command"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "list_slash_commands"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "list_slash_commands"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "list_slash_commands"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "list_slash_commands"
+      }
+    },
+    {
+      "canonical_edge": {
+        "command_id": "fixture",
+        "type": "delete_slash_command"
+      },
+      "canonical_minimal": {
+        "command_id": "fixture",
+        "type": "delete_slash_command"
+      },
+      "edge": {
+        "command_id": "fixture",
+        "type": "delete_slash_command"
+      },
+      "minimal": {
+        "command_id": "fixture",
+        "type": "delete_slash_command"
+      }
+    },
+    {
+      "canonical_edge": {
+        "args_json": null,
+        "channel": "fixture",
+        "command_name": "fixture",
+        "request_id": "fixture",
+        "server_id": "fixture",
+        "type": "invoke_slash_command"
+      },
+      "canonical_minimal": {
+        "args_json": null,
+        "channel": "fixture",
+        "command_name": "fixture",
+        "request_id": "fixture",
+        "server_id": "fixture",
+        "type": "invoke_slash_command"
+      },
+      "edge": {
+        "args_json": null,
+        "channel": "fixture",
+        "command_name": "fixture",
+        "request_id": "fixture",
+        "server_id": "fixture",
+        "type": "invoke_slash_command"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "command_name": "fixture",
+        "request_id": "fixture",
+        "server_id": "fixture",
+        "type": "invoke_slash_command"
+      }
+    },
+    {
+      "canonical_edge": {
+        "custom_id": "fixture",
+        "message_id": "fixture",
+        "request_id": "fixture",
+        "type": "invoke_message_component",
+        "values": [
+          "fixture"
+        ]
+      },
+      "canonical_minimal": {
+        "custom_id": "fixture",
+        "message_id": "fixture",
+        "request_id": "fixture",
+        "type": "invoke_message_component",
+        "values": []
+      },
+      "edge": {
+        "custom_id": "fixture",
+        "message_id": "fixture",
+        "request_id": "fixture",
+        "type": "invoke_message_component",
+        "values": [
+          "fixture"
+        ]
+      },
+      "minimal": {
+        "custom_id": "fixture",
+        "message_id": "fixture",
+        "request_id": "fixture",
+        "type": "invoke_message_component"
+      }
+    },
+    {
+      "canonical_edge": {
+        "components_json": null,
+        "content": null,
+        "embeds_json": null,
+        "ephemeral": null,
+        "interaction_id": "fixture",
+        "type": "respond_to_interaction"
+      },
+      "canonical_minimal": {
+        "components_json": null,
+        "content": null,
+        "embeds_json": null,
+        "ephemeral": null,
+        "interaction_id": "fixture",
+        "type": "respond_to_interaction"
+      },
+      "edge": {
+        "components_json": null,
+        "content": null,
+        "embeds_json": null,
+        "ephemeral": null,
+        "interaction_id": "fixture",
+        "type": "respond_to_interaction"
+      },
+      "minimal": {
+        "interaction_id": "fixture",
+        "type": "respond_to_interaction"
+      }
+    },
+    {
+      "canonical_edge": {
+        "client_type": "confidential",
+        "description": null,
+        "name": "fixture",
+        "redirect_uris": [
+          "fixture"
+        ],
+        "type": "create_o_auth2_app"
+      },
+      "canonical_minimal": {
+        "client_type": "confidential",
+        "description": null,
+        "name": "fixture",
+        "redirect_uris": [],
+        "type": "create_o_auth2_app"
+      },
+      "edge": {
+        "description": null,
+        "name": "fixture",
+        "redirect_uris": [
+          "fixture"
+        ],
+        "type": "create_o_auth2_app"
+      },
+      "minimal": {
+        "name": "fixture",
+        "redirect_uris": [],
+        "type": "create_o_auth2_app"
+      }
+    },
+    {
+      "canonical_edge": {
+        "type": "list_o_auth2_apps"
+      },
+      "canonical_minimal": {
+        "type": "list_o_auth2_apps"
+      },
+      "edge": {
+        "type": "list_o_auth2_apps"
+      },
+      "minimal": {
+        "type": "list_o_auth2_apps"
+      }
+    },
+    {
+      "canonical_edge": {
+        "app_id": "fixture",
+        "type": "delete_o_auth2_app"
+      },
+      "canonical_minimal": {
+        "app_id": "fixture",
+        "type": "delete_o_auth2_app"
+      },
+      "edge": {
+        "app_id": "fixture",
+        "type": "delete_o_auth2_app"
+      },
+      "minimal": {
+        "app_id": "fixture",
+        "type": "delete_o_auth2_app"
+      }
+    },
+    {
+      "canonical_edge": {
+        "avatar_url": null,
+        "server_id": "fixture",
+        "type": "set_server_avatar"
+      },
+      "canonical_minimal": {
+        "avatar_url": null,
+        "server_id": "fixture",
+        "type": "set_server_avatar"
+      },
+      "edge": {
+        "avatar_url": null,
+        "server_id": "fixture",
+        "type": "set_server_avatar"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "set_server_avatar"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "set_vanity_code",
+        "vanity_code": null
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "set_vanity_code",
+        "vanity_code": null
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "set_vanity_code",
+        "vanity_code": null
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "set_vanity_code"
+      }
+    },
+    {
+      "canonical_edge": {
+        "type": "get_server_limits"
+      },
+      "canonical_minimal": {
+        "type": "get_server_limits"
+      },
+      "edge": {
+        "type": "get_server_limits"
+      },
+      "minimal": {
+        "type": "get_server_limits"
+      }
+    }
+  ],
+  "server_events": [
+    {
+      "canonical_edge": {
+        "request_id": "fixture",
+        "snapshot": {
+          "cursor": "fixture",
+          "history_before": {},
+          "messages": [
+            {
+              "attachments": [
+                {
+                  "attachment_id": "fixture",
+                  "content_type": "fixture",
+                  "file_size": 9007199254740991,
+                  "filename": "fixture",
+                  "state_version": 9007199254740991
+                }
+              ],
+              "content": null,
+              "content_format": "fixture",
+              "conversation_id": "fixture",
+              "created_at": "fixture",
+              "deleted": true,
+              "edited_at": null,
+              "entity_version": 9007199254740991,
+              "mentions": [
+                {
+                  "end_byte": 9007199254740991,
+                  "kind": "everyone",
+                  "start_byte": 9007199254740991,
+                  "target_id": null
+                }
+              ],
+              "message_id": "fixture",
+              "reply_to": null,
+              "reply_to_id": null,
+              "sender_id": "fixture",
+              "sender_nick": "fixture",
+              "sequence": "fixture"
+            }
+          ],
+          "operation_generation": "fixture",
+          "protocol_version": 4294967295,
+          "reactions": [
+            {
+              "count": 9007199254740991,
+              "emoji": "fixture",
+              "message_id": "fixture",
+              "reacted_by_me": true
+            }
+          ],
+          "read_states": [
+            {
+              "conversation_id": "fixture",
+              "entity_version": 9007199254740991,
+              "message_id": "fixture",
+              "sequence": "fixture"
+            }
+          ]
+        },
+        "type": "sync_snapshot"
+      },
+      "canonical_minimal": {
+        "request_id": "fixture",
+        "snapshot": {
+          "cursor": "fixture",
+          "history_before": {},
+          "messages": [],
+          "operation_generation": "fixture",
+          "protocol_version": 0,
+          "reactions": [],
+          "read_states": []
+        },
+        "type": "sync_snapshot"
+      },
+      "edge": {
+        "request_id": "fixture",
+        "snapshot": {
+          "cursor": "fixture",
+          "history_before": {},
+          "messages": [
+            {
+              "attachments": [
+                {
+                  "attachment_id": "fixture",
+                  "content_type": "fixture",
+                  "file_size": 9007199254740991,
+                  "filename": "fixture",
+                  "state_version": 9007199254740991
+                }
+              ],
+              "content": null,
+              "content_format": "fixture",
+              "conversation_id": "fixture",
+              "created_at": "fixture",
+              "deleted": true,
+              "edited_at": null,
+              "entity_version": 9007199254740991,
+              "mentions": [
+                {
+                  "end_byte": 9007199254740991,
+                  "kind": "everyone",
+                  "start_byte": 9007199254740991,
+                  "target_id": null
+                }
+              ],
+              "message_id": "fixture",
+              "reply_to": null,
+              "reply_to_id": null,
+              "sender_id": "fixture",
+              "sender_nick": "fixture",
+              "sequence": "fixture"
+            }
+          ],
+          "operation_generation": "fixture",
+          "protocol_version": 4294967295,
+          "reactions": [
+            {
+              "count": 9007199254740991,
+              "emoji": "fixture",
+              "message_id": "fixture",
+              "reacted_by_me": true
+            }
+          ],
+          "read_states": [
+            {
+              "conversation_id": "fixture",
+              "entity_version": 9007199254740991,
+              "message_id": "fixture",
+              "sequence": "fixture"
+            }
+          ]
+        },
+        "type": "sync_snapshot"
+      },
+      "minimal": {
+        "request_id": "fixture",
+        "snapshot": {
+          "cursor": "fixture",
+          "history_before": {},
+          "messages": [],
+          "operation_generation": "fixture",
+          "protocol_version": 0,
+          "reactions": [],
+          "read_states": []
+        },
+        "type": "sync_snapshot"
+      }
+    },
+    {
+      "canonical_edge": {
+        "batch": {
+          "cursor": "fixture",
+          "events": [
+            {
+              "conversation_id": "fixture",
+              "descriptor": null,
+              "entity_id": "fixture",
+              "entity_type": "fixture",
+              "entity_version": 9007199254740991,
+              "kind": "fixture",
+              "message": null,
+              "reaction": null,
+              "read_state": null
+            }
+          ],
+          "has_more": true,
+          "operation_generation": "fixture",
+          "protocol_version": 4294967295
+        },
+        "request_id": "fixture",
+        "type": "replay_batch"
+      },
+      "canonical_minimal": {
+        "batch": {
+          "cursor": "fixture",
+          "events": [],
+          "has_more": false,
+          "operation_generation": "fixture",
+          "protocol_version": 0
+        },
+        "request_id": "fixture",
+        "type": "replay_batch"
+      },
+      "edge": {
+        "batch": {
+          "cursor": "fixture",
+          "events": [
+            {
+              "conversation_id": "fixture",
+              "descriptor": null,
+              "entity_id": "fixture",
+              "entity_type": "fixture",
+              "entity_version": 9007199254740991,
+              "kind": "fixture",
+              "message": null,
+              "reaction": null,
+              "read_state": null
+            }
+          ],
+          "has_more": true,
+          "operation_generation": "fixture",
+          "protocol_version": 4294967295
+        },
+        "request_id": "fixture",
+        "type": "replay_batch"
+      },
+      "minimal": {
+        "batch": {
+          "cursor": "fixture",
+          "events": [],
+          "has_more": false,
+          "operation_generation": "fixture",
+          "protocol_version": 0
+        },
+        "request_id": "fixture",
+        "type": "replay_batch"
+      }
+    },
+    {
+      "canonical_edge": {
+        "event": {
+          "conversation_id": "fixture",
+          "descriptor": null,
+          "entity_id": "fixture",
+          "entity_type": "fixture",
+          "entity_version": 9007199254740991,
+          "kind": "fixture",
+          "message": null,
+          "reaction": null,
+          "read_state": null
+        },
+        "type": "durable_event"
+      },
+      "canonical_minimal": {
+        "event": {
+          "conversation_id": "fixture",
+          "descriptor": null,
+          "entity_id": "fixture",
+          "entity_type": "fixture",
+          "entity_version": 0,
+          "kind": "fixture",
+          "message": null,
+          "reaction": null,
+          "read_state": null
+        },
+        "type": "durable_event"
+      },
+      "edge": {
+        "event": {
+          "conversation_id": "fixture",
+          "descriptor": null,
+          "entity_id": "fixture",
+          "entity_type": "fixture",
+          "entity_version": 9007199254740991,
+          "kind": "fixture",
+          "message": null,
+          "reaction": null,
+          "read_state": null
+        },
+        "type": "durable_event"
+      },
+      "minimal": {
+        "event": {
+          "conversation_id": "fixture",
+          "descriptor": null,
+          "entity_id": "fixture",
+          "entity_type": "fixture",
+          "entity_version": 0,
+          "kind": "fixture"
+        },
+        "type": "durable_event"
+      }
+    },
+    {
+      "canonical_edge": {
+        "reason": "invalid_cursor",
+        "request_id": "fixture",
+        "type": "resync_required"
+      },
+      "canonical_minimal": {
+        "reason": "cursor_expired",
+        "request_id": "fixture",
+        "type": "resync_required"
+      },
+      "edge": {
+        "reason": "invalid_cursor",
+        "request_id": "fixture",
+        "type": "resync_required"
+      },
+      "minimal": {
+        "reason": "cursor_expired",
+        "request_id": "fixture",
+        "type": "resync_required"
+      }
+    },
+    {
+      "canonical_edge": {
+        "code": "fixture",
+        "message": "fixture",
+        "request_id": "fixture",
+        "retryable": true,
+        "type": "command_error"
+      },
+      "canonical_minimal": {
+        "code": "fixture",
+        "message": "fixture",
+        "request_id": "fixture",
+        "retryable": false,
+        "type": "command_error"
+      },
+      "edge": {
+        "code": "fixture",
+        "message": "fixture",
+        "request_id": "fixture",
+        "retryable": true,
+        "type": "command_error"
+      },
+      "minimal": {
+        "code": "fixture",
+        "message": "fixture",
+        "request_id": "fixture",
+        "retryable": false,
+        "type": "command_error"
+      }
+    },
+    {
+      "canonical_edge": {
+        "request_id": "fixture",
+        "type": "lifecycle_command_succeeded"
+      },
+      "canonical_minimal": {
+        "request_id": "fixture",
+        "type": "lifecycle_command_succeeded"
+      },
+      "edge": {
+        "request_id": "fixture",
+        "type": "lifecycle_command_succeeded"
+      },
+      "minimal": {
+        "request_id": "fixture",
+        "type": "lifecycle_command_succeeded"
+      }
+    },
+    {
+      "canonical_edge": {
+        "receipt": {
+          "client_message_id": "fixture",
+          "entity_version": 9007199254740991,
+          "message_id": "fixture",
+          "persisted_at": "fixture",
+          "replayed": true,
+          "request_id": "fixture",
+          "sequence": "fixture"
+        },
+        "type": "command_committed"
+      },
+      "canonical_minimal": {
+        "receipt": {
+          "client_message_id": "fixture",
+          "entity_version": 0,
+          "message_id": "fixture",
+          "persisted_at": "fixture",
+          "replayed": false,
+          "request_id": "fixture",
+          "sequence": "fixture"
+        },
+        "type": "command_committed"
+      },
+      "edge": {
+        "receipt": {
+          "client_message_id": "fixture",
+          "entity_version": 9007199254740991,
+          "message_id": "fixture",
+          "persisted_at": "fixture",
+          "replayed": true,
+          "request_id": "fixture",
+          "sequence": "fixture"
+        },
+        "type": "command_committed"
+      },
+      "minimal": {
+        "receipt": {
+          "client_message_id": "fixture",
+          "entity_version": 0,
+          "message_id": "fixture",
+          "persisted_at": "fixture",
+          "request_id": "fixture",
+          "sequence": "fixture"
+        },
+        "type": "command_committed"
+      }
+    },
+    {
+      "canonical_edge": {
+        "content": "fixture",
+        "from": "fixture",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "target": "fixture",
+        "timestamp": "2026-01-02T03:04:05Z",
+        "type": "message"
+      },
+      "canonical_minimal": {
+        "content": "fixture",
+        "from": "fixture",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "target": "fixture",
+        "timestamp": "2026-01-02T03:04:05Z",
+        "type": "message"
+      },
+      "edge": {
+        "attachments": null,
+        "avatar_url": null,
+        "content": "fixture",
+        "conversation_id": null,
+        "from": "fixture",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "reply_to": null,
+        "server_id": null,
+        "target": "fixture",
+        "timestamp": "2026-01-02T03:04:05Z",
+        "type": "message"
+      },
+      "minimal": {
+        "content": "fixture",
+        "from": "fixture",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "target": "fixture",
+        "timestamp": "2026-01-02T03:04:05Z",
+        "type": "message"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "content": "fixture",
+        "edited_at": "2026-01-02T03:04:05Z",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_edit"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "content": "fixture",
+        "edited_at": "2026-01-02T03:04:05Z",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_edit"
+      },
+      "edge": {
+        "channel": "fixture",
+        "content": "fixture",
+        "edited_at": "2026-01-02T03:04:05Z",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_edit"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "content": "fixture",
+        "edited_at": "2026-01-02T03:04:05Z",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_edit"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_delete"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_delete"
+      },
+      "edge": {
+        "channel": "fixture",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_delete"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_delete"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "client_message_id": "fixture",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "persisted_at": "fixture",
+        "replayed": true,
+        "request_id": "fixture",
+        "sequence": "fixture",
+        "server_id": "fixture",
+        "type": "message_ack"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "client_message_id": "fixture",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "persisted_at": "fixture",
+        "replayed": false,
+        "request_id": "fixture",
+        "sequence": "fixture",
+        "server_id": "fixture",
+        "type": "message_ack"
+      },
+      "edge": {
+        "channel": "fixture",
+        "client_message_id": "fixture",
+        "conversation_id": null,
+        "id": "00000000-0000-4000-8000-000000000001",
+        "nonce": null,
+        "persisted_at": "fixture",
+        "replayed": true,
+        "request_id": "fixture",
+        "sequence": "fixture",
+        "server_id": "fixture",
+        "type": "message_ack"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "client_message_id": "fixture",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "persisted_at": "fixture",
+        "replayed": false,
+        "request_id": "fixture",
+        "sequence": "fixture",
+        "server_id": "fixture",
+        "type": "message_ack"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "emoji": "fixture",
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "reaction_add",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "emoji": "fixture",
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "reaction_add",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "channel": "fixture",
+        "emoji": "fixture",
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "reaction_add",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "emoji": "fixture",
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "reaction_add",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "emoji": "fixture",
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "reaction_remove",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "emoji": "fixture",
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "reaction_remove",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "channel": "fixture",
+        "emoji": "fixture",
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "reaction_remove",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "emoji": "fixture",
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "reaction_remove",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "typing_start"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "typing_start"
+      },
+      "edge": {
+        "channel": "fixture",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "typing_start"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "typing_start"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "nickname": "fixture",
+        "role_ids": [
+          "fixture"
+        ],
+        "server_id": "fixture",
+        "type": "join"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "join"
+      },
+      "edge": {
+        "avatar_url": null,
+        "channel": "fixture",
+        "nickname": "fixture",
+        "role_ids": [
+          "fixture"
+        ],
+        "server_avatar_url": null,
+        "server_id": "fixture",
+        "type": "join",
+        "user_id": null
+      },
+      "minimal": {
+        "channel": "fixture",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "join"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "nickname": "fixture",
+        "reason": null,
+        "server_id": "fixture",
+        "type": "part"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "nickname": "fixture",
+        "reason": null,
+        "server_id": "fixture",
+        "type": "part"
+      },
+      "edge": {
+        "channel": "fixture",
+        "nickname": "fixture",
+        "reason": null,
+        "server_id": "fixture",
+        "type": "part"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "nickname": "fixture",
+        "server_id": "fixture",
+        "type": "part"
+      }
+    },
+    {
+      "canonical_edge": {
+        "nickname": "fixture",
+        "reason": null,
+        "type": "quit"
+      },
+      "canonical_minimal": {
+        "nickname": "fixture",
+        "reason": null,
+        "type": "quit"
+      },
+      "edge": {
+        "nickname": "fixture",
+        "reason": null,
+        "type": "quit"
+      },
+      "minimal": {
+        "nickname": "fixture",
+        "type": "quit"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "set_by": "fixture",
+        "topic": "fixture",
+        "type": "topic_change"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "set_by": "fixture",
+        "topic": "fixture",
+        "type": "topic_change"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "set_by": "fixture",
+        "topic": "fixture",
+        "type": "topic_change"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "set_by": "fixture",
+        "topic": "fixture",
+        "type": "topic_change"
+      }
+    },
+    {
+      "canonical_edge": {
+        "new_nick": "fixture",
+        "old_nick": "fixture",
+        "type": "nick_change"
+      },
+      "canonical_minimal": {
+        "new_nick": "fixture",
+        "old_nick": "fixture",
+        "type": "nick_change"
+      },
+      "edge": {
+        "new_nick": "fixture",
+        "old_nick": "fixture",
+        "type": "nick_change"
+      },
+      "minimal": {
+        "new_nick": "fixture",
+        "old_nick": "fixture",
+        "type": "nick_change"
+      }
+    },
+    {
+      "canonical_edge": {
+        "message": "fixture",
+        "type": "server_notice"
+      },
+      "canonical_minimal": {
+        "message": "fixture",
+        "type": "server_notice"
+      },
+      "edge": {
+        "message": "fixture",
+        "type": "server_notice"
+      },
+      "minimal": {
+        "message": "fixture",
+        "type": "server_notice"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "members": [
+          {
+            "nickname": "fixture",
+            "role_ids": []
+          }
+        ],
+        "server_id": "fixture",
+        "type": "names"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "members": [],
+        "server_id": "fixture",
+        "type": "names"
+      },
+      "edge": {
+        "channel": "fixture",
+        "members": [
+          {
+            "avatar_url": null,
+            "custom_status": null,
+            "nickname": "fixture",
+            "server_avatar_url": null,
+            "status": null,
+            "status_emoji": null,
+            "user_id": null
+          }
+        ],
+        "server_id": "fixture",
+        "type": "names"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "members": [],
+        "server_id": "fixture",
+        "type": "names"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "topic": "fixture",
+        "type": "topic"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "topic": "fixture",
+        "type": "topic"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "topic": "fixture",
+        "type": "topic"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "topic": "fixture",
+        "type": "topic"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channels": [
+          {
+            "archived": true,
+            "channel_type": "fixture",
+            "conversation_id": "fixture",
+            "id": "fixture",
+            "is_nsfw": true,
+            "is_private": true,
+            "member_count": 9007199254740991,
+            "name": "fixture",
+            "position": 2147483647,
+            "server_id": "fixture",
+            "slowmode_seconds": 2147483647,
+            "topic": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "channel_list"
+      },
+      "canonical_minimal": {
+        "channels": [],
+        "server_id": "fixture",
+        "type": "channel_list"
+      },
+      "edge": {
+        "channels": [
+          {
+            "archived": true,
+            "category_id": null,
+            "channel_type": "fixture",
+            "conversation_id": "fixture",
+            "id": "fixture",
+            "is_nsfw": true,
+            "is_private": true,
+            "member_count": 9007199254740991,
+            "name": "fixture",
+            "position": 2147483647,
+            "server_id": "fixture",
+            "slowmode_seconds": 2147483647,
+            "thread_parent_message_id": null,
+            "topic": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "channel_list"
+      },
+      "minimal": {
+        "channels": [],
+        "server_id": "fixture",
+        "type": "channel_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "has_more": true,
+        "messages": [
+          {
+            "content": "fixture",
+            "from": "fixture",
+            "id": "00000000-0000-4000-8000-000000000001",
+            "timestamp": "2026-01-02T03:04:05Z"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "history"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "has_more": false,
+        "messages": [],
+        "server_id": "fixture",
+        "type": "history"
+      },
+      "edge": {
+        "channel": "fixture",
+        "has_more": true,
+        "messages": [
+          {
+            "attachments": null,
+            "content": "fixture",
+            "edited_at": null,
+            "embeds": null,
+            "from": "fixture",
+            "id": "00000000-0000-4000-8000-000000000001",
+            "reactions": null,
+            "reply_to": null,
+            "timestamp": "2026-01-02T03:04:05Z"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "history"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "has_more": false,
+        "messages": [],
+        "server_id": "fixture",
+        "type": "history"
+      }
+    },
+    {
+      "canonical_edge": {
+        "servers": [
+          {
+            "id": "fixture",
+            "member_count": 9007199254740991,
+            "my_permissions": 9007199254740991,
+            "name": "fixture"
+          }
+        ],
+        "type": "server_list"
+      },
+      "canonical_minimal": {
+        "servers": [],
+        "type": "server_list"
+      },
+      "edge": {
+        "servers": [
+          {
+            "icon_url": null,
+            "id": "fixture",
+            "member_count": 9007199254740991,
+            "my_permissions": 9007199254740991,
+            "name": "fixture",
+            "role": null
+          }
+        ],
+        "type": "server_list"
+      },
+      "minimal": {
+        "servers": [],
+        "type": "server_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "counts": [
+          {
+            "channel_name": "fixture",
+            "count": 9007199254740991
+          }
+        ],
+        "server_id": "fixture",
+        "type": "unread_counts"
+      },
+      "canonical_minimal": {
+        "counts": [],
+        "server_id": "fixture",
+        "type": "unread_counts"
+      },
+      "edge": {
+        "counts": [
+          {
+            "channel_name": "fixture",
+            "count": 9007199254740991
+          }
+        ],
+        "server_id": "fixture",
+        "type": "unread_counts"
+      },
+      "minimal": {
+        "counts": [],
+        "server_id": "fixture",
+        "type": "unread_counts"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "embeds": [
+          {
+            "url": "fixture"
+          }
+        ],
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_embed"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "embeds": [],
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_embed"
+      },
+      "edge": {
+        "channel": "fixture",
+        "embeds": [
+          {
+            "description": null,
+            "image_url": null,
+            "site_name": null,
+            "title": null,
+            "url": "fixture"
+          }
+        ],
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_embed"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "embeds": [],
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "server_id": "fixture",
+        "type": "message_embed"
+      }
+    },
+    {
+      "canonical_edge": {
+        "roles": [
+          {
+            "id": "fixture",
+            "is_default": true,
+            "name": "fixture",
+            "permissions": 9007199254740991,
+            "position": 2147483647,
+            "server_id": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "role_list",
+        "version": 9007199254740991
+      },
+      "canonical_minimal": {
+        "roles": [],
+        "server_id": "fixture",
+        "type": "role_list",
+        "version": 0
+      },
+      "edge": {
+        "roles": [
+          {
+            "color": null,
+            "icon_url": null,
+            "id": "fixture",
+            "is_default": true,
+            "name": "fixture",
+            "permissions": 9007199254740991,
+            "position": 2147483647,
+            "server_id": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "role_list",
+        "version": 9007199254740991
+      },
+      "minimal": {
+        "roles": [],
+        "server_id": "fixture",
+        "type": "role_list",
+        "version": 0
+      }
+    },
+    {
+      "canonical_edge": {
+        "role": {
+          "id": "fixture",
+          "is_default": true,
+          "name": "fixture",
+          "permissions": 9007199254740991,
+          "position": 2147483647,
+          "server_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "role_update"
+      },
+      "canonical_minimal": {
+        "role": {
+          "id": "fixture",
+          "is_default": false,
+          "name": "fixture",
+          "permissions": 0,
+          "position": 0,
+          "server_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "role_update"
+      },
+      "edge": {
+        "role": {
+          "color": null,
+          "icon_url": null,
+          "id": "fixture",
+          "is_default": true,
+          "name": "fixture",
+          "permissions": 9007199254740991,
+          "position": 2147483647,
+          "server_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "role_update"
+      },
+      "minimal": {
+        "role": {
+          "id": "fixture",
+          "is_default": false,
+          "name": "fixture",
+          "permissions": 0,
+          "position": 0,
+          "server_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "role_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "role_delete"
+      },
+      "canonical_minimal": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "role_delete"
+      },
+      "edge": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "role_delete"
+      },
+      "minimal": {
+        "role_id": "fixture",
+        "server_id": "fixture",
+        "type": "role_delete"
+      }
+    },
+    {
+      "canonical_edge": {
+        "role_ids": [
+          "fixture"
+        ],
+        "server_id": "fixture",
+        "type": "member_role_update",
+        "user_id": "fixture",
+        "version": 9007199254740991
+      },
+      "canonical_minimal": {
+        "role_ids": [],
+        "server_id": "fixture",
+        "type": "member_role_update",
+        "user_id": "fixture",
+        "version": 0
+      },
+      "edge": {
+        "role_ids": [
+          "fixture"
+        ],
+        "server_id": "fixture",
+        "type": "member_role_update",
+        "user_id": "fixture",
+        "version": 9007199254740991
+      },
+      "minimal": {
+        "role_ids": [],
+        "server_id": "fixture",
+        "type": "member_role_update",
+        "user_id": "fixture",
+        "version": 0
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel_id": "fixture",
+        "overrides": [
+          {
+            "allow_bits": 9007199254740991,
+            "channel_id": "fixture",
+            "deny_bits": 9007199254740991,
+            "id": "fixture",
+            "target_id": "fixture",
+            "target_type": "user"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "channel_permission_override_list"
+      },
+      "canonical_minimal": {
+        "channel_id": "fixture",
+        "overrides": [],
+        "server_id": "fixture",
+        "type": "channel_permission_override_list"
+      },
+      "edge": {
+        "channel_id": "fixture",
+        "overrides": [
+          {
+            "allow_bits": 9007199254740991,
+            "channel_id": "fixture",
+            "deny_bits": 9007199254740991,
+            "id": "fixture",
+            "target_id": "fixture",
+            "target_type": "user"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "channel_permission_override_list"
+      },
+      "minimal": {
+        "channel_id": "fixture",
+        "overrides": [],
+        "server_id": "fixture",
+        "type": "channel_permission_override_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "categories": [
+          {
+            "id": "fixture",
+            "name": "fixture",
+            "position": 2147483647,
+            "server_id": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "category_list"
+      },
+      "canonical_minimal": {
+        "categories": [],
+        "server_id": "fixture",
+        "type": "category_list"
+      },
+      "edge": {
+        "categories": [
+          {
+            "id": "fixture",
+            "name": "fixture",
+            "position": 2147483647,
+            "server_id": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "category_list"
+      },
+      "minimal": {
+        "categories": [],
+        "server_id": "fixture",
+        "type": "category_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "category": {
+          "id": "fixture",
+          "name": "fixture",
+          "position": 2147483647,
+          "server_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "category_update"
+      },
+      "canonical_minimal": {
+        "category": {
+          "id": "fixture",
+          "name": "fixture",
+          "position": 0,
+          "server_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "category_update"
+      },
+      "edge": {
+        "category": {
+          "id": "fixture",
+          "name": "fixture",
+          "position": 2147483647,
+          "server_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "category_update"
+      },
+      "minimal": {
+        "category": {
+          "id": "fixture",
+          "name": "fixture",
+          "position": 0,
+          "server_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "category_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "category_id": "fixture",
+        "server_id": "fixture",
+        "type": "category_delete"
+      },
+      "canonical_minimal": {
+        "category_id": "fixture",
+        "server_id": "fixture",
+        "type": "category_delete"
+      },
+      "edge": {
+        "category_id": "fixture",
+        "server_id": "fixture",
+        "type": "category_delete"
+      },
+      "minimal": {
+        "category_id": "fixture",
+        "server_id": "fixture",
+        "type": "category_delete"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channels": [
+          {
+            "id": "fixture",
+            "position": 2147483647
+          }
+        ],
+        "server_id": "fixture",
+        "type": "channel_reorder"
+      },
+      "canonical_minimal": {
+        "channels": [],
+        "server_id": "fixture",
+        "type": "channel_reorder"
+      },
+      "edge": {
+        "channels": [
+          {
+            "category_id": null,
+            "id": "fixture",
+            "position": 2147483647
+          }
+        ],
+        "server_id": "fixture",
+        "type": "channel_reorder"
+      },
+      "minimal": {
+        "channels": [],
+        "server_id": "fixture",
+        "type": "channel_reorder"
+      }
+    },
+    {
+      "canonical_edge": {
+        "presence": {
+          "nickname": "fixture",
+          "status": "fixture",
+          "user_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "presence_update"
+      },
+      "canonical_minimal": {
+        "presence": {
+          "nickname": "fixture",
+          "status": "fixture",
+          "user_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "presence_update"
+      },
+      "edge": {
+        "presence": {
+          "avatar_url": null,
+          "custom_status": null,
+          "nickname": "fixture",
+          "status": "fixture",
+          "status_emoji": null,
+          "user_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "presence_update"
+      },
+      "minimal": {
+        "presence": {
+          "nickname": "fixture",
+          "status": "fixture",
+          "user_id": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "presence_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "presences": [
+          {
+            "nickname": "fixture",
+            "status": "fixture",
+            "user_id": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "presence_list"
+      },
+      "canonical_minimal": {
+        "presences": [],
+        "server_id": "fixture",
+        "type": "presence_list"
+      },
+      "edge": {
+        "presences": [
+          {
+            "avatar_url": null,
+            "custom_status": null,
+            "nickname": "fixture",
+            "status": "fixture",
+            "status_emoji": null,
+            "user_id": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "presence_list"
+      },
+      "minimal": {
+        "presences": [],
+        "server_id": "fixture",
+        "type": "presence_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "custom_status": "fixture",
+        "effective_status": "offline",
+        "requested_status": "invisible",
+        "status_emoji": "fixture",
+        "type": "own_presence"
+      },
+      "canonical_minimal": {
+        "custom_status": null,
+        "effective_status": "online",
+        "requested_status": "online",
+        "status_emoji": null,
+        "type": "own_presence"
+      },
+      "edge": {
+        "custom_status": "fixture",
+        "effective_status": "offline",
+        "requested_status": "invisible",
+        "status_emoji": "fixture",
+        "type": "own_presence"
+      },
+      "minimal": {
+        "custom_status": null,
+        "effective_status": "online",
+        "requested_status": "online",
+        "status_emoji": null,
+        "type": "own_presence"
+      }
+    },
+    {
+      "canonical_edge": {
+        "profile": {
+          "created_at": "fixture",
+          "user_id": "fixture",
+          "username": "fixture"
+        },
+        "type": "user_profile"
+      },
+      "canonical_minimal": {
+        "profile": {
+          "created_at": "fixture",
+          "user_id": "fixture",
+          "username": "fixture"
+        },
+        "type": "user_profile"
+      },
+      "edge": {
+        "profile": {
+          "avatar_url": null,
+          "banner_url": null,
+          "bio": null,
+          "created_at": "fixture",
+          "pronouns": null,
+          "user_id": "fixture",
+          "username": "fixture"
+        },
+        "type": "user_profile"
+      },
+      "minimal": {
+        "profile": {
+          "created_at": "fixture",
+          "user_id": "fixture",
+          "username": "fixture"
+        },
+        "type": "user_profile"
+      }
+    },
+    {
+      "canonical_edge": {
+        "display_name": "fixture",
+        "nickname": null,
+        "server_avatar_url": null,
+        "server_id": "fixture",
+        "type": "server_nickname_update",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "display_name": "fixture",
+        "nickname": null,
+        "server_avatar_url": null,
+        "server_id": "fixture",
+        "type": "server_nickname_update",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "display_name": "fixture",
+        "nickname": null,
+        "server_avatar_url": null,
+        "server_id": "fixture",
+        "type": "server_nickname_update",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "display_name": "fixture",
+        "server_avatar_url": null,
+        "server_id": "fixture",
+        "type": "server_nickname_update",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "settings": [
+          {
+            "id": "fixture",
+            "level": "fixture",
+            "muted": true,
+            "suppress_everyone": true,
+            "suppress_roles": true
+          }
+        ],
+        "type": "notification_settings"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "settings": [],
+        "type": "notification_settings"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "settings": [
+          {
+            "channel_id": null,
+            "id": "fixture",
+            "level": "fixture",
+            "mute_until": null,
+            "muted": true,
+            "server_id": null,
+            "suppress_everyone": true,
+            "suppress_roles": true
+          }
+        ],
+        "type": "notification_settings"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "settings": [],
+        "type": "notification_settings"
+      }
+    },
+    {
+      "canonical_edge": {
+        "offset": 9007199254740991,
+        "query": "fixture",
+        "results": [
+          {
+            "channel_id": "fixture",
+            "channel_name": "fixture",
+            "content": "fixture",
+            "from": "fixture",
+            "id": "fixture",
+            "timestamp": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "total_count": 9007199254740991,
+        "type": "search_results"
+      },
+      "canonical_minimal": {
+        "offset": 0,
+        "query": "fixture",
+        "results": [],
+        "server_id": "fixture",
+        "total_count": 0,
+        "type": "search_results"
+      },
+      "edge": {
+        "offset": 9007199254740991,
+        "query": "fixture",
+        "results": [
+          {
+            "channel_id": "fixture",
+            "channel_name": "fixture",
+            "content": "fixture",
+            "edited_at": null,
+            "from": "fixture",
+            "id": "fixture",
+            "timestamp": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "total_count": 9007199254740991,
+        "type": "search_results"
+      },
+      "minimal": {
+        "offset": 0,
+        "query": "fixture",
+        "results": [],
+        "server_id": "fixture",
+        "total_count": 0,
+        "type": "search_results"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "pin": {
+          "channel_id": "fixture",
+          "content": "fixture",
+          "from": "fixture",
+          "id": "fixture",
+          "message_id": "fixture",
+          "pinned_at": "fixture",
+          "pinned_by": "fixture",
+          "timestamp": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "message_pin"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "pin": {
+          "channel_id": "fixture",
+          "content": "fixture",
+          "from": "fixture",
+          "id": "fixture",
+          "message_id": "fixture",
+          "pinned_at": "fixture",
+          "pinned_by": "fixture",
+          "timestamp": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "message_pin"
+      },
+      "edge": {
+        "channel": "fixture",
+        "pin": {
+          "channel_id": "fixture",
+          "content": "fixture",
+          "from": "fixture",
+          "id": "fixture",
+          "message_id": "fixture",
+          "pinned_at": "fixture",
+          "pinned_by": "fixture",
+          "timestamp": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "message_pin"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "pin": {
+          "channel_id": "fixture",
+          "content": "fixture",
+          "from": "fixture",
+          "id": "fixture",
+          "message_id": "fixture",
+          "pinned_at": "fixture",
+          "pinned_by": "fixture",
+          "timestamp": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "message_pin"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "message_unpin"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "message_unpin"
+      },
+      "edge": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "message_unpin"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "message_id": "fixture",
+        "server_id": "fixture",
+        "type": "message_unpin"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "pins": [
+          {
+            "channel_id": "fixture",
+            "content": "fixture",
+            "from": "fixture",
+            "id": "fixture",
+            "message_id": "fixture",
+            "pinned_at": "fixture",
+            "pinned_by": "fixture",
+            "timestamp": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "pinned_messages"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "pins": [],
+        "server_id": "fixture",
+        "type": "pinned_messages"
+      },
+      "edge": {
+        "channel": "fixture",
+        "pins": [
+          {
+            "channel_id": "fixture",
+            "content": "fixture",
+            "from": "fixture",
+            "id": "fixture",
+            "message_id": "fixture",
+            "pinned_at": "fixture",
+            "pinned_by": "fixture",
+            "timestamp": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "pinned_messages"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "pins": [],
+        "server_id": "fixture",
+        "type": "pinned_messages"
+      }
+    },
+    {
+      "canonical_edge": {
+        "parent_channel": "fixture",
+        "server_id": "fixture",
+        "thread": {
+          "archived": true,
+          "auto_archive_minutes": 2147483647,
+          "channel_type": "fixture",
+          "created_at": "fixture",
+          "creator_user_id": null,
+          "id": "fixture",
+          "message_count": 9007199254740991,
+          "name": "fixture",
+          "parent_message_id": null,
+          "state_version": 9007199254740991,
+          "tag_ids": [
+            "fixture"
+          ],
+          "tags_version": 9007199254740991
+        },
+        "type": "thread_create"
+      },
+      "canonical_minimal": {
+        "parent_channel": "fixture",
+        "server_id": "fixture",
+        "thread": {
+          "archived": false,
+          "auto_archive_minutes": 0,
+          "channel_type": "fixture",
+          "created_at": "fixture",
+          "creator_user_id": null,
+          "id": "fixture",
+          "message_count": 0,
+          "name": "fixture",
+          "parent_message_id": null,
+          "state_version": 0,
+          "tag_ids": [],
+          "tags_version": 0
+        },
+        "type": "thread_create"
+      },
+      "edge": {
+        "parent_channel": "fixture",
+        "server_id": "fixture",
+        "thread": {
+          "archived": true,
+          "auto_archive_minutes": 2147483647,
+          "channel_type": "fixture",
+          "created_at": "fixture",
+          "creator_user_id": null,
+          "id": "fixture",
+          "message_count": 9007199254740991,
+          "name": "fixture",
+          "parent_message_id": null,
+          "state_version": 9007199254740991,
+          "tag_ids": [
+            "fixture"
+          ],
+          "tags_version": 9007199254740991
+        },
+        "type": "thread_create"
+      },
+      "minimal": {
+        "parent_channel": "fixture",
+        "server_id": "fixture",
+        "thread": {
+          "archived": false,
+          "auto_archive_minutes": 0,
+          "channel_type": "fixture",
+          "created_at": "fixture",
+          "id": "fixture",
+          "message_count": 0,
+          "name": "fixture"
+        },
+        "type": "thread_create"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "thread": {
+          "archived": true,
+          "auto_archive_minutes": 2147483647,
+          "channel_type": "fixture",
+          "created_at": "fixture",
+          "creator_user_id": null,
+          "id": "fixture",
+          "message_count": 9007199254740991,
+          "name": "fixture",
+          "parent_message_id": null,
+          "state_version": 9007199254740991,
+          "tag_ids": [
+            "fixture"
+          ],
+          "tags_version": 9007199254740991
+        },
+        "type": "thread_update"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "thread": {
+          "archived": false,
+          "auto_archive_minutes": 0,
+          "channel_type": "fixture",
+          "created_at": "fixture",
+          "creator_user_id": null,
+          "id": "fixture",
+          "message_count": 0,
+          "name": "fixture",
+          "parent_message_id": null,
+          "state_version": 0,
+          "tag_ids": [],
+          "tags_version": 0
+        },
+        "type": "thread_update"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "thread": {
+          "archived": true,
+          "auto_archive_minutes": 2147483647,
+          "channel_type": "fixture",
+          "created_at": "fixture",
+          "creator_user_id": null,
+          "id": "fixture",
+          "message_count": 9007199254740991,
+          "name": "fixture",
+          "parent_message_id": null,
+          "state_version": 9007199254740991,
+          "tag_ids": [
+            "fixture"
+          ],
+          "tags_version": 9007199254740991
+        },
+        "type": "thread_update"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "thread": {
+          "archived": false,
+          "auto_archive_minutes": 0,
+          "channel_type": "fixture",
+          "created_at": "fixture",
+          "id": "fixture",
+          "message_count": 0,
+          "name": "fixture"
+        },
+        "type": "thread_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "threads": [
+          {
+            "archived": true,
+            "auto_archive_minutes": 2147483647,
+            "channel_type": "fixture",
+            "created_at": "fixture",
+            "creator_user_id": null,
+            "id": "fixture",
+            "message_count": 9007199254740991,
+            "name": "fixture",
+            "parent_message_id": null,
+            "state_version": 9007199254740991,
+            "tag_ids": [
+              "fixture"
+            ],
+            "tags_version": 9007199254740991
+          }
+        ],
+        "type": "thread_list"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "threads": [],
+        "type": "thread_list"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "threads": [
+          {
+            "archived": true,
+            "auto_archive_minutes": 2147483647,
+            "channel_type": "fixture",
+            "created_at": "fixture",
+            "creator_user_id": null,
+            "id": "fixture",
+            "message_count": 9007199254740991,
+            "name": "fixture",
+            "parent_message_id": null,
+            "state_version": 9007199254740991,
+            "tag_ids": [
+              "fixture"
+            ],
+            "tags_version": 9007199254740991
+          }
+        ],
+        "type": "thread_list"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "threads": [],
+        "type": "thread_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tags": [
+          {
+            "id": "fixture",
+            "moderated": true,
+            "name": "fixture",
+            "position": 2147483647
+          }
+        ],
+        "type": "forum_tag_list"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tags": [],
+        "type": "forum_tag_list"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tags": [
+          {
+            "emoji": null,
+            "id": "fixture",
+            "moderated": true,
+            "name": "fixture",
+            "position": 2147483647
+          }
+        ],
+        "type": "forum_tag_list"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tags": [],
+        "type": "forum_tag_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag": {
+          "id": "fixture",
+          "moderated": true,
+          "name": "fixture",
+          "position": 2147483647
+        },
+        "type": "forum_tag_update"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag": {
+          "id": "fixture",
+          "moderated": false,
+          "name": "fixture",
+          "position": 0
+        },
+        "type": "forum_tag_update"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag": {
+          "emoji": null,
+          "id": "fixture",
+          "moderated": true,
+          "name": "fixture",
+          "position": 2147483647
+        },
+        "type": "forum_tag_update"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag": {
+          "id": "fixture",
+          "moderated": false,
+          "name": "fixture",
+          "position": 0
+        },
+        "type": "forum_tag_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "forum_tag_delete"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "forum_tag_delete"
+      },
+      "edge": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "forum_tag_delete"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "server_id": "fixture",
+        "tag_id": "fixture",
+        "type": "forum_tag_delete"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "tag_ids": [
+          "fixture"
+        ],
+        "thread_id": "fixture",
+        "type": "thread_tag_update",
+        "version": 9007199254740991
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "tag_ids": [],
+        "thread_id": "fixture",
+        "type": "thread_tag_update",
+        "version": 0
+      },
+      "edge": {
+        "server_id": "fixture",
+        "tag_ids": [
+          "fixture"
+        ],
+        "thread_id": "fixture",
+        "type": "thread_tag_update",
+        "version": 9007199254740991
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "tag_ids": [],
+        "thread_id": "fixture",
+        "type": "thread_tag_update",
+        "version": 0
+      }
+    },
+    {
+      "canonical_edge": {
+        "bookmarks": [
+          {
+            "channel_id": "fixture",
+            "content": "fixture",
+            "created_at": "fixture",
+            "from": "fixture",
+            "id": "fixture",
+            "message_id": "fixture",
+            "timestamp": "fixture"
+          }
+        ],
+        "type": "bookmark_list"
+      },
+      "canonical_minimal": {
+        "bookmarks": [],
+        "type": "bookmark_list"
+      },
+      "edge": {
+        "bookmarks": [
+          {
+            "channel_id": "fixture",
+            "content": "fixture",
+            "created_at": "fixture",
+            "from": "fixture",
+            "id": "fixture",
+            "message_id": "fixture",
+            "note": null,
+            "timestamp": "fixture"
+          }
+        ],
+        "type": "bookmark_list"
+      },
+      "minimal": {
+        "bookmarks": [],
+        "type": "bookmark_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "bookmark": {
+          "channel_id": "fixture",
+          "content": "fixture",
+          "created_at": "fixture",
+          "from": "fixture",
+          "id": "fixture",
+          "message_id": "fixture",
+          "timestamp": "fixture"
+        },
+        "type": "bookmark_add"
+      },
+      "canonical_minimal": {
+        "bookmark": {
+          "channel_id": "fixture",
+          "content": "fixture",
+          "created_at": "fixture",
+          "from": "fixture",
+          "id": "fixture",
+          "message_id": "fixture",
+          "timestamp": "fixture"
+        },
+        "type": "bookmark_add"
+      },
+      "edge": {
+        "bookmark": {
+          "channel_id": "fixture",
+          "content": "fixture",
+          "created_at": "fixture",
+          "from": "fixture",
+          "id": "fixture",
+          "message_id": "fixture",
+          "note": null,
+          "timestamp": "fixture"
+        },
+        "type": "bookmark_add"
+      },
+      "minimal": {
+        "bookmark": {
+          "channel_id": "fixture",
+          "content": "fixture",
+          "created_at": "fixture",
+          "from": "fixture",
+          "id": "fixture",
+          "message_id": "fixture",
+          "timestamp": "fixture"
+        },
+        "type": "bookmark_add"
+      }
+    },
+    {
+      "canonical_edge": {
+        "message_id": "fixture",
+        "type": "bookmark_remove"
+      },
+      "canonical_minimal": {
+        "message_id": "fixture",
+        "type": "bookmark_remove"
+      },
+      "edge": {
+        "message_id": "fixture",
+        "type": "bookmark_remove"
+      },
+      "minimal": {
+        "message_id": "fixture",
+        "type": "bookmark_remove"
+      }
+    },
+    {
+      "canonical_edge": {
+        "conversations": [
+          {
+            "id": "fixture",
+            "peer_id": "fixture",
+            "peer_username": "fixture",
+            "unread_count": 9007199254740991
+          }
+        ],
+        "type": "direct_conversation_list"
+      },
+      "canonical_minimal": {
+        "conversations": [],
+        "type": "direct_conversation_list"
+      },
+      "edge": {
+        "conversations": [
+          {
+            "id": "fixture",
+            "last_message_at": null,
+            "peer_avatar_url": null,
+            "peer_id": "fixture",
+            "peer_username": "fixture",
+            "unread_count": 9007199254740991
+          }
+        ],
+        "type": "direct_conversation_list"
+      },
+      "minimal": {
+        "conversations": [],
+        "type": "direct_conversation_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "kicked_by": "fixture",
+        "reason": null,
+        "server_id": "fixture",
+        "type": "member_kick",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "kicked_by": "fixture",
+        "reason": null,
+        "server_id": "fixture",
+        "type": "member_kick",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "kicked_by": "fixture",
+        "reason": null,
+        "server_id": "fixture",
+        "type": "member_kick",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "kicked_by": "fixture",
+        "server_id": "fixture",
+        "type": "member_kick",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "banned_by": "fixture",
+        "reason": null,
+        "server_id": "fixture",
+        "type": "member_ban",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "banned_by": "fixture",
+        "reason": null,
+        "server_id": "fixture",
+        "type": "member_ban",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "banned_by": "fixture",
+        "reason": null,
+        "server_id": "fixture",
+        "type": "member_ban",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "banned_by": "fixture",
+        "server_id": "fixture",
+        "type": "member_ban",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "member_unban",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "member_unban",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "member_unban",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "member_unban",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "timeout_until": null,
+        "type": "member_timeout",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "timeout_until": null,
+        "type": "member_timeout",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "timeout_until": null,
+        "type": "member_timeout",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "member_timeout",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "seconds": 2147483647,
+        "server_id": "fixture",
+        "type": "slow_mode_update"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "seconds": 0,
+        "server_id": "fixture",
+        "type": "slow_mode_update"
+      },
+      "edge": {
+        "channel": "fixture",
+        "seconds": 2147483647,
+        "server_id": "fixture",
+        "type": "slow_mode_update"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "seconds": 0,
+        "server_id": "fixture",
+        "type": "slow_mode_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "is_nsfw": true,
+        "server_id": "fixture",
+        "type": "nsfw_update"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "is_nsfw": false,
+        "server_id": "fixture",
+        "type": "nsfw_update"
+      },
+      "edge": {
+        "channel": "fixture",
+        "is_nsfw": true,
+        "server_id": "fixture",
+        "type": "nsfw_update"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "is_nsfw": false,
+        "server_id": "fixture",
+        "type": "nsfw_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "message_ids": [
+          "fixture"
+        ],
+        "server_id": "fixture",
+        "type": "bulk_message_delete"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "message_ids": [],
+        "server_id": "fixture",
+        "type": "bulk_message_delete"
+      },
+      "edge": {
+        "channel": "fixture",
+        "message_ids": [
+          "fixture"
+        ],
+        "server_id": "fixture",
+        "type": "bulk_message_delete"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "message_ids": [],
+        "server_id": "fixture",
+        "type": "bulk_message_delete"
+      }
+    },
+    {
+      "canonical_edge": {
+        "entries": [
+          {
+            "action_type": "fixture",
+            "actor_id": "fixture",
+            "actor_username_snapshot": "fixture",
+            "created_at": "fixture",
+            "id": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "audit_log_entries"
+      },
+      "canonical_minimal": {
+        "entries": [],
+        "server_id": "fixture",
+        "type": "audit_log_entries"
+      },
+      "edge": {
+        "entries": [
+          {
+            "action_type": "fixture",
+            "actor_avatar_snapshot": null,
+            "actor_id": "fixture",
+            "actor_username_snapshot": "fixture",
+            "changes": null,
+            "created_at": "fixture",
+            "id": "fixture",
+            "reason": null,
+            "target_id": null,
+            "target_type": null
+          }
+        ],
+        "server_id": "fixture",
+        "type": "audit_log_entries"
+      },
+      "minimal": {
+        "entries": [],
+        "server_id": "fixture",
+        "type": "audit_log_entries"
+      }
+    },
+    {
+      "canonical_edge": {
+        "bans": [
+          {
+            "banned_by": "fixture",
+            "created_at": "fixture",
+            "id": "fixture",
+            "user_id": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "ban_list"
+      },
+      "canonical_minimal": {
+        "bans": [],
+        "server_id": "fixture",
+        "type": "ban_list"
+      },
+      "edge": {
+        "bans": [
+          {
+            "banned_by": "fixture",
+            "created_at": "fixture",
+            "id": "fixture",
+            "reason": null,
+            "user_id": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "ban_list"
+      },
+      "minimal": {
+        "bans": [],
+        "server_id": "fixture",
+        "type": "ban_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "rules": [
+          {
+            "action_type": "fixture",
+            "config": "fixture",
+            "enabled": true,
+            "id": "fixture",
+            "name": "fixture",
+            "rule_type": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "automod_rule_list"
+      },
+      "canonical_minimal": {
+        "rules": [],
+        "server_id": "fixture",
+        "type": "automod_rule_list"
+      },
+      "edge": {
+        "rules": [
+          {
+            "action_type": "fixture",
+            "config": "fixture",
+            "enabled": true,
+            "id": "fixture",
+            "name": "fixture",
+            "rule_type": "fixture",
+            "timeout_duration_seconds": null
+          }
+        ],
+        "server_id": "fixture",
+        "type": "automod_rule_list"
+      },
+      "minimal": {
+        "rules": [],
+        "server_id": "fixture",
+        "type": "automod_rule_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "rule": {
+          "action_type": "fixture",
+          "config": "fixture",
+          "enabled": true,
+          "id": "fixture",
+          "name": "fixture",
+          "rule_type": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "automod_rule_update"
+      },
+      "canonical_minimal": {
+        "rule": {
+          "action_type": "fixture",
+          "config": "fixture",
+          "enabled": false,
+          "id": "fixture",
+          "name": "fixture",
+          "rule_type": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "automod_rule_update"
+      },
+      "edge": {
+        "rule": {
+          "action_type": "fixture",
+          "config": "fixture",
+          "enabled": true,
+          "id": "fixture",
+          "name": "fixture",
+          "rule_type": "fixture",
+          "timeout_duration_seconds": null
+        },
+        "server_id": "fixture",
+        "type": "automod_rule_update"
+      },
+      "minimal": {
+        "rule": {
+          "action_type": "fixture",
+          "config": "fixture",
+          "enabled": false,
+          "id": "fixture",
+          "name": "fixture",
+          "rule_type": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "automod_rule_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "type": "automod_rule_delete"
+      },
+      "canonical_minimal": {
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "type": "automod_rule_delete"
+      },
+      "edge": {
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "type": "automod_rule_delete"
+      },
+      "minimal": {
+        "rule_id": "fixture",
+        "server_id": "fixture",
+        "type": "automod_rule_delete"
+      }
+    },
+    {
+      "canonical_edge": {
+        "invites": [
+          {
+            "code": "fixture",
+            "created_at": "fixture",
+            "created_by": "fixture",
+            "id": "fixture",
+            "server_id": "fixture",
+            "use_count": 2147483647
+          }
+        ],
+        "server_id": "fixture",
+        "type": "invite_list"
+      },
+      "canonical_minimal": {
+        "invites": [],
+        "server_id": "fixture",
+        "type": "invite_list"
+      },
+      "edge": {
+        "invites": [
+          {
+            "channel_id": null,
+            "code": "fixture",
+            "created_at": "fixture",
+            "created_by": "fixture",
+            "expires_at": null,
+            "id": "fixture",
+            "max_uses": null,
+            "server_id": "fixture",
+            "use_count": 2147483647
+          }
+        ],
+        "server_id": "fixture",
+        "type": "invite_list"
+      },
+      "minimal": {
+        "invites": [],
+        "server_id": "fixture",
+        "type": "invite_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "invite": {
+          "code": "fixture",
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "server_id": "fixture",
+          "use_count": 2147483647
+        },
+        "server_id": "fixture",
+        "type": "invite_create"
+      },
+      "canonical_minimal": {
+        "invite": {
+          "code": "fixture",
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "server_id": "fixture",
+          "use_count": 0
+        },
+        "server_id": "fixture",
+        "type": "invite_create"
+      },
+      "edge": {
+        "invite": {
+          "channel_id": null,
+          "code": "fixture",
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "expires_at": null,
+          "id": "fixture",
+          "max_uses": null,
+          "server_id": "fixture",
+          "use_count": 2147483647
+        },
+        "server_id": "fixture",
+        "type": "invite_create"
+      },
+      "minimal": {
+        "invite": {
+          "code": "fixture",
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "server_id": "fixture",
+          "use_count": 0
+        },
+        "server_id": "fixture",
+        "type": "invite_create"
+      }
+    },
+    {
+      "canonical_edge": {
+        "invite_id": "fixture",
+        "server_id": "fixture",
+        "type": "invite_delete"
+      },
+      "canonical_minimal": {
+        "invite_id": "fixture",
+        "server_id": "fixture",
+        "type": "invite_delete"
+      },
+      "edge": {
+        "invite_id": "fixture",
+        "server_id": "fixture",
+        "type": "invite_delete"
+      },
+      "minimal": {
+        "invite_id": "fixture",
+        "server_id": "fixture",
+        "type": "invite_delete"
+      }
+    },
+    {
+      "canonical_edge": {
+        "events": [
+          {
+            "created_at": "fixture",
+            "created_by": "fixture",
+            "id": "fixture",
+            "interested_count": 9007199254740991,
+            "name": "fixture",
+            "server_id": "fixture",
+            "start_time": "fixture",
+            "status": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "event_list"
+      },
+      "canonical_minimal": {
+        "events": [],
+        "server_id": "fixture",
+        "type": "event_list"
+      },
+      "edge": {
+        "events": [
+          {
+            "channel_id": null,
+            "created_at": "fixture",
+            "created_by": "fixture",
+            "description": null,
+            "end_time": null,
+            "id": "fixture",
+            "image_url": null,
+            "interested_count": 9007199254740991,
+            "name": "fixture",
+            "server_id": "fixture",
+            "start_time": "fixture",
+            "status": "fixture"
+          }
+        ],
+        "server_id": "fixture",
+        "type": "event_list"
+      },
+      "minimal": {
+        "events": [],
+        "server_id": "fixture",
+        "type": "event_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "event": {
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "interested_count": 9007199254740991,
+          "name": "fixture",
+          "server_id": "fixture",
+          "start_time": "fixture",
+          "status": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "event_update"
+      },
+      "canonical_minimal": {
+        "event": {
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "interested_count": 0,
+          "name": "fixture",
+          "server_id": "fixture",
+          "start_time": "fixture",
+          "status": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "event_update"
+      },
+      "edge": {
+        "event": {
+          "channel_id": null,
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "description": null,
+          "end_time": null,
+          "id": "fixture",
+          "image_url": null,
+          "interested_count": 9007199254740991,
+          "name": "fixture",
+          "server_id": "fixture",
+          "start_time": "fixture",
+          "status": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "event_update"
+      },
+      "minimal": {
+        "event": {
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "interested_count": 0,
+          "name": "fixture",
+          "server_id": "fixture",
+          "start_time": "fixture",
+          "status": "fixture"
+        },
+        "server_id": "fixture",
+        "type": "event_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "event_delete"
+      },
+      "canonical_minimal": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "event_delete"
+      },
+      "edge": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "event_delete"
+      },
+      "minimal": {
+        "event_id": "fixture",
+        "server_id": "fixture",
+        "type": "event_delete"
+      }
+    },
+    {
+      "canonical_edge": {
+        "event_id": "fixture",
+        "rsvps": [
+          {
+            "status": "fixture",
+            "user_id": "fixture"
+          }
+        ],
+        "type": "event_rsvp_list"
+      },
+      "canonical_minimal": {
+        "event_id": "fixture",
+        "rsvps": [],
+        "type": "event_rsvp_list"
+      },
+      "edge": {
+        "event_id": "fixture",
+        "rsvps": [
+          {
+            "status": "fixture",
+            "user_id": "fixture"
+          }
+        ],
+        "type": "event_rsvp_list"
+      },
+      "minimal": {
+        "event_id": "fixture",
+        "rsvps": [],
+        "type": "event_rsvp_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "community": {
+          "is_discoverable": true,
+          "server_id": "fixture"
+        },
+        "type": "server_community"
+      },
+      "canonical_minimal": {
+        "community": {
+          "is_discoverable": false,
+          "server_id": "fixture"
+        },
+        "type": "server_community"
+      },
+      "edge": {
+        "community": {
+          "category": null,
+          "description": null,
+          "is_discoverable": true,
+          "rules_text": null,
+          "server_id": "fixture",
+          "welcome_message": null
+        },
+        "type": "server_community"
+      },
+      "minimal": {
+        "community": {
+          "is_discoverable": false,
+          "server_id": "fixture"
+        },
+        "type": "server_community"
+      }
+    },
+    {
+      "canonical_edge": {
+        "servers": [
+          {
+            "is_discoverable": true,
+            "server_id": "fixture"
+          }
+        ],
+        "type": "discover_servers"
+      },
+      "canonical_minimal": {
+        "servers": [],
+        "type": "discover_servers"
+      },
+      "edge": {
+        "servers": [
+          {
+            "category": null,
+            "description": null,
+            "is_discoverable": true,
+            "rules_text": null,
+            "server_id": "fixture",
+            "welcome_message": null
+          }
+        ],
+        "type": "discover_servers"
+      },
+      "minimal": {
+        "servers": [],
+        "type": "discover_servers"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel_id": "fixture",
+        "follows": [
+          {
+            "created_by": "fixture",
+            "id": "fixture",
+            "source_channel_id": "fixture",
+            "target_channel_id": "fixture"
+          }
+        ],
+        "type": "channel_follow_list"
+      },
+      "canonical_minimal": {
+        "channel_id": "fixture",
+        "follows": [],
+        "type": "channel_follow_list"
+      },
+      "edge": {
+        "channel_id": "fixture",
+        "follows": [
+          {
+            "created_by": "fixture",
+            "id": "fixture",
+            "source_channel_id": "fixture",
+            "target_channel_id": "fixture"
+          }
+        ],
+        "type": "channel_follow_list"
+      },
+      "minimal": {
+        "channel_id": "fixture",
+        "follows": [],
+        "type": "channel_follow_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "follow": {
+          "created_by": "fixture",
+          "id": "fixture",
+          "source_channel_id": "fixture",
+          "target_channel_id": "fixture"
+        },
+        "type": "channel_follow_create"
+      },
+      "canonical_minimal": {
+        "follow": {
+          "created_by": "fixture",
+          "id": "fixture",
+          "source_channel_id": "fixture",
+          "target_channel_id": "fixture"
+        },
+        "type": "channel_follow_create"
+      },
+      "edge": {
+        "follow": {
+          "created_by": "fixture",
+          "id": "fixture",
+          "source_channel_id": "fixture",
+          "target_channel_id": "fixture"
+        },
+        "type": "channel_follow_create"
+      },
+      "minimal": {
+        "follow": {
+          "created_by": "fixture",
+          "id": "fixture",
+          "source_channel_id": "fixture",
+          "target_channel_id": "fixture"
+        },
+        "type": "channel_follow_create"
+      }
+    },
+    {
+      "canonical_edge": {
+        "follow_id": "fixture",
+        "type": "channel_follow_delete"
+      },
+      "canonical_minimal": {
+        "follow_id": "fixture",
+        "type": "channel_follow_delete"
+      },
+      "edge": {
+        "follow_id": "fixture",
+        "type": "channel_follow_delete"
+      },
+      "minimal": {
+        "follow_id": "fixture",
+        "type": "channel_follow_delete"
+      }
+    },
+    {
+      "canonical_edge": {
+        "published_count": 9007199254740991,
+        "source_message_id": "fixture",
+        "type": "announcement_published"
+      },
+      "canonical_minimal": {
+        "published_count": 0,
+        "source_message_id": "fixture",
+        "type": "announcement_published"
+      },
+      "edge": {
+        "published_count": 9007199254740991,
+        "source_message_id": "fixture",
+        "type": "announcement_published"
+      },
+      "minimal": {
+        "published_count": 0,
+        "source_message_id": "fixture",
+        "type": "announcement_published"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "templates": [
+          {
+            "created_at": "fixture",
+            "created_by": "fixture",
+            "id": "fixture",
+            "name": "fixture",
+            "server_id": "fixture",
+            "use_count": 2147483647
+          }
+        ],
+        "type": "template_list"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "templates": [],
+        "type": "template_list"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "templates": [
+          {
+            "created_at": "fixture",
+            "created_by": "fixture",
+            "description": null,
+            "id": "fixture",
+            "name": "fixture",
+            "server_id": "fixture",
+            "use_count": 2147483647
+          }
+        ],
+        "type": "template_list"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "templates": [],
+        "type": "template_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "template": {
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "server_id": "fixture",
+          "use_count": 2147483647
+        },
+        "type": "template_update"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "template": {
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "server_id": "fixture",
+          "use_count": 0
+        },
+        "type": "template_update"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "template": {
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "description": null,
+          "id": "fixture",
+          "name": "fixture",
+          "server_id": "fixture",
+          "use_count": 2147483647
+        },
+        "type": "template_update"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "template": {
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "server_id": "fixture",
+          "use_count": 0
+        },
+        "type": "template_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "template_delete"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "template_delete"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "template_delete"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "template_delete"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "template_instantiated"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "template_instantiated"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "template_instantiated"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "template_id": "fixture",
+        "type": "template_instantiated"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "webhook_list",
+        "webhooks": [
+          {
+            "channel_id": "fixture",
+            "created_at": "fixture",
+            "created_by": "fixture",
+            "id": "fixture",
+            "name": "fixture",
+            "server_id": "fixture",
+            "token": "fixture",
+            "webhook_type": "fixture"
+          }
+        ]
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "webhook_list",
+        "webhooks": []
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "webhook_list",
+        "webhooks": [
+          {
+            "avatar_url": null,
+            "channel_id": "fixture",
+            "created_at": "fixture",
+            "created_by": "fixture",
+            "id": "fixture",
+            "name": "fixture",
+            "server_id": "fixture",
+            "token": "fixture",
+            "url": null,
+            "webhook_type": "fixture"
+          }
+        ]
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "webhook_list",
+        "webhooks": []
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "webhook_update",
+        "webhook": {
+          "channel_id": "fixture",
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "server_id": "fixture",
+          "token": "fixture",
+          "webhook_type": "fixture"
+        }
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "webhook_update",
+        "webhook": {
+          "channel_id": "fixture",
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "server_id": "fixture",
+          "token": "fixture",
+          "webhook_type": "fixture"
+        }
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "webhook_update",
+        "webhook": {
+          "avatar_url": null,
+          "channel_id": "fixture",
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "server_id": "fixture",
+          "token": "fixture",
+          "url": null,
+          "webhook_type": "fixture"
+        }
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "webhook_update",
+        "webhook": {
+          "channel_id": "fixture",
+          "created_at": "fixture",
+          "created_by": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "server_id": "fixture",
+          "token": "fixture",
+          "webhook_type": "fixture"
+        }
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "webhook_delete",
+        "webhook_id": "fixture"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "webhook_delete",
+        "webhook_id": "fixture"
+      },
+      "edge": {
+        "server_id": "fixture",
+        "type": "webhook_delete",
+        "webhook_id": "fixture"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "webhook_delete",
+        "webhook_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "commands": [
+          {
+            "bot_user_id": "fixture",
+            "description": "fixture",
+            "id": "fixture",
+            "name": "fixture",
+            "options": [
+              {
+                "description": "fixture",
+                "name": "fixture",
+                "option_type": "fixture",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "server_id": "fixture",
+        "type": "slash_command_list"
+      },
+      "canonical_minimal": {
+        "commands": [],
+        "server_id": "fixture",
+        "type": "slash_command_list"
+      },
+      "edge": {
+        "commands": [
+          {
+            "bot_user_id": "fixture",
+            "description": "fixture",
+            "id": "fixture",
+            "name": "fixture",
+            "options": [
+              {
+                "choices": null,
+                "description": "fixture",
+                "name": "fixture",
+                "option_type": "fixture",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "server_id": "fixture",
+        "type": "slash_command_list"
+      },
+      "minimal": {
+        "commands": [],
+        "server_id": "fixture",
+        "type": "slash_command_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "command": {
+          "bot_user_id": "fixture",
+          "description": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "options": [
+            {
+              "description": "fixture",
+              "name": "fixture",
+              "option_type": "fixture",
+              "required": true
+            }
+          ]
+        },
+        "server_id": "fixture",
+        "type": "slash_command_update"
+      },
+      "canonical_minimal": {
+        "command": {
+          "bot_user_id": "fixture",
+          "description": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "options": []
+        },
+        "server_id": "fixture",
+        "type": "slash_command_update"
+      },
+      "edge": {
+        "command": {
+          "bot_user_id": "fixture",
+          "description": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "options": [
+            {
+              "choices": null,
+              "description": "fixture",
+              "name": "fixture",
+              "option_type": "fixture",
+              "required": true
+            }
+          ]
+        },
+        "server_id": "fixture",
+        "type": "slash_command_update"
+      },
+      "minimal": {
+        "command": {
+          "bot_user_id": "fixture",
+          "description": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "options": []
+        },
+        "server_id": "fixture",
+        "type": "slash_command_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "command_id": "fixture",
+        "server_id": "fixture",
+        "type": "slash_command_delete"
+      },
+      "canonical_minimal": {
+        "command_id": "fixture",
+        "server_id": "fixture",
+        "type": "slash_command_delete"
+      },
+      "edge": {
+        "command_id": "fixture",
+        "server_id": "fixture",
+        "type": "slash_command_delete"
+      },
+      "minimal": {
+        "command_id": "fixture",
+        "server_id": "fixture",
+        "type": "slash_command_delete"
+      }
+    },
+    {
+      "canonical_edge": {
+        "interaction": {
+          "channel_id": "fixture",
+          "data": null,
+          "id": "fixture",
+          "interaction_type": "fixture",
+          "server_id": "fixture",
+          "user_id": "fixture"
+        },
+        "type": "interaction_create"
+      },
+      "canonical_minimal": {
+        "interaction": {
+          "channel_id": "fixture",
+          "data": null,
+          "id": "fixture",
+          "interaction_type": "fixture",
+          "server_id": "fixture",
+          "user_id": "fixture"
+        },
+        "type": "interaction_create"
+      },
+      "edge": {
+        "interaction": {
+          "channel_id": "fixture",
+          "command_name": null,
+          "data": null,
+          "id": "fixture",
+          "interaction_type": "fixture",
+          "server_id": "fixture",
+          "user_id": "fixture"
+        },
+        "type": "interaction_create"
+      },
+      "minimal": {
+        "interaction": {
+          "channel_id": "fixture",
+          "data": null,
+          "id": "fixture",
+          "interaction_type": "fixture",
+          "server_id": "fixture",
+          "user_id": "fixture"
+        },
+        "type": "interaction_create"
+      }
+    },
+    {
+      "canonical_edge": {
+        "channel": "fixture",
+        "interaction_id": "fixture",
+        "response": {
+          "ephemeral": true
+        },
+        "server_id": "fixture",
+        "type": "interaction_response"
+      },
+      "canonical_minimal": {
+        "channel": "fixture",
+        "interaction_id": "fixture",
+        "response": {
+          "ephemeral": false
+        },
+        "server_id": "fixture",
+        "type": "interaction_response"
+      },
+      "edge": {
+        "channel": "fixture",
+        "interaction_id": "fixture",
+        "response": {
+          "components": null,
+          "content": null,
+          "embeds": null,
+          "ephemeral": true
+        },
+        "server_id": "fixture",
+        "type": "interaction_response"
+      },
+      "minimal": {
+        "channel": "fixture",
+        "interaction_id": "fixture",
+        "response": {},
+        "server_id": "fixture",
+        "type": "interaction_response"
+      }
+    },
+    {
+      "canonical_edge": {
+        "request_id": "fixture",
+        "type": "interaction_invoked"
+      },
+      "canonical_minimal": {
+        "request_id": "fixture",
+        "type": "interaction_invoked"
+      },
+      "edge": {
+        "request_id": "fixture",
+        "type": "interaction_invoked"
+      },
+      "minimal": {
+        "request_id": "fixture",
+        "type": "interaction_invoked"
+      }
+    },
+    {
+      "canonical_edge": {
+        "bots": [
+          {
+            "id": "fixture",
+            "installed_server_ids": [
+              "fixture"
+            ],
+            "username": "fixture"
+          }
+        ],
+        "type": "bot_account_list"
+      },
+      "canonical_minimal": {
+        "bots": [],
+        "type": "bot_account_list"
+      },
+      "edge": {
+        "bots": [
+          {
+            "avatar_url": null,
+            "id": "fixture",
+            "installed_server_ids": [
+              "fixture"
+            ],
+            "username": "fixture"
+          }
+        ],
+        "type": "bot_account_list"
+      },
+      "minimal": {
+        "bots": [],
+        "type": "bot_account_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "bot_user_id": "fixture",
+        "credential": {
+          "created_at": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "scopes": "fixture"
+        },
+        "token": "fixture",
+        "type": "bot_credential_created"
+      },
+      "canonical_minimal": {
+        "bot_user_id": "fixture",
+        "credential": {
+          "created_at": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "scopes": "fixture"
+        },
+        "token": "fixture",
+        "type": "bot_credential_created"
+      },
+      "edge": {
+        "bot_user_id": "fixture",
+        "credential": {
+          "created_at": "fixture",
+          "id": "fixture",
+          "last_used": null,
+          "name": "fixture",
+          "scopes": "fixture"
+        },
+        "token": "fixture",
+        "type": "bot_credential_created"
+      },
+      "minimal": {
+        "bot_user_id": "fixture",
+        "credential": {
+          "created_at": "fixture",
+          "id": "fixture",
+          "name": "fixture",
+          "scopes": "fixture"
+        },
+        "token": "fixture",
+        "type": "bot_credential_created"
+      }
+    },
+    {
+      "canonical_edge": {
+        "bot_user_id": "fixture",
+        "tokens": [
+          {
+            "created_at": "fixture",
+            "id": "fixture",
+            "name": "fixture",
+            "scopes": "fixture"
+          }
+        ],
+        "type": "bot_token_list"
+      },
+      "canonical_minimal": {
+        "bot_user_id": "fixture",
+        "tokens": [],
+        "type": "bot_token_list"
+      },
+      "edge": {
+        "bot_user_id": "fixture",
+        "tokens": [
+          {
+            "created_at": "fixture",
+            "id": "fixture",
+            "last_used": null,
+            "name": "fixture",
+            "scopes": "fixture"
+          }
+        ],
+        "type": "bot_token_list"
+      },
+      "minimal": {
+        "bot_user_id": "fixture",
+        "tokens": [],
+        "type": "bot_token_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "apps": [
+          {
+            "created_at": "fixture",
+            "description": "fixture",
+            "id": "fixture",
+            "is_public": true,
+            "name": "fixture",
+            "owner_id": "fixture",
+            "redirect_uris": [
+              "fixture"
+            ],
+            "scopes": "fixture"
+          }
+        ],
+        "type": "o_auth2_app_list"
+      },
+      "canonical_minimal": {
+        "apps": [],
+        "type": "o_auth2_app_list"
+      },
+      "edge": {
+        "apps": [
+          {
+            "created_at": "fixture",
+            "description": "fixture",
+            "icon_url": null,
+            "id": "fixture",
+            "is_public": true,
+            "name": "fixture",
+            "owner_id": "fixture",
+            "redirect_uris": [
+              "fixture"
+            ],
+            "scopes": "fixture"
+          }
+        ],
+        "type": "o_auth2_app_list"
+      },
+      "minimal": {
+        "apps": [],
+        "type": "o_auth2_app_list"
+      }
+    },
+    {
+      "canonical_edge": {
+        "app": {
+          "created_at": "fixture",
+          "description": "fixture",
+          "id": "fixture",
+          "is_public": true,
+          "name": "fixture",
+          "owner_id": "fixture",
+          "redirect_uris": [
+            "fixture"
+          ],
+          "scopes": "fixture"
+        },
+        "type": "o_auth2_app_update"
+      },
+      "canonical_minimal": {
+        "app": {
+          "created_at": "fixture",
+          "description": "fixture",
+          "id": "fixture",
+          "is_public": false,
+          "name": "fixture",
+          "owner_id": "fixture",
+          "redirect_uris": [],
+          "scopes": "fixture"
+        },
+        "type": "o_auth2_app_update"
+      },
+      "edge": {
+        "app": {
+          "created_at": "fixture",
+          "description": "fixture",
+          "icon_url": null,
+          "id": "fixture",
+          "is_public": true,
+          "name": "fixture",
+          "owner_id": "fixture",
+          "redirect_uris": [
+            "fixture"
+          ],
+          "scopes": "fixture"
+        },
+        "type": "o_auth2_app_update"
+      },
+      "minimal": {
+        "app": {
+          "created_at": "fixture",
+          "description": "fixture",
+          "id": "fixture",
+          "is_public": false,
+          "name": "fixture",
+          "owner_id": "fixture",
+          "redirect_uris": [],
+          "scopes": "fixture"
+        },
+        "type": "o_auth2_app_update"
+      }
+    },
+    {
+      "canonical_edge": {
+        "bsky_handle": "fixture",
+        "followers_count": 9007199254740991,
+        "follows_count": 9007199254740991,
+        "type": "bluesky_profile_sync",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "bsky_handle": "fixture",
+        "followers_count": 0,
+        "follows_count": 0,
+        "type": "bluesky_profile_sync",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "avatar_url": null,
+        "banner_url": null,
+        "bsky_handle": "fixture",
+        "description": null,
+        "display_name": null,
+        "followers_count": 9007199254740991,
+        "follows_count": 9007199254740991,
+        "type": "bluesky_profile_sync",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "bsky_handle": "fixture",
+        "followers_count": 0,
+        "follows_count": 0,
+        "type": "bluesky_profile_sync",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "message_id": "fixture",
+        "success": true,
+        "type": "bluesky_share_result"
+      },
+      "canonical_minimal": {
+        "message_id": "fixture",
+        "success": false,
+        "type": "bluesky_share_result"
+      },
+      "edge": {
+        "error": null,
+        "message_id": "fixture",
+        "post_uri": null,
+        "success": true,
+        "type": "bluesky_share_result"
+      },
+      "minimal": {
+        "message_id": "fixture",
+        "success": false,
+        "type": "bluesky_share_result"
+      }
+    },
+    {
+      "canonical_edge": {
+        "server_id": "fixture",
+        "type": "server_avatar_update",
+        "user_id": "fixture"
+      },
+      "canonical_minimal": {
+        "server_id": "fixture",
+        "type": "server_avatar_update",
+        "user_id": "fixture"
+      },
+      "edge": {
+        "avatar_url": null,
+        "server_id": "fixture",
+        "type": "server_avatar_update",
+        "user_id": "fixture"
+      },
+      "minimal": {
+        "server_id": "fixture",
+        "type": "server_avatar_update",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "canonical_edge": {
+        "max_file_size_mb": 9007199254740991,
+        "max_message_length": 9007199254740991,
+        "type": "server_limits"
+      },
+      "canonical_minimal": {
+        "max_file_size_mb": 0,
+        "max_message_length": 0,
+        "type": "server_limits"
+      },
+      "edge": {
+        "max_file_size_mb": 9007199254740991,
+        "max_message_length": 9007199254740991,
+        "type": "server_limits"
+      },
+      "minimal": {
+        "max_file_size_mb": 0,
+        "max_message_length": 0,
+        "type": "server_limits"
+      }
+    },
+    {
+      "canonical_edge": {
+        "code": "fixture",
+        "message": "fixture",
+        "type": "error"
+      },
+      "canonical_minimal": {
+        "code": "fixture",
+        "message": "fixture",
+        "type": "error"
+      },
+      "edge": {
+        "code": "fixture",
+        "message": "fixture",
+        "type": "error"
+      },
+      "minimal": {
+        "code": "fixture",
+        "message": "fixture",
+        "type": "error"
+      }
+    }
+  ]
+}

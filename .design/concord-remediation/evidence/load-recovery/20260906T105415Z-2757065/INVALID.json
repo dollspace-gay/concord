@@ -1,0 +1,4 @@
+{
+  "acceptance_eligible": false,
+  "reason": "Superseded: provider cleanup made the restored pending-job reconciliation assertion vacuous."
+}

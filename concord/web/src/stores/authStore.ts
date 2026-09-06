@@ -12,6 +12,8 @@ interface AuthState {
   logout: () => Promise<void>;
 }
 
+let authGeneration = 0;
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   providers: [],
@@ -19,33 +21,38 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
 
   checkAuth: async () => {
-    console.log('[authStore] checkAuth starting');
+    const generation = ++authGeneration;
     set({ loading: true, error: null });
     try {
       const status = await api.getAuthStatus();
-      console.log('[authStore] got auth status:', status);
+      if (generation !== authGeneration) return;
       set({ providers: status.providers });
 
       try {
         const user = await api.getMe();
-        console.log('[authStore] got user:', user);
+        if (generation !== authGeneration) return;
         set({ user, loading: false });
       } catch (e) {
-        console.log('[authStore] getMe failed (not authenticated):', e);
-        set({ user: null, loading: false });
+        if (generation !== authGeneration) return;
+        if (e instanceof api.HttpError && e.status === 401) {
+          set({ user: null, loading: false });
+        } else {
+          set({ error: `Unable to verify sign-in: ${String(e)}`, loading: false });
+        }
       }
     } catch (e) {
-      console.error('[authStore] checkAuth error:', e);
+      if (generation !== authGeneration) return;
       set({ error: String(e), loading: false });
     }
   },
 
   logout: async () => {
+    ++authGeneration;
+    set({ user: null, loading: false, error: null });
     try {
       await api.logout();
-    } catch {
-      // ignore
+    } catch (e) {
+      set({ error: `Signed out locally, but the server session could not be revoked: ${String(e)}` });
     }
-    set({ user: null });
   },
 }));

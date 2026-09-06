@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8"><title>Concord settings harness</title></head>
+  <body><div id="root"></div>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { SettingsPage } from '/src/components/auth/SettingsPage.tsx';
+      import { useAuthStore } from '/src/stores/authStore.ts';
+      import { useChatStore } from '/src/stores/chatStore.ts';
+      window.authStore = useAuthStore;
+      window.chatStore = useChatStore;
+      useAuthStore.setState({ user: { id: 'account-a', username: 'alice' }, loading: false });
+      useChatStore.setState({ activeAccountId: 'account-a', protectedGeneration: 1 });
+      function ScopedSettings() {
+        const userId = useAuthStore((state) => state.user?.id);
+        const accountId = useChatStore((state) => state.activeAccountId);
+        const generation = useChatStore((state) => state.protectedGeneration);
+        return React.createElement(SettingsPage, { key: `${userId}:${accountId}:${generation}` });
+      }
+      createRoot(document.getElementById('root')).render(React.createElement(ScopedSettings));
+    </script>
+  </body>
+</html>

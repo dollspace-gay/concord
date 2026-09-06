@@ -20,6 +20,81 @@ pub async fn create_bot_user(
     Ok(())
 }
 
+pub async fn create_bot_user_owned(
+    pool: &SqlitePool,
+    user_id: &str,
+    username: &str,
+    avatar_url: Option<&str>,
+    owner_user_id: &str,
+) -> Result<(), sqlx::Error> {
+    let mut transaction = pool.begin().await?;
+    sqlx::query("INSERT INTO users (id, username, avatar_url, is_bot) VALUES (?, ?, ?, 1)")
+        .bind(user_id)
+        .bind(username)
+        .bind(avatar_url)
+        .execute(&mut *transaction)
+        .await?;
+    sqlx::query(
+        "INSERT INTO bot_ownership(bot_user_id,owner_user_id,repair_required) VALUES (?,?,0)",
+    )
+    .bind(user_id)
+    .bind(owner_user_id)
+    .execute(&mut *transaction)
+    .await?;
+    transaction.commit().await?;
+    Ok(())
+}
+
+pub async fn delete_bot_user(pool: &SqlitePool, user_id: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM users WHERE id=? AND is_bot=1")
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn record_bot_owner(
+    pool: &SqlitePool,
+    bot_user_id: &str,
+    owner_user_id: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO bot_ownership(bot_user_id,owner_user_id,repair_required) VALUES (?,?,0)",
+    )
+    .bind(bot_user_id)
+    .bind(owner_user_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn bot_owner(
+    pool: &SqlitePool,
+    bot_user_id: &str,
+) -> Result<Option<String>, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT owner_user_id FROM bot_ownership \
+         WHERE bot_user_id=? AND repair_required=0",
+    )
+    .bind(bot_user_id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn bot_token_owner(
+    pool: &SqlitePool,
+    token_id: &str,
+) -> Result<Option<String>, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT o.owner_user_id FROM bot_tokens t \
+         JOIN bot_ownership o ON o.bot_user_id=t.user_id \
+         WHERE t.id=? AND o.repair_required=0",
+    )
+    .bind(token_id)
+    .fetch_optional(pool)
+    .await
+}
+
 pub async fn create_bot_token(
     pool: &SqlitePool,
     id: &str,
@@ -101,13 +176,52 @@ pub async fn add_bot_to_server(
     server_id: &str,
     bot_user_id: &str,
 ) -> Result<(), sqlx::Error> {
+    let installed_by: String = sqlx::query_scalar("SELECT owner_id FROM servers WHERE id=?")
+        .bind(server_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)?;
+    add_bot_to_server_with_grants(pool, server_id, bot_user_id, &installed_by, "messages").await
+}
+
+pub async fn add_bot_to_server_with_grants(
+    pool: &SqlitePool,
+    server_id: &str,
+    bot_user_id: &str,
+    installed_by: &str,
+    granted_scopes: &str,
+) -> Result<(), sqlx::Error> {
+    let mut transaction = pool.begin().await?;
+    let bot: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM users WHERE id=? AND is_bot=1 AND disabled_at IS NULL)",
+    )
+    .bind(bot_user_id)
+    .fetch_one(&mut *transaction)
+    .await?;
+    if !bot {
+        return Err(sqlx::Error::RowNotFound);
+    }
     sqlx::query(
         "INSERT OR IGNORE INTO server_members (server_id, user_id, role) VALUES (?, ?, 'member')",
     )
     .bind(server_id)
     .bind(bot_user_id)
-    .execute(pool)
+    .execute(&mut *transaction)
     .await?;
+    sqlx::query(
+        "INSERT INTO bot_installations(id,bot_user_id,server_id,installed_by,granted_scopes,state) \
+         VALUES(?,?,?,?,?,'active') ON CONFLICT(bot_user_id,server_id) DO UPDATE SET \
+         installed_by=excluded.installed_by,granted_scopes=excluded.granted_scopes,state='active', \
+         revoked_at=NULL,authorization_version=bot_installations.authorization_version+1",
+    )
+    .bind(uuid::Uuid::new_v4().to_string())
+    .bind(bot_user_id)
+    .bind(server_id)
+    .bind(installed_by)
+    .bind(granted_scopes)
+    .execute(&mut *transaction)
+    .await?;
+    transaction.commit().await?;
     Ok(())
 }
 
@@ -129,11 +243,21 @@ pub async fn remove_bot_from_server(
     server_id: &str,
     bot_user_id: &str,
 ) -> Result<(), sqlx::Error> {
+    let mut transaction = pool.begin().await?;
+    sqlx::query(
+        "UPDATE bot_installations SET state='revoked',revoked_at=datetime('now'), \
+         authorization_version=authorization_version+1 WHERE server_id=? AND bot_user_id=? AND state='active'",
+    )
+    .bind(server_id)
+    .bind(bot_user_id)
+    .execute(&mut *transaction)
+    .await?;
     sqlx::query("DELETE FROM server_members WHERE server_id = ? AND user_id = ?")
         .bind(server_id)
         .bind(bot_user_id)
-        .execute(pool)
+        .execute(&mut *transaction)
         .await?;
+    transaction.commit().await?;
     Ok(())
 }
 
@@ -272,6 +396,14 @@ mod tests {
             .unwrap();
         assert!(member.is_some());
         assert_eq!(member.unwrap().role, "member");
+        let installed: (String, String, i64) = sqlx::query_as(
+            "SELECT state,granted_scopes,authorization_version FROM bot_installations \
+             WHERE server_id='s1' AND bot_user_id='bot1'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(installed, ("active".into(), "messages".into(), 1));
 
         remove_bot_from_server(&pool, "s1", "bot1").await.unwrap();
 
@@ -279,6 +411,21 @@ mod tests {
             .await
             .unwrap();
         assert!(member.is_none());
+        let revoked: (String, i64) = sqlx::query_as(
+            "SELECT state,authorization_version FROM bot_installations WHERE server_id='s1' AND bot_user_id='bot1'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!(revoked, ("revoked".into(), 2));
+
+        add_bot_to_server_with_grants(&pool, "s1", "bot1", "u1", "messages commands")
+            .await
+            .unwrap();
+        let reinstalled: (String, String, i64) = sqlx::query_as(
+            "SELECT state,granted_scopes,authorization_version FROM bot_installations WHERE server_id='s1' AND bot_user_id='bot1'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!(
+            reinstalled,
+            ("active".into(), "messages commands".into(), 3)
+        );
     }
 
     #[tokio::test]

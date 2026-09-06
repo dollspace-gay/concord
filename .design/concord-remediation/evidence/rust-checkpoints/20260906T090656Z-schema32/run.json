@@ -1,0 +1,11 @@
+{
+  "command": "cargo test --workspace --all-features --locked",
+  "log": "/tmp/concord-remediation-workspace-schema32.log",
+  "source_state": "uncommitted working source; Rust/contract edits held during compile",
+  "captured_at": "20260906T090656Z",
+  "result": "failed",
+  "library_passed": 999,
+  "library_failed": 1,
+  "failure": "web::ws_handler::tests::lifecycle_mutation_reports_success_only_after_command_acceptance used bare command after protocol switched to explicit lifecycle envelope",
+  "integration_binaries_reached": false
+}

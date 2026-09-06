@@ -11,6 +11,7 @@ export function QuickSwitcher() {
   const setActiveChannel = useUiStore((s) => s.setActiveChannel);
   const joinChannel = useChatStore((s) => s.joinChannel);
   const inputRef = useRef<HTMLInputElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -33,7 +34,13 @@ export function QuickSwitcher() {
   }, [show, setShow]);
 
   useEffect(() => {
-    if (show) inputRef.current?.focus();
+    if (show) {
+      previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      inputRef.current?.focus();
+    } else if (previousFocusRef.current) {
+      previousFocusRef.current.focus();
+      previousFocusRef.current = null;
+    }
   }, [show]);
 
   const results = useMemo(() => {
@@ -86,7 +93,7 @@ export function QuickSwitcher() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] bg-black/60" onClick={() => setShow(false)}>
-      <div className="w-[500px] overflow-hidden rounded-lg bg-bg-primary shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Quick switcher" className="w-[500px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg bg-bg-primary shadow-xl" onClick={(e) => e.stopPropagation()}>
         <input
           ref={inputRef}
           type="text"
@@ -94,6 +101,7 @@ export function QuickSwitcher() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Where would you like to go?"
+          aria-label="Search servers and channels"
           className="w-full border-b border-border bg-bg-primary px-4 py-3 text-lg text-text-primary outline-none placeholder:text-text-muted"
         />
         {results.length > 0 && (

@@ -12,6 +12,7 @@ pub const MAX_SERVER_NAME_LENGTH: usize = 100;
 
 /// Maximum nickname length.
 pub const MAX_NICKNAME_LENGTH: usize = 32;
+pub const MAX_DISPLAY_NAME_LENGTH: usize = 256;
 
 /// Validate a server name. Must be 1-100 chars, non-empty after trimming.
 pub fn validate_server_name(name: &str) -> Result<(), String> {
@@ -24,6 +25,9 @@ pub fn validate_server_name(name: &str) -> Result<(), String> {
             "Server name too long (max {} characters)",
             MAX_SERVER_NAME_LENGTH
         ));
+    }
+    if trimmed.chars().any(char::is_control) {
+        return Err("Server name cannot contain control characters".into());
     }
     Ok(())
 }
@@ -42,17 +46,33 @@ pub fn validate_nickname(nick: &str) -> Result<(), String> {
     }
     if !nick
         .chars()
-        .all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
+        .all(|c| c.is_ascii_alphanumeric() || "_-.[\\]^{|}~".contains(c))
     {
-        return Err(
-            "Nickname can only contain letters, numbers, underscores, hyphens, and dots".into(),
-        );
+        return Err("Nickname contains characters unsupported by IRC".into());
+    }
+    let first = nick.chars().next().expect("nonempty nickname");
+    if !(first.is_ascii_alphabetic() || "_[\\]^{|}~".contains(first)) {
+        return Err("Nickname must start with an IRC letter or special character".into());
+    }
+    Ok(())
+}
+
+pub fn validate_display_name(name: &str) -> Result<(), String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() || trimmed.len() > MAX_DISPLAY_NAME_LENGTH {
+        return Err("Display name must contain 1-256 bytes".into());
+    }
+    if trimmed.chars().any(char::is_control) {
+        return Err("Display name cannot contain control characters".into());
     }
     Ok(())
 }
 
 /// Validate a channel name. Must start with #, 2-50 chars, no spaces.
 pub fn validate_channel_name(name: &str) -> Result<(), String> {
+    if !name.starts_with('#') {
+        return Err("Channel name must start with #".into());
+    }
     if name.len() < 2 {
         return Err("Channel name too short".into());
     }
@@ -62,8 +82,11 @@ pub fn validate_channel_name(name: &str) -> Result<(), String> {
             MAX_CHANNEL_NAME_LENGTH
         ));
     }
-    if name.contains(' ') {
-        return Err("Channel name cannot contain spaces".into());
+    if name
+        .chars()
+        .any(|character| character.is_control() || matches!(character, ' ' | ',' | ':'))
+    {
+        return Err("Channel name contains characters unsupported by IRC".into());
     }
     Ok(())
 }
@@ -121,6 +144,9 @@ pub fn validate_topic(topic: &str) -> Result<(), String> {
             "Topic too long (max {} characters)",
             MAX_TOPIC_LENGTH
         ));
+    }
+    if topic.chars().any(char::is_control) {
+        return Err("Topic cannot contain control characters".into());
     }
     Ok(())
 }
@@ -255,12 +281,10 @@ mod tests {
     // ────────────────────────────────────────────────────────────────
 
     #[test]
-    fn test_nickname_rejects_emoji_but_allows_unicode_alphanumeric() {
-        // Rust's is_alphanumeric() returns true for Unicode letters/digits,
-        // so accented chars and CJK are allowed by the current validation.
-        assert!(validate_nickname("user\u{1F600}").is_err()); // emoji is not alphanumeric
-        assert!(validate_nickname("\u{00E9}mile").is_ok()); // accented char IS alphanumeric
-        assert!(validate_nickname("\u{4E16}\u{754C}").is_ok()); // CJK chars ARE alphanumeric
+    fn test_irc_nickname_rejects_non_ascii() {
+        assert!(validate_nickname("user\u{1F600}").is_err());
+        assert!(validate_nickname("\u{00E9}mile").is_err());
+        assert!(validate_nickname("\u{4E16}\u{754C}").is_err());
     }
 
     #[test]
@@ -349,6 +373,11 @@ mod tests {
     fn test_channel_name_rejects_spaces() {
         assert!(validate_channel_name("#has space").is_err());
         assert!(validate_channel_name("# ").is_err());
+        assert!(validate_channel_name("general").is_err());
+        assert!(validate_channel_name("#comma,name").is_err());
+        assert!(validate_channel_name("#colon:name").is_err());
+        assert!(validate_channel_name("#line\nname").is_err());
+        assert!(validate_channel_name("#nul\0name").is_err());
     }
 
     #[test]
@@ -356,15 +385,15 @@ mod tests {
         assert!(validate_nickname("my_user").is_ok());
         assert!(validate_nickname("my-user").is_ok());
         assert!(validate_nickname("_leading").is_ok());
-        assert!(validate_nickname("-leading").is_ok());
+        assert!(validate_nickname("-leading").is_err());
         assert!(validate_nickname("trailing_").is_ok());
         assert!(validate_nickname("trailing-").is_ok());
         assert!(validate_nickname("a-b_c").is_ok());
     }
 
     #[test]
-    fn test_nickname_numbers_only() {
-        assert!(validate_nickname("12345").is_ok());
+    fn test_nickname_cannot_start_with_number() {
+        assert!(validate_nickname("12345").is_err());
     }
 
     #[test]
@@ -376,7 +405,7 @@ mod tests {
     #[test]
     fn test_topic_with_special_chars() {
         assert!(validate_topic("Welcome! <b>bold</b> & \"quoted\"").is_ok());
-        assert!(validate_topic("Topic with\nnewline").is_ok());
+        assert!(validate_topic("Topic with\nnewline").is_err());
     }
 
     #[test]

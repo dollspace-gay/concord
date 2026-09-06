@@ -1,19 +1,21 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
 import { channelKey } from '../../api/types';
-import { UserProfilePopup } from './UserProfilePopup';
 import { PresenceIndicator } from '../presence/PresenceIndicator';
 import type { MemberInfo, RoleInfo } from '../../api/types';
+import { ExternalImage } from '../ExternalImage';
 
 const EMPTY_MEMBERS: MemberInfo[] = [];
 const EMPTY_ROLES: RoleInfo[] = [];
+const EMPTY_MEMBER_ROLES: Record<string, string[]> = {};
 
 interface ContextMenuState {
   userId: string;
   nickname: string;
   x: number;
   y: number;
+  trigger: HTMLElement;
 }
 
 export function MemberList() {
@@ -22,28 +24,25 @@ export function MemberList() {
   const key = activeServer && activeChannel ? channelKey(activeServer, activeChannel) : null;
   const members = useChatStore((s) => (key ? s.members[key] ?? EMPTY_MEMBERS : EMPTY_MEMBERS));
   const roles = useChatStore((s) => (activeServer ? s.roles[activeServer] ?? EMPTY_ROLES : EMPTY_ROLES));
+  const memberRoles = useChatStore((s) => (activeServer ? s.memberRoles[activeServer] ?? EMPTY_MEMBER_ROLES : EMPTY_MEMBER_ROLES));
   const avatars = useChatStore((s) => s.avatars);
   const presences = useChatStore((s) => s.presences);
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [popupAnchor, setPopupAnchor] = useState<{ top: number; left: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const kickMember = useChatStore(s => s.kickMember);
   const banMember = useChatStore(s => s.banMember);
   const timeoutMember = useChatStore(s => s.timeoutMember);
 
   // Get the top (highest position) role with a color for display
-  const topRoleColor = useMemo(() => {
-    if (roles.length === 0) return null;
-    // Sort by position desc — highest position = most prominent role
-    const sorted = [...roles].sort((a, b) => b.position - a.position);
-    return sorted.find((r) => r.color)?.color ?? null;
-  }, [roles]);
+  const roleColorFor = useCallback((member: MemberInfo) => {
+    const assigned = member.user_id ? memberRoles[member.user_id] ?? member.role_ids ?? [] : member.role_ids ?? [];
+    return [...roles]
+      .filter((role) => assigned.includes(role.id) && role.color)
+      .sort((left, right) => right.position - left.position)[0]?.color ?? null;
+  }, [memberRoles, roles]);
 
-  // Group members by their display (for now, all in one group since member-role mapping
-  // isn't tracked per-member yet — we show role headers when data is available)
+  // Group members under the highest display role available for this server.
   const roleGroups = useMemo(() => {
-    // Simple single-group for now — members don't carry role_ids yet
-    // When member_role_update tracking is added, this will group properly
     const sortedRoles = [...roles].sort((a, b) => b.position - a.position);
     const topRole = sortedRoles.find((r) => !r.is_default && r.color);
 
@@ -54,24 +53,29 @@ export function MemberList() {
     }];
   }, [members, roles]);
 
-  const handleMemberClick = (nickname: string, e: React.MouseEvent) => {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setPopupAnchor({ top: rect.top, left: rect.left - 320 });
-    setSelectedUser(nickname);
-  };
-
   const handleContextMenu = useCallback((e: React.MouseEvent, member: MemberInfo) => {
     e.preventDefault();
     if (!member.user_id || !activeServer) return;
-    setContextMenu({ userId: member.user_id, nickname: member.nickname, x: e.clientX, y: e.clientY });
+    setContextMenu({ userId: member.user_id, nickname: member.nickname, x: e.clientX, y: e.clientY, trigger: e.currentTarget as HTMLElement });
   }, [activeServer]);
+
+  const closeContextMenu = useCallback(() => {
+    const trigger = contextMenu?.trigger;
+    setContextMenu(null);
+    requestAnimationFrame(() => trigger?.focus());
+  }, [contextMenu]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+  }, [contextMenu]);
 
   const handleKick = useCallback(() => {
     if (!contextMenu || !activeServer) return;
     const reason = prompt('Kick reason (optional):') ?? undefined;
     kickMember(activeServer, contextMenu.userId, reason);
-    setContextMenu(null);
-  }, [contextMenu, activeServer, kickMember]);
+    closeContextMenu();
+  }, [contextMenu, activeServer, kickMember, closeContextMenu]);
 
   const handleBan = useCallback(() => {
     if (!contextMenu || !activeServer) return;
@@ -79,23 +83,23 @@ export function MemberList() {
     const daysStr = prompt('Delete message history (days, 0-7):', '0');
     const days = daysStr ? parseInt(daysStr, 10) : 0;
     banMember(activeServer, contextMenu.userId, reason, isNaN(days) ? 0 : days);
-    setContextMenu(null);
-  }, [contextMenu, activeServer, banMember]);
+    closeContextMenu();
+  }, [contextMenu, activeServer, banMember, closeContextMenu]);
 
   const handleTimeout = useCallback(() => {
     if (!contextMenu || !activeServer) return;
     const minutes = prompt('Timeout duration in minutes:', '10');
-    if (!minutes) { setContextMenu(null); return; }
+    if (!minutes) { closeContextMenu(); return; }
     const mins = parseInt(minutes, 10);
-    if (isNaN(mins) || mins <= 0) { setContextMenu(null); return; }
+    if (isNaN(mins) || mins <= 0) { closeContextMenu(); return; }
     const until = new Date(Date.now() + mins * 60 * 1000).toISOString();
     const reason = prompt('Timeout reason (optional):') ?? undefined;
     timeoutMember(activeServer, contextMenu.userId, until, reason);
-    setContextMenu(null);
-  }, [contextMenu, activeServer, timeoutMember]);
+    closeContextMenu();
+  }, [contextMenu, activeServer, timeoutMember, closeContextMenu]);
 
   return (
-    <div className="flex h-full w-60 flex-col bg-bg-secondary">
+    <div aria-label="Members" className="flex h-full w-60 flex-col bg-bg-secondary">
       {roleGroups.map((group) => (
         <div key={group.roleName}>
           <div className="px-4 pt-6">
@@ -110,26 +114,36 @@ export function MemberList() {
 
           <div className="flex-1 overflow-y-auto px-2">
             {group.members.map((member) => {
-              const avatarUrl = member.avatar_url || avatars[member.nickname];
+              const avatarUrl = member.server_avatar_url || member.avatar_url || avatars[member.nickname];
               const presence = activeServer ? presences[activeServer]?.[member.user_id || ''] : null;
               const statusValue = presence?.status || member.status || 'online';
+              const roleColor = roleColorFor(member);
               return (
-                <button
+                <div
+                  role="button"
+                  tabIndex={0}
                   key={member.nickname}
-                  onClick={(e) => {
+                  onClick={() => {
                     if (member.user_id) {
                       useUiStore.getState().setShowUserProfile(member.user_id);
                     }
-                    handleMemberClick(member.nickname, e);
+                  }}
+                  onKeyDown={(event) => {
+                    if ((event.key === 'Enter' || event.key === ' ') && member.user_id) {
+                      event.preventDefault();
+                      useUiStore.getState().setShowUserProfile(member.user_id);
+                    }
                   }}
                   onContextMenu={(e) => handleContextMenu(e, member)}
                   className="group flex w-full items-center gap-3 rounded px-2 py-1.5 text-left hover:bg-bg-hover"
                 >
                   <div className="relative">
                     {avatarUrl ? (
-                      <img
+                      <ExternalImage
                         src={avatarUrl}
                         alt={member.nickname}
+                        label={`${member.nickname} avatar`}
+                        privacyScopeKey={`member:${activeServer ?? ''}:${member.user_id ?? member.nickname}:avatar`}
                         className="h-8 w-8 rounded-full object-cover"
                       />
                     ) : (
@@ -146,10 +160,10 @@ export function MemberList() {
                   <div className="min-w-0 flex-1">
                     <span
                       className="truncate text-sm"
-                      style={{ color: topRoleColor ?? undefined }}
+                      style={{ color: roleColor ?? undefined }}
                     >
-                      {!topRoleColor && <span className="text-text-secondary">{member.nickname}</span>}
-                      {topRoleColor && member.nickname}
+                      {!roleColor && <span className="text-text-secondary">{member.nickname}</span>}
+                      {roleColor && member.nickname}
                     </span>
                     {presence?.custom_status && (
                       <div className="truncate text-xs text-text-muted">
@@ -158,37 +172,44 @@ export function MemberList() {
                       </div>
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
         </div>
       ))}
 
-      {selectedUser && popupAnchor && (
-        <UserProfilePopup
-          nickname={selectedUser}
-          position={popupAnchor}
-          onClose={() => setSelectedUser(null)}
-        />
-      )}
-
       {/* Moderation context menu */}
       {contextMenu && (
         <div
           className="fixed inset-0 z-50"
-          onClick={() => setContextMenu(null)}
-          onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
+          onMouseDown={(event) => { if (event.target === event.currentTarget) closeContextMenu(); }}
+          onContextMenu={(e) => { e.preventDefault(); closeContextMenu(); }}
         >
           <div
+            ref={menuRef}
+            role="menu"
+            aria-label={`Moderate ${contextMenu.nickname}`}
             className="absolute rounded bg-bg-primary shadow-lg border border-border py-1 min-w-[160px]"
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(event) => {
+              const items = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
+              const index = items.indexOf(document.activeElement as HTMLButtonElement);
+              if (event.key === 'Escape') { event.preventDefault(); closeContextMenu(); return; }
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                const offset = event.key === 'ArrowDown' ? 1 : -1;
+                items[(index + offset + items.length) % items.length]?.focus();
+              } else if (event.key === 'Home') { event.preventDefault(); items[0]?.focus(); }
+              else if (event.key === 'End') { event.preventDefault(); items.at(-1)?.focus(); }
+            }}
           >
             <div className="px-3 py-1.5 text-xs font-semibold text-text-muted border-b border-border mb-1">
               {contextMenu.nickname}
             </div>
             <button
+              role="menuitem"
               onClick={handleKick}
               className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-yellow-400 hover:bg-bg-hover"
             >
@@ -198,6 +219,7 @@ export function MemberList() {
               Kick
             </button>
             <button
+              role="menuitem"
               onClick={handleBan}
               className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-red-400 hover:bg-bg-hover"
             >
@@ -207,6 +229,7 @@ export function MemberList() {
               Ban
             </button>
             <button
+              role="menuitem"
               onClick={handleTimeout}
               className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-orange-400 hover:bg-bg-hover"
             >

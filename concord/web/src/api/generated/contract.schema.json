@@ -1,0 +1,8169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Concord WebSocket contract",
+  "description": "The current bidirectional WebSocket payloads.\n\nThis is a generation root rather than a second wire model: both fields point\ndirectly at the types serialized and deserialized by the production socket.",
+  "type": "object",
+  "properties": {
+    "client_message": {
+      "$ref": "#/$defs/ClientMessage"
+    },
+    "server_event": {
+      "$ref": "#/$defs/ChatEvent"
+    }
+  },
+  "required": [
+    "client_message",
+    "server_event"
+  ],
+  "x-concord-protocol-version": 2,
+  "$defs": {
+    "AttachmentInfo": {
+      "description": "Metadata for a file attachment.",
+      "type": "object",
+      "properties": {
+        "content_type": {
+          "type": "string"
+        },
+        "file_size": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "filename",
+        "content_type",
+        "file_size",
+        "url"
+      ]
+    },
+    "AuditLogEntry": {
+      "description": "Audit log entry sent to clients.",
+      "type": "object",
+      "properties": {
+        "action_type": {
+          "type": "string"
+        },
+        "actor_avatar_snapshot": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "actor_id": {
+          "type": "string"
+        },
+        "actor_username_snapshot": {
+          "type": "string"
+        },
+        "changes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "actor_id",
+        "actor_username_snapshot",
+        "action_type",
+        "created_at"
+      ]
+    },
+    "AutomodRuleInfo": {
+      "description": "AutoMod rule info sent to clients.",
+      "type": "object",
+      "properties": {
+        "action_type": {
+          "type": "string"
+        },
+        "config": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "rule_type": {
+          "type": "string"
+        },
+        "timeout_duration_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "enabled",
+        "rule_type",
+        "config",
+        "action_type"
+      ]
+    },
+    "BanInfo": {
+      "description": "Ban info sent to clients.",
+      "type": "object",
+      "properties": {
+        "banned_by": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "user_id",
+        "banned_by",
+        "created_at"
+      ]
+    },
+    "BookmarkInfo": {
+      "description": "Bookmark info.",
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timestamp": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "message_id",
+        "channel_id",
+        "from",
+        "content",
+        "timestamp",
+        "created_at"
+      ]
+    },
+    "BotAccountInfo": {
+      "type": "object",
+      "properties": {
+        "avatar_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "installed_server_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "username": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "installed_server_ids"
+      ]
+    },
+    "BotTokenInfo": {
+      "description": "Bot token info (without the actual hash).",
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "last_used": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "scopes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "scopes",
+        "created_at"
+      ]
+    },
+    "CategoryInfo": {
+      "description": "Channel category metadata sent to clients.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "server_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "server_id",
+        "name",
+        "position"
+      ]
+    },
+    "ChannelFollowInfo": {
+      "description": "Channel follow info.",
+      "type": "object",
+      "properties": {
+        "created_by": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "source_channel_id": {
+          "type": "string"
+        },
+        "target_channel_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "source_channel_id",
+        "target_channel_id",
+        "created_by"
+      ]
+    },
+    "ChannelInfo": {
+      "type": "object",
+      "properties": {
+        "archived": {
+          "type": "boolean"
+        },
+        "category_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "channel_type": {
+          "type": "string"
+        },
+        "conversation_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "is_nsfw": {
+          "type": "boolean"
+        },
+        "is_private": {
+          "type": "boolean"
+        },
+        "member_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "server_id": {
+          "type": "string"
+        },
+        "slowmode_seconds": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "thread_parent_message_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "topic": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "conversation_id",
+        "server_id",
+        "name",
+        "topic",
+        "member_count",
+        "position",
+        "is_private",
+        "channel_type",
+        "archived",
+        "slowmode_seconds",
+        "is_nsfw"
+      ]
+    },
+    "ChannelPermissionOverrideInfo": {
+      "description": "A role- or member-specific permission rule for one channel.",
+      "type": "object",
+      "properties": {
+        "allow_bits": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "channel_id": {
+          "type": "string"
+        },
+        "deny_bits": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "id": {
+          "type": "string"
+        },
+        "target_id": {
+          "type": "string"
+        },
+        "target_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "channel_id",
+        "target_type",
+        "target_id",
+        "allow_bits",
+        "deny_bits"
+      ]
+    },
+    "ChannelPositionInfo": {
+      "description": "Minimal channel position info for reorder events.",
+      "type": "object",
+      "properties": {
+        "category_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "id",
+        "position"
+      ]
+    },
+    "ChatEvent": {
+      "description": "Protocol-agnostic event that flows through the chat engine.\nBoth IRC and WebSocket adapters produce and consume these.",
+      "oneOf": [
+        {
+          "description": "Protocol-v2 synchronization snapshot at an opaque durable cursor.",
+          "type": "object",
+          "properties": {
+            "request_id": {
+              "type": "string"
+            },
+            "snapshot": {
+              "$ref": "#/$defs/SyncSnapshot"
+            },
+            "type": {
+              "type": "string",
+              "const": "sync_snapshot"
+            }
+          },
+          "required": [
+            "type",
+            "request_id",
+            "snapshot"
+          ]
+        },
+        {
+          "description": "Protocol-v2 durable replay batch.",
+          "type": "object",
+          "properties": {
+            "batch": {
+              "$ref": "#/$defs/ReplayBatch"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "replay_batch"
+            }
+          },
+          "required": [
+            "type",
+            "request_id",
+            "batch"
+          ]
+        },
+        {
+          "description": "Current authorized projection of a durable event descriptor.",
+          "type": "object",
+          "properties": {
+            "event": {
+              "$ref": "#/$defs/DurableEventProjection"
+            },
+            "type": {
+              "type": "string",
+              "const": "durable_event"
+            }
+          },
+          "required": [
+            "type",
+            "event"
+          ]
+        },
+        {
+          "description": "The supplied cursor cannot safely resume and the client must replace cached state.",
+          "type": "object",
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/ResyncReason"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "resync_required"
+            }
+          },
+          "required": [
+            "type",
+            "request_id",
+            "reason"
+          ]
+        },
+        {
+          "description": "Correlated stable command failure for protocol-v2 clients.",
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "type": {
+              "type": "string",
+              "const": "command_error"
+            }
+          },
+          "required": [
+            "type",
+            "request_id",
+            "code",
+            "message",
+            "retryable"
+          ]
+        },
+        {
+          "description": "Correlated acceptance of a non-durable lifecycle command.\n\nClients add `request_id` to the command object. Serde deliberately\nignores that field on older command variants, while the WebSocket\nadapter retains it and emits this result only after the command has\ncompleted successfully.",
+          "type": "object",
+          "properties": {
+            "request_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "lifecycle_command_succeeded"
+            }
+          },
+          "required": [
+            "type",
+            "request_id"
+          ]
+        },
+        {
+          "description": "Durable correlated result for edit/delete/reaction/read commands.",
+          "type": "object",
+          "properties": {
+            "receipt": {
+              "$ref": "#/$defs/CommandReceipt"
+            },
+            "type": {
+              "type": "string",
+              "const": "command_committed"
+            }
+          },
+          "required": [
+            "type",
+            "receipt"
+          ]
+        },
+        {
+          "description": "A message sent to a channel or as a DM.",
+          "type": "object",
+          "properties": {
+            "attachments": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "$ref": "#/$defs/AttachmentInfo"
+              }
+            },
+            "avatar_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "content": {
+              "type": "string"
+            },
+            "conversation_id": {
+              "description": "Canonical conversation identifier, present for direct messages.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "from": {
+              "type": "string"
+            },
+            "id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "reply_to": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ReplyInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "server_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "target": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "type": {
+              "type": "string",
+              "const": "message"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "from",
+            "target",
+            "content",
+            "timestamp"
+          ]
+        },
+        {
+          "description": "A message was edited.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "edited_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "message_edit"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "server_id",
+            "channel",
+            "content",
+            "edited_at"
+          ]
+        },
+        {
+          "description": "A message was deleted.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "message_delete"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "server_id",
+            "channel"
+          ]
+        },
+        {
+          "description": "Acknowledgment sent back to the sender with the server-generated message ID.\nThe nonce matches the client-provided value so the frontend can update the optimistic message.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "client_message_id": {
+              "type": "string"
+            },
+            "conversation_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "nonce": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "persisted_at": {
+              "type": "string"
+            },
+            "replayed": {
+              "type": "boolean"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "sequence": {
+              "description": "Decimal string to preserve the full SQLite integer range in JavaScript.",
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "message_ack"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "server_id",
+            "channel",
+            "request_id",
+            "client_message_id",
+            "sequence",
+            "persisted_at",
+            "replayed"
+          ]
+        },
+        {
+          "description": "A reaction was added to a message.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "emoji": {
+              "type": "string"
+            },
+            "message_id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "nickname": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "reaction_add"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message_id",
+            "server_id",
+            "channel",
+            "user_id",
+            "nickname",
+            "emoji"
+          ]
+        },
+        {
+          "description": "A reaction was removed from a message.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "emoji": {
+              "type": "string"
+            },
+            "message_id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "nickname": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "reaction_remove"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message_id",
+            "server_id",
+            "channel",
+            "user_id",
+            "nickname",
+            "emoji"
+          ]
+        },
+        {
+          "description": "A user started typing in a channel.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "nickname": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "typing_start"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "nickname"
+          ]
+        },
+        {
+          "description": "User joined a channel.",
+          "type": "object",
+          "properties": {
+            "avatar_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "channel": {
+              "type": "string"
+            },
+            "nickname": {
+              "type": "string"
+            },
+            "role_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "server_avatar_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "join"
+            },
+            "user_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "nickname",
+            "server_id",
+            "channel"
+          ]
+        },
+        {
+          "description": "User left a channel.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "nickname": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "part"
+            }
+          },
+          "required": [
+            "type",
+            "nickname",
+            "server_id",
+            "channel"
+          ]
+        },
+        {
+          "description": "User disconnected from the server.",
+          "type": "object",
+          "properties": {
+            "nickname": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "quit"
+            }
+          },
+          "required": [
+            "type",
+            "nickname"
+          ]
+        },
+        {
+          "description": "Channel topic changed.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "set_by": {
+              "type": "string"
+            },
+            "topic": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "topic_change"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "set_by",
+            "topic"
+          ]
+        },
+        {
+          "description": "User changed their nickname.",
+          "type": "object",
+          "properties": {
+            "new_nick": {
+              "type": "string"
+            },
+            "old_nick": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "nick_change"
+            }
+          },
+          "required": [
+            "type",
+            "old_nick",
+            "new_nick"
+          ]
+        },
+        {
+          "description": "Server notice directed at a specific session.",
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "server_notice"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ]
+        },
+        {
+          "description": "Channel member list (sent on join).",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "members": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MemberInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "names"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "members"
+          ]
+        },
+        {
+          "description": "Current topic of a channel (sent on join).",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "topic": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "topic"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "topic"
+          ]
+        },
+        {
+          "description": "Response to a channel list request.",
+          "type": "object",
+          "properties": {
+            "channels": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ChannelInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "channel_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channels"
+          ]
+        },
+        {
+          "description": "Message history response.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "has_more": {
+              "type": "boolean"
+            },
+            "messages": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/HistoryMessage"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "history"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "messages",
+            "has_more"
+          ]
+        },
+        {
+          "description": "List of servers the user belongs to.",
+          "type": "object",
+          "properties": {
+            "servers": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ServerInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "server_list"
+            }
+          },
+          "required": [
+            "type",
+            "servers"
+          ]
+        },
+        {
+          "description": "Unread message counts for channels in a server.",
+          "type": "object",
+          "properties": {
+            "counts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/UnreadCount"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "unread_counts"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "counts"
+          ]
+        },
+        {
+          "description": "Link embed previews were resolved for a message.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "embeds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/EmbedInfo"
+              }
+            },
+            "message_id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "message_embed"
+            }
+          },
+          "required": [
+            "type",
+            "message_id",
+            "server_id",
+            "channel",
+            "embeds"
+          ]
+        },
+        {
+          "description": "List of roles in a server.",
+          "type": "object",
+          "properties": {
+            "member_roles": {
+              "description": "Present for an authoritative bootstrap; absent for a metadata-only mutation.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "$ref": "#/$defs/MemberRoleInfo"
+              }
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RoleInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "role_list"
+            },
+            "version": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "version",
+            "roles"
+          ]
+        },
+        {
+          "description": "A role was created or updated.",
+          "type": "object",
+          "properties": {
+            "role": {
+              "$ref": "#/$defs/RoleInfo"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "role_update"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "role"
+          ]
+        },
+        {
+          "description": "A role was deleted.",
+          "type": "object",
+          "properties": {
+            "role_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "role_delete"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "role_id"
+          ]
+        },
+        {
+          "description": "A member's role assignments changed.",
+          "type": "object",
+          "properties": {
+            "role_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "member_role_update"
+            },
+            "user_id": {
+              "type": "string"
+            },
+            "version": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "version",
+            "user_id",
+            "role_ids"
+          ]
+        },
+        {
+          "description": "Authoritative permission rules for one channel.",
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "overrides": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ChannelPermissionOverrideInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "channel_permission_override_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel_id",
+            "overrides"
+          ]
+        },
+        {
+          "description": "List of categories in a server.",
+          "type": "object",
+          "properties": {
+            "categories": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/CategoryInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "category_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "categories"
+          ]
+        },
+        {
+          "description": "A category was created or updated.",
+          "type": "object",
+          "properties": {
+            "category": {
+              "$ref": "#/$defs/CategoryInfo"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "category_update"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "category"
+          ]
+        },
+        {
+          "description": "A category was deleted.",
+          "type": "object",
+          "properties": {
+            "category_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "category_delete"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "category_id"
+          ]
+        },
+        {
+          "description": "Channel positions/categories were reordered.",
+          "type": "object",
+          "properties": {
+            "channels": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ChannelPositionInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "channel_reorder"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channels"
+          ]
+        },
+        {
+          "description": "Presence update for a user (broadcast to shared server members).",
+          "type": "object",
+          "properties": {
+            "presence": {
+              "$ref": "#/$defs/PresenceInfo"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "presence_update"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "presence"
+          ]
+        },
+        {
+          "description": "Bulk presence list for a server (sent on connect/join).",
+          "type": "object",
+          "properties": {
+            "presences": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PresenceInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "presence_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "presences"
+          ]
+        },
+        {
+          "description": "The authenticated user's durable preference and current projected state.",
+          "type": "object",
+          "properties": {
+            "custom_status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "effective_status": {
+              "type": "string"
+            },
+            "requested_status": {
+              "type": "string"
+            },
+            "status_emoji": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "own_presence"
+            }
+          },
+          "required": [
+            "type",
+            "requested_status",
+            "effective_status"
+          ]
+        },
+        {
+          "description": "A user's profile was fetched or updated.",
+          "type": "object",
+          "properties": {
+            "profile": {
+              "$ref": "#/$defs/UserProfileInfo"
+            },
+            "type": {
+              "type": "string",
+              "const": "user_profile"
+            }
+          },
+          "required": [
+            "type",
+            "profile"
+          ]
+        },
+        {
+          "description": "A member's server nickname changed.",
+          "type": "object",
+          "properties": {
+            "display_name": {
+              "type": "string"
+            },
+            "nickname": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_avatar_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "server_nickname_update"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id",
+            "display_name"
+          ]
+        },
+        {
+          "description": "Notification settings response.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "settings": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/NotificationSettingInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "notification_settings"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "settings"
+          ]
+        },
+        {
+          "description": "Search results response.",
+          "type": "object",
+          "properties": {
+            "next_continuation": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "offset": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "query": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "restarted": {
+              "type": "boolean"
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SearchResultMessage"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "total_count": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "type": {
+              "type": "string",
+              "const": "search_results"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "query",
+            "results",
+            "total_count",
+            "offset"
+          ]
+        },
+        {
+          "description": "Message was pinned in a channel.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "pin": {
+              "$ref": "#/$defs/PinnedMessageInfo"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "message_pin"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "pin"
+          ]
+        },
+        {
+          "description": "Message was unpinned from a channel.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "message_unpin"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "message_id"
+          ]
+        },
+        {
+          "description": "List of all pinned messages in a channel.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "pins": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PinnedMessageInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "pinned_messages"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "pins"
+          ]
+        },
+        {
+          "description": "A thread was created.",
+          "type": "object",
+          "properties": {
+            "parent_channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "thread": {
+              "$ref": "#/$defs/ThreadInfo"
+            },
+            "type": {
+              "type": "string",
+              "const": "thread_create"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "parent_channel",
+            "thread"
+          ]
+        },
+        {
+          "description": "A thread was archived or unarchived.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "thread": {
+              "$ref": "#/$defs/ThreadInfo"
+            },
+            "type": {
+              "type": "string",
+              "const": "thread_update"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "thread"
+          ]
+        },
+        {
+          "description": "List of threads for a channel.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "threads": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ThreadInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "thread_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "threads"
+          ]
+        },
+        {
+          "description": "Forum tags list.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ForumTagInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "forum_tag_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "tags"
+          ]
+        },
+        {
+          "description": "Forum tag created/updated.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "tag": {
+              "$ref": "#/$defs/ForumTagInfo"
+            },
+            "type": {
+              "type": "string",
+              "const": "forum_tag_update"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "tag"
+          ]
+        },
+        {
+          "description": "Forum tag deleted.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "tag_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "forum_tag_delete"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "tag_id"
+          ]
+        },
+        {
+          "description": "Complete tag selection for a thread.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "tag_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "thread_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "thread_tag_update"
+            },
+            "version": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "thread_id",
+            "version",
+            "tag_ids"
+          ]
+        },
+        {
+          "description": "Bookmarks list response.",
+          "type": "object",
+          "properties": {
+            "bookmarks": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/BookmarkInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "bookmark_list"
+            }
+          },
+          "required": [
+            "type",
+            "bookmarks"
+          ]
+        },
+        {
+          "description": "Bookmark added.",
+          "type": "object",
+          "properties": {
+            "bookmark": {
+              "$ref": "#/$defs/BookmarkInfo"
+            },
+            "type": {
+              "type": "string",
+              "const": "bookmark_add"
+            }
+          },
+          "required": [
+            "type",
+            "bookmark"
+          ]
+        },
+        {
+          "description": "Bookmark removed.",
+          "type": "object",
+          "properties": {
+            "message_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "bookmark_remove"
+            }
+          },
+          "required": [
+            "type",
+            "message_id"
+          ]
+        },
+        {
+          "description": "Actor-scoped direct conversation navigation state.",
+          "type": "object",
+          "properties": {
+            "conversations": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/DirectConversationInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "direct_conversation_list"
+            }
+          },
+          "required": [
+            "type",
+            "conversations"
+          ]
+        },
+        {
+          "description": "A member was kicked from the server.",
+          "type": "object",
+          "properties": {
+            "kicked_by": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "member_kick"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id",
+            "kicked_by"
+          ]
+        },
+        {
+          "description": "A member was banned from the server.",
+          "type": "object",
+          "properties": {
+            "banned_by": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "member_ban"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id",
+            "banned_by"
+          ]
+        },
+        {
+          "description": "A ban was removed from the server.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "member_unban"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id"
+          ]
+        },
+        {
+          "description": "A member was timed out.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "timeout_until": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "member_timeout"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id"
+          ]
+        },
+        {
+          "description": "Channel slow mode was updated.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "seconds": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "slow_mode_update"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "seconds"
+          ]
+        },
+        {
+          "description": "Channel NSFW flag was updated.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "is_nsfw": {
+              "type": "boolean"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "nsfw_update"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "is_nsfw"
+          ]
+        },
+        {
+          "description": "Bulk messages were deleted.",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "message_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "bulk_message_delete"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "message_ids"
+          ]
+        },
+        {
+          "description": "Audit log entries response.",
+          "type": "object",
+          "properties": {
+            "entries": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/AuditLogEntry"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "audit_log_entries"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "entries"
+          ]
+        },
+        {
+          "description": "Ban list response.",
+          "type": "object",
+          "properties": {
+            "bans": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/BanInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "ban_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "bans"
+          ]
+        },
+        {
+          "description": "AutoMod rules list response.",
+          "type": "object",
+          "properties": {
+            "rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/AutomodRuleInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "automod_rule_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "rules"
+          ]
+        },
+        {
+          "description": "AutoMod rule created/updated.",
+          "type": "object",
+          "properties": {
+            "rule": {
+              "$ref": "#/$defs/AutomodRuleInfo"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "automod_rule_update"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "rule"
+          ]
+        },
+        {
+          "description": "AutoMod rule deleted.",
+          "type": "object",
+          "properties": {
+            "rule_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "automod_rule_delete"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "rule_id"
+          ]
+        },
+        {
+          "description": "Invite list response.",
+          "type": "object",
+          "properties": {
+            "invites": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/InviteInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "invite_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "invites"
+          ]
+        },
+        {
+          "description": "Invite created.",
+          "type": "object",
+          "properties": {
+            "invite": {
+              "$ref": "#/$defs/InviteInfo"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "invite_create"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "invite"
+          ]
+        },
+        {
+          "description": "Invite deleted.",
+          "type": "object",
+          "properties": {
+            "invite_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "invite_delete"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "invite_id"
+          ]
+        },
+        {
+          "description": "Server events list.",
+          "type": "object",
+          "properties": {
+            "events": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/EventInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "event_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "events"
+          ]
+        },
+        {
+          "description": "Event created or updated.",
+          "type": "object",
+          "properties": {
+            "event": {
+              "$ref": "#/$defs/EventInfo"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "event_update"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "event"
+          ]
+        },
+        {
+          "description": "Event deleted.",
+          "type": "object",
+          "properties": {
+            "event_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "event_delete"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "event_id"
+          ]
+        },
+        {
+          "description": "Event RSVP list.",
+          "type": "object",
+          "properties": {
+            "event_id": {
+              "type": "string"
+            },
+            "rsvps": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RsvpInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "event_rsvp_list"
+            }
+          },
+          "required": [
+            "type",
+            "event_id",
+            "rsvps"
+          ]
+        },
+        {
+          "description": "Server community settings.",
+          "type": "object",
+          "properties": {
+            "community": {
+              "$ref": "#/$defs/ServerCommunityInfo"
+            },
+            "type": {
+              "type": "string",
+              "const": "server_community"
+            }
+          },
+          "required": [
+            "type",
+            "community"
+          ]
+        },
+        {
+          "description": "Discoverable servers list.",
+          "type": "object",
+          "properties": {
+            "servers": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ServerCommunityInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "discover_servers"
+            }
+          },
+          "required": [
+            "type",
+            "servers"
+          ]
+        },
+        {
+          "description": "Channel follows list.",
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "follows": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ChannelFollowInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "channel_follow_list"
+            }
+          },
+          "required": [
+            "type",
+            "channel_id",
+            "follows"
+          ]
+        },
+        {
+          "description": "Channel follow created.",
+          "type": "object",
+          "properties": {
+            "follow": {
+              "$ref": "#/$defs/ChannelFollowInfo"
+            },
+            "type": {
+              "type": "string",
+              "const": "channel_follow_create"
+            }
+          },
+          "required": [
+            "type",
+            "follow"
+          ]
+        },
+        {
+          "description": "Channel follow deleted.",
+          "type": "object",
+          "properties": {
+            "follow_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "channel_follow_delete"
+            }
+          },
+          "required": [
+            "type",
+            "follow_id"
+          ]
+        },
+        {
+          "description": "Result of an explicit announcement publication request.",
+          "type": "object",
+          "properties": {
+            "published_count": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "source_message_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "announcement_published"
+            }
+          },
+          "required": [
+            "type",
+            "source_message_id",
+            "published_count"
+          ]
+        },
+        {
+          "description": "Server templates list.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "templates": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TemplateInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "template_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "templates"
+          ]
+        },
+        {
+          "description": "Template created/updated.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "template": {
+              "$ref": "#/$defs/TemplateInfo"
+            },
+            "type": {
+              "type": "string",
+              "const": "template_update"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "template"
+          ]
+        },
+        {
+          "description": "Template deleted.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "template_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "template_delete"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "template_id"
+          ]
+        },
+        {
+          "description": "A new server created atomically from a versioned template.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "template_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "template_instantiated"
+            }
+          },
+          "required": [
+            "type",
+            "template_id",
+            "server_id"
+          ]
+        },
+        {
+          "description": "Webhook list response.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "webhook_list"
+            },
+            "webhooks": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WebhookInfo"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "webhooks"
+          ]
+        },
+        {
+          "description": "Webhook created or updated.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "webhook_update"
+            },
+            "webhook": {
+              "$ref": "#/$defs/WebhookInfo"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "webhook"
+          ]
+        },
+        {
+          "description": "Webhook deleted.",
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "webhook_delete"
+            },
+            "webhook_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "webhook_id"
+          ]
+        },
+        {
+          "description": "Slash commands list response.",
+          "type": "object",
+          "properties": {
+            "commands": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SlashCommandInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "slash_command_list"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "commands"
+          ]
+        },
+        {
+          "description": "Slash command created or updated.",
+          "type": "object",
+          "properties": {
+            "command": {
+              "$ref": "#/$defs/SlashCommandInfo"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "slash_command_update"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "command"
+          ]
+        },
+        {
+          "description": "Slash command deleted.",
+          "type": "object",
+          "properties": {
+            "command_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "slash_command_delete"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "command_id"
+          ]
+        },
+        {
+          "description": "An interaction was created (sent to the bot).",
+          "type": "object",
+          "properties": {
+            "interaction": {
+              "$ref": "#/$defs/InteractionInfo"
+            },
+            "type": {
+              "type": "string",
+              "const": "interaction_create"
+            }
+          },
+          "required": [
+            "type",
+            "interaction"
+          ]
+        },
+        {
+          "description": "An interaction response (sent back to the channel).",
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "interaction_id": {
+              "type": "string"
+            },
+            "response": {
+              "$ref": "#/$defs/InteractionResponseData"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "interaction_response"
+            }
+          },
+          "required": [
+            "type",
+            "interaction_id",
+            "server_id",
+            "channel",
+            "response"
+          ]
+        },
+        {
+          "description": "Correlated acceptance of a slash command or message component invocation.",
+          "type": "object",
+          "properties": {
+            "request_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "interaction_invoked"
+            }
+          },
+          "required": [
+            "type",
+            "request_id"
+          ]
+        },
+        {
+          "description": "Bot tokens list response (sent only to the bot owner).",
+          "type": "object",
+          "properties": {
+            "bot_user_id": {
+              "type": "string"
+            },
+            "tokens": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/BotTokenInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "bot_token_list"
+            }
+          },
+          "required": [
+            "type",
+            "bot_user_id",
+            "tokens"
+          ]
+        },
+        {
+          "description": "Bot accounts controlled by the authenticated owner.",
+          "type": "object",
+          "properties": {
+            "bots": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/BotAccountInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "bot_account_list"
+            }
+          },
+          "required": [
+            "type",
+            "bots"
+          ]
+        },
+        {
+          "description": "A newly issued secret. The raw token is emitted exactly once.",
+          "type": "object",
+          "properties": {
+            "bot_user_id": {
+              "type": "string"
+            },
+            "credential": {
+              "$ref": "#/$defs/BotTokenInfo"
+            },
+            "token": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "bot_credential_created"
+            }
+          },
+          "required": [
+            "type",
+            "bot_user_id",
+            "token",
+            "credential"
+          ]
+        },
+        {
+          "description": "OAuth2 app list response.",
+          "type": "object",
+          "properties": {
+            "apps": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/OAuth2AppInfo"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "o_auth2_app_list"
+            }
+          },
+          "required": [
+            "type",
+            "apps"
+          ]
+        },
+        {
+          "description": "OAuth2 app created/updated.",
+          "type": "object",
+          "properties": {
+            "app": {
+              "$ref": "#/$defs/OAuth2AppInfo"
+            },
+            "type": {
+              "type": "string",
+              "const": "o_auth2_app_update"
+            }
+          },
+          "required": [
+            "type",
+            "app"
+          ]
+        },
+        {
+          "description": "Bluesky profile sync result.",
+          "type": "object",
+          "properties": {
+            "avatar_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "banner_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "bsky_handle": {
+              "type": "string"
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "display_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "followers_count": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "follows_count": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "type": {
+              "type": "string",
+              "const": "bluesky_profile_sync"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "user_id",
+            "bsky_handle",
+            "followers_count",
+            "follows_count"
+          ]
+        },
+        {
+          "description": "Result of sharing a message to Bluesky.",
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "post_uri": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "success": {
+              "type": "boolean"
+            },
+            "type": {
+              "type": "string",
+              "const": "bluesky_share_result"
+            }
+          },
+          "required": [
+            "type",
+            "message_id",
+            "success"
+          ]
+        },
+        {
+          "description": "Per-server avatar updated.",
+          "type": "object",
+          "properties": {
+            "avatar_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "server_avatar_update"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id"
+          ]
+        },
+        {
+          "description": "Server configuration/limits info.",
+          "type": "object",
+          "properties": {
+            "max_file_size_mb": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "max_message_length": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "server_limits"
+            }
+          },
+          "required": [
+            "type",
+            "max_message_length",
+            "max_file_size_mb"
+          ]
+        },
+        {
+          "description": "Error from the server.",
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "error"
+            }
+          },
+          "required": [
+            "type",
+            "code",
+            "message"
+          ]
+        }
+      ]
+    },
+    "ClientMessage": {
+      "description": "Client-to-server WebSocket message types.",
+      "oneOf": [
+        {
+          "description": "Explicit correlation envelope for non-durable lifecycle commands.",
+          "type": "object",
+          "properties": {
+            "command": {
+              "$ref": "#/$defs/ClientMessage"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "lifecycle_command"
+            }
+          },
+          "required": [
+            "type",
+            "request_id",
+            "command"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cursor": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint",
+              "default": null,
+              "minimum": 0
+            },
+            "protocol_version": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "subscriptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "sync"
+            }
+          },
+          "required": [
+            "type",
+            "request_id",
+            "protocol_version",
+            "subscriptions"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "attachment_ids": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "channel": {
+              "type": "string"
+            },
+            "client_message_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "content": {
+              "type": "string"
+            },
+            "content_format": {
+              "$ref": "#/$defs/ContentFormat",
+              "default": "markdown"
+            },
+            "conversation_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "mentions": {
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/MessageMention"
+              }
+            },
+            "nonce": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operation_generation": {
+              "type": "string"
+            },
+            "reply_to": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "request_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "server_id": {
+              "type": "string",
+              "default": "default"
+            },
+            "type": {
+              "type": "string",
+              "const": "send_message"
+            }
+          },
+          "required": [
+            "type",
+            "operation_generation",
+            "channel",
+            "content"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "attachment_ids": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "client_message_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "content": {
+              "type": "string"
+            },
+            "content_format": {
+              "$ref": "#/$defs/ContentFormat",
+              "default": "markdown"
+            },
+            "nonce": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operation_generation": {
+              "type": "string"
+            },
+            "recipient": {
+              "type": "string"
+            },
+            "reply_to": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "request_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "type": {
+              "type": "string",
+              "const": "send_direct_message"
+            }
+          },
+          "required": [
+            "type",
+            "operation_generation",
+            "recipient",
+            "content"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "list_direct_conversations"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string",
+              "default": "default"
+            },
+            "type": {
+              "type": "string",
+              "const": "join_channel"
+            }
+          },
+          "required": [
+            "type",
+            "channel"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string",
+              "default": "default"
+            },
+            "type": {
+              "type": "string",
+              "const": "part_channel"
+            }
+          },
+          "required": [
+            "type",
+            "channel"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string",
+              "default": "default"
+            },
+            "topic": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "set_topic"
+            }
+          },
+          "required": [
+            "type",
+            "channel",
+            "topic"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "before": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "channel": {
+              "type": "string"
+            },
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            },
+            "server_id": {
+              "type": "string",
+              "default": "default"
+            },
+            "type": {
+              "type": "string",
+              "const": "fetch_history"
+            }
+          },
+          "required": [
+            "type",
+            "channel"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string",
+              "default": "default"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_channels"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string",
+              "default": "default"
+            },
+            "type": {
+              "type": "string",
+              "const": "get_members"
+            }
+          },
+          "required": [
+            "type",
+            "channel"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "list_servers"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "icon_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "create_server"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "join_server"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "leave_server"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "category_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "channel_type": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "is_private": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "create_channel"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_channel"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_server"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "icon_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "update_server"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "update_member_role"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id",
+            "role"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "client_message_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "content": {
+              "type": "string"
+            },
+            "content_format": {
+              "$ref": "#/$defs/ContentFormat",
+              "default": "markdown"
+            },
+            "mentions": {
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/MessageMention"
+              }
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "operation_generation": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "type": {
+              "type": "string",
+              "const": "edit_message"
+            }
+          },
+          "required": [
+            "type",
+            "operation_generation",
+            "message_id",
+            "content"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "client_message_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "operation_generation": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_message"
+            }
+          },
+          "required": [
+            "type",
+            "operation_generation",
+            "message_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "client_message_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "emoji": {
+              "type": "string"
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "operation_generation": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "type": {
+              "type": "string",
+              "const": "add_reaction"
+            }
+          },
+          "required": [
+            "type",
+            "operation_generation",
+            "message_id",
+            "emoji"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "client_message_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "emoji": {
+              "type": "string"
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "operation_generation": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "type": {
+              "type": "string",
+              "const": "remove_reaction"
+            }
+          },
+          "required": [
+            "type",
+            "operation_generation",
+            "message_id",
+            "emoji"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string",
+              "default": "default"
+            },
+            "type": {
+              "type": "string",
+              "const": "typing"
+            }
+          },
+          "required": [
+            "type",
+            "channel"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "client_message_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "conversation_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "operation_generation": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "server_id": {
+              "type": "string",
+              "default": "default"
+            },
+            "type": {
+              "type": "string",
+              "const": "mark_read"
+            }
+          },
+          "required": [
+            "type",
+            "operation_generation",
+            "channel",
+            "message_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string",
+              "default": "default"
+            },
+            "type": {
+              "type": "string",
+              "const": "get_unread_counts"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_roles"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "color": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "permissions": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "create_role"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "color": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "permissions": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "role_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "update_role"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "role_id",
+            "name",
+            "permissions"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_role"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "role_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "assign_role"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id",
+            "role_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "remove_role"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id",
+            "role_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_channel_permission_overrides"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "allow_bits": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "channel_id": {
+              "type": "string"
+            },
+            "deny_bits": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "target_id": {
+              "type": "string"
+            },
+            "target_type": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "set_channel_permission_override"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel_id",
+            "target_type",
+            "target_id",
+            "allow_bits",
+            "deny_bits"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "target_id": {
+              "type": "string"
+            },
+            "target_type": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_channel_permission_override"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel_id",
+            "target_type",
+            "target_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_categories"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "create_category"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "category_id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "update_category"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "category_id",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "category_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_category"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "category_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channels": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ChannelPositionInfo"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "reorder_channels"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channels"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "custom_status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "status_emoji": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "set_presence"
+            }
+          },
+          "required": [
+            "type",
+            "status"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "get_presences"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "nickname": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "set_server_nickname"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "continuation": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            },
+            "offset": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            },
+            "query": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "search_messages"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "query"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "level": {
+              "type": "string"
+            },
+            "mute_until": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "muted": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "suppress_everyone": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "suppress_roles": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "update_notification_settings"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "level"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "get_notification_settings"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "get_user_profile"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "user_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "pin_message"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "message_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "unpin_message"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "message_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "get_pinned_messages"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "is_private": {
+              "type": "boolean",
+              "default": false
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "parent_channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "create_thread"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "parent_channel",
+            "name",
+            "message_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "thread_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "archive_thread"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "thread_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "thread_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "unarchive_thread"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "thread_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_threads"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "emoji": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "moderated": {
+              "type": "boolean",
+              "default": false
+            },
+            "name": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "create_forum_tag"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "emoji": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "moderated": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "position": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "tag_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "update_forum_tag"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "tag_id",
+            "name",
+            "moderated",
+            "position"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "tag_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_forum_tag"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "tag_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_forum_tags"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "tag_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "thread_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "set_thread_tags"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "thread_id",
+            "tag_ids"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "thread_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "get_thread_tags"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "thread_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "message_id": {
+              "type": "string"
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "add_bookmark"
+            }
+          },
+          "required": [
+            "type",
+            "message_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "message_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "remove_bookmark"
+            }
+          },
+          "required": [
+            "type",
+            "message_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "list_bookmarks"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "kick_member"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delete_message_days": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "ban_member"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "unban_member"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_bans"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "timeout_until": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "timeout_member"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "user_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "seconds": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "set_slow_mode"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "seconds"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "is_nsfw": {
+              "type": "boolean"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "set_nsfw"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "is_nsfw"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "message_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "bulk_delete_messages"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "message_ids"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action_type": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "before": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "get_audit_log"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action_type": {
+              "type": "string"
+            },
+            "config": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "rule_type": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "timeout_duration_seconds": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "type": {
+              "type": "string",
+              "const": "create_automod_rule"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "name",
+            "rule_type",
+            "config",
+            "action_type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action_type": {
+              "type": "string"
+            },
+            "config": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "rule_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "timeout_duration_seconds": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "type": {
+              "type": "string",
+              "const": "update_automod_rule"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "rule_id",
+            "name",
+            "enabled",
+            "config",
+            "action_type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "rule_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_automod_rule"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "rule_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_automod_rules"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "expires_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "max_uses": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "create_invite"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_invites"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "invite_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_invite"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "invite_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "use_invite"
+            }
+          },
+          "required": [
+            "type",
+            "code"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "end_time": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "image_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "start_time": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "create_event"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "name",
+            "start_time"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_events"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "update_event_status"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "event_id",
+            "status"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_event"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "event_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "set_rsvp"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "event_id",
+            "status"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "remove_rsvp"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "event_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_rsvps"
+            }
+          },
+          "required": [
+            "type",
+            "event_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "category": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "is_discoverable": {
+              "type": "boolean"
+            },
+            "rules_text": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "update_community_settings"
+            },
+            "welcome_message": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "is_discoverable"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "get_community_settings"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "category": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "discover_servers"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "accept_rules"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "is_announcement": {
+              "type": "boolean"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "set_announcement_channel"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel",
+            "is_announcement"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source_channel_id": {
+              "type": "string"
+            },
+            "target_channel_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "follow_channel"
+            }
+          },
+          "required": [
+            "type",
+            "source_channel_id",
+            "target_channel_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "follow_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "unfollow_channel"
+            }
+          },
+          "required": [
+            "type",
+            "follow_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_channel_follows"
+            }
+          },
+          "required": [
+            "type",
+            "channel_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "message_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "publish_announcement"
+            }
+          },
+          "required": [
+            "type",
+            "message_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "create_template"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_templates"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "template_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_template"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "template_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_name": {
+              "type": "string"
+            },
+            "template_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "instantiate_template"
+            }
+          },
+          "required": [
+            "type",
+            "template_id",
+            "server_name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "create_webhook"
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "webhook_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "channel_id",
+            "name",
+            "webhook_type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_webhooks"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "avatar_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "channel_id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "update_webhook"
+            },
+            "webhook_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "webhook_id",
+            "name",
+            "channel_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "delete_webhook"
+            },
+            "webhook_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "webhook_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "avatar_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "create_bot"
+            },
+            "username": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "username"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "list_owned_bots"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "bot_user_id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "scopes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "create_bot_token"
+            }
+          },
+          "required": [
+            "type",
+            "bot_user_id",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "bot_user_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_bot_tokens"
+            }
+          },
+          "required": [
+            "type",
+            "bot_user_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "token_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_bot_token"
+            }
+          },
+          "required": [
+            "type",
+            "token_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "bot_user_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "add_bot_to_server"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "bot_user_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "bot_user_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "remove_bot_from_server"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "bot_user_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "options_json": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "register_slash_command"
+            }
+          },
+          "required": [
+            "type",
+            "server_id",
+            "name",
+            "description"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "list_slash_commands"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "command_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_slash_command"
+            }
+          },
+          "required": [
+            "type",
+            "command_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "args_json": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "channel": {
+              "type": "string"
+            },
+            "command_name": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "invoke_slash_command"
+            }
+          },
+          "required": [
+            "type",
+            "request_id",
+            "server_id",
+            "channel",
+            "command_name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "custom_id": {
+              "type": "string"
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "invoke_message_component"
+            },
+            "values": {
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "request_id",
+            "message_id",
+            "custom_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "components_json": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "content": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "embeds_json": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ephemeral": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "interaction_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "respond_to_interaction"
+            }
+          },
+          "required": [
+            "type",
+            "interaction_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "client_type": {
+              "type": "string",
+              "default": "confidential"
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "redirect_uris": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "create_o_auth2_app"
+            }
+          },
+          "required": [
+            "type",
+            "name",
+            "redirect_uris"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "list_o_auth2_apps"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "app_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "delete_o_auth2_app"
+            }
+          },
+          "required": [
+            "type",
+            "app_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "avatar_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "set_server_avatar"
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "set_vanity_code"
+            },
+            "vanity_code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "server_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "get_server_limits"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "CommandReceipt": {
+      "type": "object",
+      "properties": {
+        "client_message_id": {
+          "type": "string"
+        },
+        "entity_version": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "persisted_at": {
+          "type": "string"
+        },
+        "replayed": {
+          "type": "boolean",
+          "default": false
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "sequence": {
+          "description": "Decimal JSON string; JavaScript clients must not parse this as a number.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "client_message_id",
+        "message_id",
+        "sequence",
+        "entity_version",
+        "persisted_at"
+      ]
+    },
+    "ContentFormat": {
+      "type": "string",
+      "enum": [
+        "plain",
+        "markdown"
+      ]
+    },
+    "ConversationId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]+$"
+    },
+    "DirectConversationInfo": {
+      "description": "Direct conversation navigation entry sent only to a participant.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "last_message_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "peer_avatar_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "peer_id": {
+          "type": "string"
+        },
+        "peer_username": {
+          "type": "string"
+        },
+        "unread_count": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "peer_id",
+        "peer_username",
+        "unread_count"
+      ]
+    },
+    "DurableAttachmentProjection": {
+      "type": "object",
+      "properties": {
+        "attachment_id": {
+          "type": "string"
+        },
+        "content_type": {
+          "type": "string"
+        },
+        "file_size": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "state_version": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "attachment_id",
+        "filename",
+        "content_type",
+        "file_size",
+        "state_version"
+      ]
+    },
+    "DurableEventProjection": {
+      "type": "object",
+      "properties": {
+        "conversation_id": {
+          "$ref": "#/$defs/ConversationId"
+        },
+        "descriptor": true,
+        "entity_id": {
+          "type": "string"
+        },
+        "entity_type": {
+          "type": "string"
+        },
+        "entity_version": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "kind": {
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DurableMessageProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reaction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DurableReactionProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "read_state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DurableReadProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "conversation_id",
+        "entity_type",
+        "entity_id",
+        "entity_version",
+        "descriptor"
+      ]
+    },
+    "DurableMessageProjection": {
+      "type": "object",
+      "properties": {
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DurableAttachmentProjection"
+          }
+        },
+        "components": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/MessageComponent"
+          }
+        },
+        "content": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "content_format": {
+          "type": "string"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/ConversationId"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "edited_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "entity_version": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "mentions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MessageMention"
+          }
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DurableReplyProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reply_to_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rich_embeds": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/RichEmbedInfo"
+          }
+        },
+        "sender_id": {
+          "type": "string"
+        },
+        "sender_nick": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "conversation_id",
+        "sequence",
+        "entity_version",
+        "sender_id",
+        "sender_nick",
+        "content_format",
+        "created_at",
+        "deleted",
+        "attachments",
+        "mentions"
+      ]
+    },
+    "DurableReactionProjection": {
+      "type": "object",
+      "properties": {
+        "emoji": {
+          "type": "string"
+        },
+        "entity_version": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "present": {
+          "type": "boolean"
+        },
+        "user_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "user_id",
+        "emoji",
+        "present",
+        "entity_version"
+      ]
+    },
+    "DurableReadProjection": {
+      "type": "object",
+      "properties": {
+        "conversation_id": {
+          "$ref": "#/$defs/ConversationId"
+        },
+        "entity_version": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "conversation_id",
+        "message_id",
+        "sequence",
+        "entity_version"
+      ]
+    },
+    "DurableReplyProjection": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "sender_id": {
+          "type": "string"
+        },
+        "sender_nick": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "sender_id",
+        "sender_nick",
+        "deleted"
+      ]
+    },
+    "EmbedAuthor": {
+      "description": "Author section for a rich embed.",
+      "type": "object",
+      "properties": {
+        "icon_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "EmbedField": {
+      "description": "A field in a rich embed.",
+      "type": "object",
+      "properties": {
+        "inline": {
+          "type": "boolean",
+          "default": false
+        },
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ]
+    },
+    "EmbedFooter": {
+      "description": "Footer for a rich embed.",
+      "type": "object",
+      "properties": {
+        "icon_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ]
+    },
+    "EmbedInfo": {
+      "description": "Open Graph link embed preview metadata.",
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "site_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "EventInfo": {
+      "description": "Scheduled event info sent to clients.",
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "created_by": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "end_time": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "image_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "interested_count": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "server_id": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "server_id",
+        "name",
+        "start_time",
+        "created_by",
+        "status",
+        "interested_count",
+        "created_at"
+      ]
+    },
+    "ForumTagInfo": {
+      "description": "Forum tag info.",
+      "type": "object",
+      "properties": {
+        "emoji": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "moderated": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "moderated",
+        "position"
+      ]
+    },
+    "HistoryMessage": {
+      "type": "object",
+      "properties": {
+        "attachments": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/AttachmentInfo"
+          }
+        },
+        "components": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/MessageComponent"
+          }
+        },
+        "content": {
+          "type": "string"
+        },
+        "edited_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "embeds": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/EmbedInfo"
+          }
+        },
+        "from": {
+          "type": "string"
+        },
+        "id": {
+          "$ref": "#/$defs/MessageId"
+        },
+        "reactions": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ReactionGroup"
+          }
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReplyInfo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rich_embeds": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/RichEmbedInfo"
+          }
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "from",
+        "content",
+        "timestamp"
+      ]
+    },
+    "InteractionInfo": {
+      "description": "Interaction info sent to bots.",
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "type": "string"
+        },
+        "command_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "data": true,
+        "id": {
+          "type": "string"
+        },
+        "interaction_type": {
+          "type": "string"
+        },
+        "server_id": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "interaction_type",
+        "user_id",
+        "server_id",
+        "channel_id",
+        "data"
+      ]
+    },
+    "InteractionResponseData": {
+      "description": "Bot's response to an interaction.",
+      "type": "object",
+      "properties": {
+        "components": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/MessageComponent"
+          }
+        },
+        "content": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "embeds": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/RichEmbedInfo"
+          }
+        },
+        "ephemeral": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "InviteInfo": {
+      "description": "Server invite info sent to clients.",
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "created_by": {
+          "type": "string"
+        },
+        "expires_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "max_uses": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "server_id": {
+          "type": "string"
+        },
+        "use_count": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "id",
+        "code",
+        "server_id",
+        "created_by",
+        "use_count",
+        "created_at"
+      ]
+    },
+    "MemberInfo": {
+      "type": "object",
+      "properties": {
+        "avatar_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "custom_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nickname": {
+          "type": "string"
+        },
+        "role_ids": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "server_avatar_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status_emoji": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "nickname"
+      ]
+    },
+    "MemberRoleInfo": {
+      "description": "One member's role assignments in an authoritative role bootstrap.",
+      "type": "object",
+      "properties": {
+        "role_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "user_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "role_ids"
+      ]
+    },
+    "MentionKind": {
+      "type": "string",
+      "enum": [
+        "user",
+        "role",
+        "everyone"
+      ]
+    },
+    "MessageComponent": {
+      "description": "A message component (button, select menu, or action row).",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "components": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MessageComponent"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "action_row"
+            }
+          },
+          "required": [
+            "type",
+            "components"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "custom_id": {
+              "type": "string"
+            },
+            "disabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "emoji": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "label": {
+              "type": "string"
+            },
+            "style": {
+              "type": "string",
+              "default": "primary"
+            },
+            "type": {
+              "type": "string",
+              "const": "button"
+            }
+          },
+          "required": [
+            "type",
+            "custom_id",
+            "label"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "custom_id": {
+              "type": "string"
+            },
+            "max_values": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            },
+            "min_values": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SelectOption"
+              }
+            },
+            "placeholder": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "select_menu"
+            }
+          },
+          "required": [
+            "type",
+            "custom_id",
+            "options"
+          ]
+        }
+      ]
+    },
+    "MessageId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]+$"
+    },
+    "MessageMention": {
+      "type": "object",
+      "properties": {
+        "end_byte": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "kind": {
+          "$ref": "#/$defs/MentionKind"
+        },
+        "start_byte": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "target_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "start_byte",
+        "end_byte"
+      ]
+    },
+    "NotificationSettingInfo": {
+      "description": "Notification setting info.",
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string"
+        },
+        "mute_until": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "muted": {
+          "type": "boolean"
+        },
+        "server_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "suppress_everyone": {
+          "type": "boolean"
+        },
+        "suppress_roles": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "level",
+        "suppress_everyone",
+        "suppress_roles",
+        "muted"
+      ]
+    },
+    "OAuth2AppInfo": {
+      "description": "OAuth2 application info.",
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "icon_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "is_public": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "owner_id": {
+          "type": "string"
+        },
+        "redirect_uris": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scopes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "owner_id",
+        "redirect_uris",
+        "scopes",
+        "is_public",
+        "created_at"
+      ]
+    },
+    "PinnedMessageInfo": {
+      "description": "Info about a pinned message.",
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "pinned_at": {
+          "type": "string"
+        },
+        "pinned_by": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "message_id",
+        "channel_id",
+        "pinned_by",
+        "pinned_at",
+        "from",
+        "content",
+        "timestamp"
+      ]
+    },
+    "PresenceInfo": {
+      "description": "User presence info sent to clients.",
+      "type": "object",
+      "properties": {
+        "avatar_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "custom_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nickname": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "status_emoji": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "nickname",
+        "status"
+      ]
+    },
+    "ReactionGroup": {
+      "description": "Grouped reactions for a message in history.",
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "emoji": {
+          "type": "string"
+        },
+        "user_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "emoji",
+        "count",
+        "user_ids"
+      ]
+    },
+    "ReplayBatch": {
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DurableEventProjection"
+          }
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "operation_generation": {
+          "type": "string"
+        },
+        "protocol_version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "protocol_version",
+        "operation_generation",
+        "cursor",
+        "events",
+        "has_more"
+      ]
+    },
+    "ReplyInfo": {
+      "description": "Info about a replied-to message.",
+      "type": "object",
+      "properties": {
+        "content_preview": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "from",
+        "content_preview"
+      ]
+    },
+    "ResyncReason": {
+      "type": "string",
+      "enum": [
+        "cursor_expired",
+        "database_restored",
+        "credential_changed",
+        "subscription_changed",
+        "access_revoked",
+        "protocol_changed",
+        "invalid_cursor"
+      ]
+    },
+    "RichEmbedInfo": {
+      "description": "Rich embed format for bot messages.",
+      "type": "object",
+      "properties": {
+        "author": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EmbedAuthor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "color": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fields": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/EmbedField"
+          }
+        },
+        "footer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EmbedFooter"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "image_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnail_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timestamp": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "RoleInfo": {
+      "description": "Role metadata sent to clients.",
+      "type": "object",
+      "properties": {
+        "color": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "icon_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "is_default": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "position": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "server_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "server_id",
+        "name",
+        "position",
+        "permissions",
+        "is_default"
+      ]
+    },
+    "RsvpInfo": {
+      "description": "RSVP info.",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "status"
+      ]
+    },
+    "SearchResultMessage": {
+      "description": "A search result message (same as HistoryMessage but with channel info).",
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "type": "string"
+        },
+        "channel_name": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "edited_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "from": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "from",
+        "content",
+        "timestamp",
+        "channel_id",
+        "channel_name"
+      ]
+    },
+    "SelectOption": {
+      "description": "An option in a select menu component.",
+      "type": "object",
+      "properties": {
+        "default": {
+          "type": "boolean",
+          "default": false
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "emoji": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "value"
+      ]
+    },
+    "ServerCommunityInfo": {
+      "description": "Server community/discovery info.",
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "is_discoverable": {
+          "type": "boolean"
+        },
+        "rules_accepted": {
+          "description": "Whether the requesting member accepted the server's current rules version.\nOmitted from public discovery results.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "rules_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "server_id": {
+          "type": "string"
+        },
+        "welcome_message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "server_id",
+        "is_discoverable"
+      ]
+    },
+    "ServerInfo": {
+      "type": "object",
+      "properties": {
+        "icon_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "member_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "my_permissions": {
+          "description": "Effective permission bitfield for the requesting user in this server.",
+          "type": "integer",
+          "format": "int64",
+          "default": 0
+        },
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "member_count"
+      ]
+    },
+    "SlashCommandChoice": {
+      "description": "A pre-defined choice for a slash command option.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ]
+    },
+    "SlashCommandInfo": {
+      "description": "Slash command info sent to clients.",
+      "type": "object",
+      "properties": {
+        "bot_user_id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SlashCommandOption"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "bot_user_id",
+        "name",
+        "description",
+        "options"
+      ]
+    },
+    "SlashCommandOption": {
+      "description": "A single option/parameter for a slash command.",
+      "type": "object",
+      "properties": {
+        "choices": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/SlashCommandChoice"
+          }
+        },
+        "description": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "option_type": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "option_type"
+      ]
+    },
+    "SnapshotReactionGroup": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "emoji": {
+          "type": "string"
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "reacted_by_me": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "message_id",
+        "emoji",
+        "count",
+        "reacted_by_me"
+      ]
+    },
+    "SyncSnapshot": {
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string"
+        },
+        "history_before": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DurableMessageProjection"
+          }
+        },
+        "operation_generation": {
+          "type": "string"
+        },
+        "protocol_version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "reactions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SnapshotReactionGroup"
+          }
+        },
+        "read_states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DurableReadProjection"
+          }
+        }
+      },
+      "required": [
+        "protocol_version",
+        "operation_generation",
+        "cursor",
+        "messages",
+        "reactions",
+        "read_states",
+        "history_before"
+      ]
+    },
+    "TemplateInfo": {
+      "description": "Server template info.",
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "created_by": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "server_id": {
+          "type": "string"
+        },
+        "use_count": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "server_id",
+        "created_by",
+        "use_count",
+        "created_at"
+      ]
+    },
+    "ThreadInfo": {
+      "description": "Info about a thread.",
+      "type": "object",
+      "properties": {
+        "archived": {
+          "type": "boolean"
+        },
+        "auto_archive_minutes": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "channel_type": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "creator_user_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "message_count": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parent_message_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state_version": {
+          "type": "integer",
+          "format": "int64",
+          "default": 0
+        },
+        "tag_ids": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags_version": {
+          "type": "integer",
+          "format": "int64",
+          "default": 0
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "channel_type",
+        "archived",
+        "auto_archive_minutes",
+        "message_count",
+        "created_at"
+      ]
+    },
+    "UnreadCount": {
+      "type": "object",
+      "properties": {
+        "channel_name": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "channel_name",
+        "count"
+      ]
+    },
+    "UserProfileInfo": {
+      "description": "Full user profile info.",
+      "type": "object",
+      "properties": {
+        "avatar_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "banner_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bio": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "pronouns": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user_id": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "username",
+        "created_at"
+      ]
+    },
+    "WebhookInfo": {
+      "description": "Webhook info sent to clients.",
+      "type": "object",
+      "properties": {
+        "avatar_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "channel_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "created_by": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "server_id": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "webhook_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "server_id",
+        "channel_id",
+        "name",
+        "webhook_type",
+        "token",
+        "created_by",
+        "created_at"
+      ]
+    }
+  }
+}

@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { useChatStore } from '../../stores/chatStore';
+import { Dialog } from '../Dialog';
 
 interface Props {
   onClose: () => void;
@@ -8,36 +9,28 @@ interface Props {
 export function CreateServerModal({ onClose }: Props) {
   const [name, setName] = useState('');
   const [iconUrl, setIconUrl] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const createServer = useChatStore((s) => s.createServer);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
-    createServer(trimmed, iconUrl.trim() || undefined);
-    onClose();
+    setPending(true);
+    setError(null);
+    try {
+      await createServer(trimmed, iconUrl.trim() || undefined);
+      onClose();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Server creation was rejected.');
+    } finally {
+      setPending(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-lg bg-bg-primary p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog label="Create a Server" onClose={onClose} panelClassName="w-full max-w-md rounded-lg bg-bg-primary p-6 shadow-xl">
         <h2 className="mb-4 text-xl font-bold text-text-primary">Create a Server</h2>
 
         <form onSubmit={handleSubmit}>
@@ -45,9 +38,10 @@ export function CreateServerModal({ onClose }: Props) {
             Server Name
           </label>
           <input
-            ref={inputRef}
+            data-dialog-initial-focus
             type="text"
             value={name}
+            disabled={pending}
             onChange={(e) => setName(e.target.value)}
             placeholder="My Awesome Server"
             className="mb-4 w-full rounded bg-bg-input px-3 py-2 text-text-primary placeholder-text-muted outline-none focus:ring-2 focus:ring-bg-accent"
@@ -60,6 +54,7 @@ export function CreateServerModal({ onClose }: Props) {
           <input
             type="text"
             value={iconUrl}
+            disabled={pending}
             onChange={(e) => setIconUrl(e.target.value)}
             placeholder="https://example.com/icon.png"
             className="mb-6 w-full rounded bg-bg-input px-3 py-2 text-text-primary placeholder-text-muted outline-none focus:ring-2 focus:ring-bg-accent"
@@ -69,20 +64,21 @@ export function CreateServerModal({ onClose }: Props) {
             <button
               type="button"
               onClick={onClose}
+              disabled={pending}
               className="rounded px-4 py-2 text-sm text-text-secondary hover:text-text-primary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={!name.trim()}
+              disabled={!name.trim() || pending}
               className="rounded bg-bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
             >
-              Create
+              {pending ? 'Creating…' : 'Create'}
             </button>
           </div>
+          {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
         </form>
-      </div>
-    </div>
+    </Dialog>
   );
 }

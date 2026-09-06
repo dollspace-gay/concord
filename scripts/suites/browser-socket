@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+"${repository_root}/scripts/run-authenticated-browser.sh" "$@"
+"${repository_root}/scripts/run-irc-client-qualification.sh"

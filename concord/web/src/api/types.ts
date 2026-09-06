@@ -24,6 +24,7 @@ export interface ServerInfo {
 
 export interface ChannelInfo {
   id: string;
+  conversation_id: string;
   server_id: string;
   name: string;
   topic: string;
@@ -46,6 +47,7 @@ export interface MemberInfo {
   status_emoji?: string | null;
   user_id?: string | null;
   server_avatar_url?: string | null;
+  role_ids?: string[];
 }
 
 export interface StickerInfo {
@@ -87,6 +89,9 @@ export interface EmbedInfo {
 export interface HistoryMessage {
   id: string;
   from: string;
+  sender_id?: string;
+  sequence?: string;
+  deleted?: boolean;
   content: string;
   timestamp: string;
   edited_at?: string | null;
@@ -94,6 +99,8 @@ export interface HistoryMessage {
   reactions?: ReactionGroup[] | null;
   attachments?: AttachmentInfo[] | null;
   embeds?: EmbedInfo[] | null;
+  rich_embeds?: RichEmbedInfo[] | null;
+  components?: MessageComponent[] | null;
 }
 
 export interface UnreadCount {
@@ -185,6 +192,10 @@ export interface ThreadInfo {
   auto_archive_minutes: number;
   message_count: number;
   created_at: string;
+  creator_user_id?: string | null;
+  state_version?: number;
+  tag_ids?: string[];
+  tags_version?: number;
 }
 
 export interface ForumTagInfo {
@@ -209,6 +220,8 @@ export interface BookmarkInfo {
 export interface AuditLogEntry {
   id: string;
   actor_id: string;
+  actor_username_snapshot: string;
+  actor_avatar_snapshot?: string | null;
   action_type: string;
   target_type?: string | null;
   target_id?: string | null;
@@ -291,6 +304,7 @@ export interface ServerCommunityInfo {
   welcome_message?: string | null;
   rules_text?: string | null;
   category?: string | null;
+  rules_accepted?: boolean | null;
 }
 
 // ── Phase 8: Integrations & Bots ──────────────────────
@@ -306,6 +320,18 @@ export interface WebhookInfo {
   url?: string | null;
   created_by: string;
   created_at: string;
+}
+
+export interface WebhookDeliveryStatus {
+  delivery_id: string;
+  event_type: string;
+  event_version: number;
+  state: 'pending' | 'leased' | 'delivered' | 'failed' | 'cancelled';
+  attempt_count: number;
+  last_status?: number | null;
+  safe_error_code?: string | null;
+  created_at: string;
+  delivered_at?: string | null;
 }
 
 export interface SlashCommandInfo {
@@ -350,6 +376,13 @@ export interface BotTokenInfo {
   last_used?: string | null;
 }
 
+export interface BotAccountInfo {
+  id: string;
+  username: string;
+  avatar_url?: string | null;
+  installed_server_ids: string[];
+}
+
 export interface OAuth2AppInfo {
   id: string;
   name: string;
@@ -366,8 +399,8 @@ export interface RichEmbedInfo {
   title?: string | null;
   description?: string | null;
   url?: string | null;
-  color?: number | null;
-  fields?: EmbedField[];
+  color?: string | null;
+  fields?: EmbedField[] | null;
   footer?: { text: string; icon_url?: string | null } | null;
   author?: { name: string; url?: string | null; icon_url?: string | null } | null;
   thumbnail_url?: string | null;
@@ -378,18 +411,19 @@ export interface RichEmbedInfo {
 export interface EmbedField {
   name: string;
   value: string;
-  inline: boolean;
+  inline?: boolean;
 }
 
 export type MessageComponent =
   | { type: 'action_row'; components: MessageComponent[] }
-  | { type: 'button'; custom_id: string; label: string; style: number; disabled?: boolean; url?: string | null }
+  | { type: 'button'; custom_id: string; label: string; style?: string; emoji?: string | null; disabled?: boolean }
   | { type: 'select_menu'; custom_id: string; placeholder?: string | null; min_values?: number; max_values?: number; options: SelectOption[] };
 
 export interface SelectOption {
   label: string;
   value: string;
   description?: string | null;
+  emoji?: string | null;
   default?: boolean;
 }
 
@@ -408,7 +442,32 @@ export interface BlueskyIdentityInfo {
 }
 
 export interface BlueskyShareResult {
-  post_uri: string;
+  success?: boolean;
+  publication_id: string;
+  status: string;
+  post_uri: string | null;
+  cid: string | null;
+}
+
+export interface AtprotoPublicationStatus {
+  id: string;
+  source_message_id: string;
+  source_version: number;
+  channel_id: string;
+  status: 'pending' | 'published' | 'update_pending' | 'delete_pending' | 'deleted' | 'failed' | 'cancelled';
+  remote_uri: string | null;
+  remote_cid: string | null;
+  safe_error_code: string | null;
+  updated_at: string;
+  retryable: boolean;
+  reauthentication_required: boolean;
+}
+
+export interface AtprotoChannelPublicationPolicy {
+  channel_id: string;
+  eligible: boolean;
+  channel_enabled: boolean;
+  user_granted: boolean;
 }
 
 // ── Permission bitfield constants ──────────────────────
@@ -485,10 +544,10 @@ export type ServerEvent =
   | { type: 'server_list'; servers: ServerInfo[] }
   | { type: 'unread_counts'; server_id: string; counts: UnreadCount[] }
   | { type: 'server_notice'; message: string }
-  | { type: 'role_list'; server_id: string; roles: RoleInfo[] }
+  | { type: 'role_list'; server_id: string; version: number; roles: RoleInfo[]; member_roles?: Array<{ user_id: string; role_ids: string[] }> }
   | { type: 'role_update'; server_id: string; role: RoleInfo }
   | { type: 'role_delete'; server_id: string; role_id: string }
-  | { type: 'member_role_update'; server_id: string; user_id: string; role_ids: string[] }
+  | { type: 'member_role_update'; server_id: string; version: number; user_id: string; role_ids: string[] }
   | { type: 'category_list'; server_id: string; categories: CategoryInfo[] }
   | { type: 'category_update'; server_id: string; category: CategoryInfo }
   | { type: 'category_delete'; server_id: string; category_id: string }
@@ -538,6 +597,7 @@ export type ServerEvent =
   | { type: 'template_list'; server_id: string; templates: TemplateInfo[] }
   | { type: 'template_update'; server_id: string; template: TemplateInfo }
   | { type: 'template_delete'; server_id: string; template_id: string }
+  | { type: 'template_instantiated'; server_id: string; template_id: string }
   | { type: 'webhook_list'; server_id: string; webhooks: WebhookInfo[] }
   | { type: 'webhook_update'; server_id: string; webhook: WebhookInfo }
   | { type: 'webhook_delete'; server_id: string; webhook_id: string }
@@ -546,7 +606,9 @@ export type ServerEvent =
   | { type: 'slash_command_delete'; server_id: string; command_id: string }
   | { type: 'interaction_create'; interaction: InteractionInfo }
   | { type: 'interaction_response'; interaction_id: string; response: { content?: string; embeds?: RichEmbedInfo[]; components?: MessageComponent[] } }
-  | { type: 'bot_token_list'; tokens: BotTokenInfo[] }
+  | { type: 'bot_token_list'; bot_user_id?: string; tokens: BotTokenInfo[] }
+  | { type: 'bot_account_list'; bots: BotAccountInfo[] }
+  | { type: 'bot_credential_created'; bot_user_id: string; token: string; credential: BotTokenInfo }
   | { type: 'oauth2_app_list'; apps: OAuth2AppInfo[] }
   | { type: 'oauth2_app_update'; app: OAuth2AppInfo }
   | { type: 'server_avatar_update'; server_id: string; user_id: string; avatar_url: string | null }
@@ -639,12 +701,14 @@ export type ClientCommand =
   | { type: 'create_template'; server_id: string; name: string; description?: string }
   | { type: 'list_templates'; server_id: string }
   | { type: 'delete_template'; server_id: string; template_id: string }
+  | { type: 'instantiate_template'; template_id: string; server_name: string }
   // Phase 8: Integrations & Bots
   | { type: 'create_webhook'; server_id: string; channel_id: string; name: string; webhook_type: string; url?: string }
   | { type: 'list_webhooks'; server_id: string }
   | { type: 'update_webhook'; webhook_id: string; name: string; avatar_url?: string }
   | { type: 'delete_webhook'; webhook_id: string }
   | { type: 'create_bot'; username: string }
+  | { type: 'list_owned_bots' }
   | { type: 'create_bot_token'; bot_user_id: string; name?: string; scopes?: string }
   | { type: 'list_bot_tokens'; bot_user_id: string }
   | { type: 'delete_bot_token'; token_id: string }
@@ -654,8 +718,9 @@ export type ClientCommand =
   | { type: 'list_slash_commands'; server_id: string }
   | { type: 'delete_slash_command'; command_id: string }
   | { type: 'invoke_slash_command'; server_id: string; channel_id: string; command_name: string; args_json?: string }
+  | { type: 'invoke_message_component'; message_id: string; custom_id: string; values?: string[] }
   | { type: 'respond_to_interaction'; interaction_id: string; content?: string; embeds_json?: string; components_json?: string }
-  | { type: 'create_oauth2_app'; name: string; description: string; redirect_uris: string; scopes?: string }
+  | { type: 'create_oauth2_app'; name: string; description: string; redirect_uris: string; client_type: 'confidential' | 'public'; scopes?: string }
   | { type: 'list_oauth2_apps' }
   | { type: 'delete_oauth2_app'; app_id: string }
   | { type: 'update_server'; server_id: string; name?: string; icon_url?: string }

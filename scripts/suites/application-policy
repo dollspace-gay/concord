@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+manifest="${repository_root}/concord/Cargo.toml"
+test_source="${repository_root}/concord/server/tests/session_authority.rs"
+
+[[ -f "${manifest}" && -f "${test_source}" ]] || {
+  echo "application-policy prerequisites are missing" >&2
+  exit 2
+}
+
+grep -Fq "search_excludes_channels_without_history_permission" \
+  "${repository_root}/concord/server/src/engine/authorization.rs" || {
+  echo "authorized-search regression coverage is missing" >&2
+  exit 2
+}
+
+cd "${repository_root}/concord"
+run_tests="${repository_root}/scripts/run-cargo-tests-nonempty.sh"
+python3 "${repository_root}/scripts/check-actor-service-boundaries.py"
+python3 "${repository_root}/scripts/test-actor-service-boundaries.py"
+"${run_tests}" --locked -p concord-server --test session_authority
+"${run_tests}" --locked -p concord-server engine::authorization::tests --lib
+"${run_tests}" --locked -p concord-server engine::messaging::tests --lib
+"${run_tests}" --locked -p concord-server engine::chat_engine::tests --lib
+"${run_tests}" --locked -p concord-server engine::organization::tests --lib
+"${run_tests}" --locked -p concord-server engine::community_service::tests --lib
+"${run_tests}" --locked -p concord-server \
+  engine::chat_engine::tests::forum_tags_enforce_parent_ownership_and_moderated_authority --lib
+"${run_tests}" --locked -p concord-server \
+  engine::chat_engine::tests::ban_commits_membership_ban_and_audit_then_evicts_subscriptions --lib
+"${run_tests}" --locked -p concord-server engine::integrations::tests --lib
+"${run_tests}" --locked -p concord-server web::rest_api::tests --lib
+
+echo "application-policy passed: durable credentials, actual HTTP/WebSocket/IRC revocation, REST, moderation, channel/search/media policy, and domain-service authorization matrices"

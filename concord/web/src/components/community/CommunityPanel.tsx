@@ -1,8 +1,39 @@
 import { useState, useEffect } from 'react';
 import { useChatStore } from '../../stores/chatStore';
-import type { InviteInfo, EventInfo, ServerCommunityInfo, TemplateInfo } from '../../api/types';
+import { useAuthStore } from '../../stores/authStore';
+import type { ChannelFollowInfo, ChannelInfo, InviteInfo, EventInfo, RsvpInfo, ServerCommunityInfo, TemplateInfo } from '../../api/types';
+import { Dialog } from '../Dialog';
 
-type Tab = 'invites' | 'events' | 'settings' | 'discovery';
+const EMPTY_INVITES: InviteInfo[] = [];
+const EMPTY_EVENTS: EventInfo[] = [];
+const EMPTY_TEMPLATES: TemplateInfo[] = [];
+
+function useActionStatus() {
+  const [pending, setPending] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+  const run = async (key: string, action: () => Promise<void>, success: string, accepted?: () => void) => {
+    if (pending) return;
+    setPending(key);
+    setOutcome(null);
+    try {
+      await action();
+      accepted?.();
+      setOutcome({ kind: 'success', message: success });
+    } catch (cause) {
+      setOutcome({ kind: 'error', message: cause instanceof Error ? cause.message : 'The action was rejected.' });
+    } finally {
+      setPending(null);
+    }
+  };
+  return { pending, outcome, run };
+}
+
+function ActionOutcome({ outcome }: { outcome: { kind: 'success' | 'error'; message: string } | null }) {
+  if (!outcome) return null;
+  return <p role={outcome.kind === 'error' ? 'alert' : 'status'} className={`text-sm ${outcome.kind === 'error' ? 'text-red-400' : 'text-green-400'}`}>{outcome.message}</p>;
+}
+
+type Tab = 'invites' | 'events' | 'announcements' | 'settings' | 'discovery';
 
 interface Props {
   serverId: string;
@@ -12,11 +43,17 @@ interface Props {
 export function CommunityPanel({ serverId, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('invites');
 
-  const invites = useChatStore(s => s.invites[serverId] ?? []);
-  const serverEvents = useChatStore(s => s.serverEvents[serverId] ?? []);
+  const invites = useChatStore(s => s.invites[serverId] ?? EMPTY_INVITES);
+  const serverEvents = useChatStore(s => s.serverEvents[serverId] ?? EMPTY_EVENTS);
+  const eventRsvps = useChatStore(s => s.eventRsvps);
   const communitySettings = useChatStore(s => s.communitySettings[serverId]);
   const discoverableServers = useChatStore(s => s.discoverableServers);
-  const templates = useChatStore(s => s.templates[serverId] ?? []);
+  const templates = useChatStore(s => s.templates[serverId] ?? EMPTY_TEMPLATES);
+  const channelsByServer = useChatStore(s => s.channels);
+  const channelFollows = useChatStore(s => s.channelFollows);
+  const userId = useAuthStore(s => s.user?.id);
+  const serverChannels = channelsByServer[serverId] ?? [];
+  const allChannels = Object.values(channelsByServer).flat();
 
   const listInvites = useChatStore(s => s.listInvites);
   const createInvite = useChatStore(s => s.createInvite);
@@ -25,6 +62,8 @@ export function CommunityPanel({ serverId, onClose }: Props) {
   const createEvent = useChatStore(s => s.createEvent);
   const deleteEvent = useChatStore(s => s.deleteEvent);
   const setRsvp = useChatStore(s => s.setRsvp);
+  const removeRsvp = useChatStore(s => s.removeRsvp);
+  const listRsvps = useChatStore(s => s.listRsvps);
   const updateCommunitySettings = useChatStore(s => s.updateCommunitySettings);
   const getCommunitySettings = useChatStore(s => s.getCommunitySettings);
   const discoverServers = useChatStore(s => s.discoverServers);
@@ -32,6 +71,12 @@ export function CommunityPanel({ serverId, onClose }: Props) {
   const listTemplates = useChatStore(s => s.listTemplates);
   const createTemplate = useChatStore(s => s.createTemplate);
   const deleteTemplate = useChatStore(s => s.deleteTemplate);
+  const instantiateTemplate = useChatStore(s => s.instantiateTemplate);
+  const setAnnouncementChannel = useChatStore(s => s.setAnnouncementChannel);
+  const followChannel = useChatStore(s => s.followChannel);
+  const unfollowChannel = useChatStore(s => s.unfollowChannel);
+  const listChannelFollows = useChatStore(s => s.listChannelFollows);
+  const updateEventStatus = useChatStore(s => s.updateEventStatus);
 
   // Fetch data on mount / tab change
   useEffect(() => {
@@ -44,27 +89,21 @@ export function CommunityPanel({ serverId, onClose }: Props) {
     if (activeTab === 'discovery') discoverServers();
   }, [serverId, activeTab, listInvites, listEvents, getCommunitySettings, discoverServers, listTemplates]);
 
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
-
   const tabLabels: Record<Tab, string> = {
     invites: 'Invites',
     events: 'Events',
+    announcements: 'Announcements',
     settings: 'Settings',
     discovery: 'Discovery',
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div className="w-full max-w-3xl max-h-[85vh] flex flex-col rounded-lg bg-bg-primary shadow-xl" onClick={e => e.stopPropagation()}>
+    <Dialog label="Community" onClose={onClose} panelClassName="w-full max-w-3xl max-h-[85vh] flex flex-col rounded-lg bg-bg-primary shadow-xl">
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border p-4">
           <h2 className="text-lg font-bold text-text-primary">Community</h2>
-          <button onClick={onClose} className="text-text-muted hover:text-text-primary text-xl leading-none">&times;</button>
+          <button onClick={onClose} aria-label="Close community" className="text-text-muted hover:text-text-primary text-xl leading-none">&times;</button>
         </div>
 
         {/* Tabs */}
@@ -95,10 +134,28 @@ export function CommunityPanel({ serverId, onClose }: Props) {
           {activeTab === 'events' && (
             <EventsTab
               events={serverEvents}
+              channels={serverChannels}
+              rsvps={eventRsvps}
+              userId={userId}
               serverId={serverId}
               onCreate={createEvent}
               onDelete={deleteEvent}
               onRsvp={setRsvp}
+              onRemoveRsvp={removeRsvp}
+              onListRsvps={listRsvps}
+              onStatus={updateEventStatus}
+            />
+          )}
+          {activeTab === 'announcements' && (
+            <AnnouncementsTab
+              serverId={serverId}
+              serverChannels={serverChannels}
+              allChannels={allChannels}
+              follows={channelFollows}
+              onSetAnnouncement={setAnnouncementChannel}
+              onFollow={followChannel}
+              onUnfollow={unfollowChannel}
+              onList={listChannelFollows}
             />
           )}
           {activeTab === 'settings' && (
@@ -109,6 +166,7 @@ export function CommunityPanel({ serverId, onClose }: Props) {
               onUpdate={updateCommunitySettings}
               onCreateTemplate={createTemplate}
               onDeleteTemplate={deleteTemplate}
+              onInstantiateTemplate={instantiateTemplate}
             />
           )}
           {activeTab === 'discovery' && (
@@ -120,7 +178,7 @@ export function CommunityPanel({ serverId, onClose }: Props) {
           )}
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -129,22 +187,24 @@ export function CommunityPanel({ serverId, onClose }: Props) {
 function InvitesTab({ invites, serverId, onCreate, onDelete }: {
   invites: InviteInfo[];
   serverId: string;
-  onCreate: (serverId: string, maxUses?: number, expiresAt?: string, channelId?: string) => void;
-  onDelete: (serverId: string, inviteId: string) => void;
+  onCreate: (serverId: string, maxUses?: number, expiresAt?: string, channelId?: string) => Promise<void>;
+  onDelete: (serverId: string, inviteId: string) => Promise<void>;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [maxUses, setMaxUses] = useState('');
   const [expiresIn, setExpiresIn] = useState('24'); // hours
   const [copied, setCopied] = useState<string | null>(null);
+  const { pending, outcome, run } = useActionStatus();
 
   const handleCreate = () => {
     const mu = maxUses ? parseInt(maxUses, 10) : undefined;
     const hours = parseInt(expiresIn, 10);
     const ea = hours > 0 ? new Date(Date.now() + hours * 3600000).toISOString() : undefined;
-    onCreate(serverId, mu, ea);
-    setShowForm(false);
-    setMaxUses('');
-    setExpiresIn('24');
+    void run('create', () => onCreate(serverId, mu, ea), 'Invite created.', () => {
+      setShowForm(false);
+      setMaxUses('');
+      setExpiresIn('24');
+    });
   };
 
   const copyCode = (code: string) => {
@@ -158,6 +218,7 @@ function InvitesTab({ invites, serverId, onCreate, onDelete }: {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-text-secondary">Server Invites</h3>
         <button
+          disabled={pending !== null}
           onClick={() => setShowForm(!showForm)}
           className="rounded bg-bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-bg-accent/80"
         >
@@ -168,8 +229,9 @@ function InvitesTab({ invites, serverId, onCreate, onDelete }: {
       {showForm && (
         <div className="rounded bg-bg-secondary p-3 space-y-3">
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Max Uses (0 = unlimited)</label>
+            <label htmlFor="invite-max-uses" className="block text-xs font-medium text-text-muted mb-1">Max Uses (0 = unlimited)</label>
             <input
+              id="invite-max-uses"
               type="number"
               value={maxUses}
               onChange={e => setMaxUses(e.target.value)}
@@ -179,8 +241,9 @@ function InvitesTab({ invites, serverId, onCreate, onDelete }: {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Expires In (hours, 0 = never)</label>
+            <label htmlFor="invite-expiry" className="block text-xs font-medium text-text-muted mb-1">Expires In (hours, 0 = never)</label>
             <select
+              id="invite-expiry"
               value={expiresIn}
               onChange={e => setExpiresIn(e.target.value)}
               className="w-full rounded bg-bg-tertiary px-3 py-1.5 text-sm text-text-primary outline-none focus:ring-1 focus:ring-bg-accent"
@@ -195,10 +258,11 @@ function InvitesTab({ invites, serverId, onCreate, onDelete }: {
             </select>
           </div>
           <button
+            disabled={pending !== null}
             onClick={handleCreate}
             className="rounded bg-bg-accent px-4 py-1.5 text-xs font-medium text-white hover:bg-bg-accent/80"
           >
-            Generate Invite
+            {pending === 'create' ? 'Generating…' : 'Generate Invite'}
           </button>
         </div>
       )}
@@ -230,45 +294,62 @@ function InvitesTab({ invites, serverId, onCreate, onDelete }: {
                 </div>
               </div>
               <button
-                onClick={() => onDelete(serverId, invite.id)}
+                disabled={pending !== null}
+                onClick={() => run(`delete:${invite.id}`, () => onDelete(serverId, invite.id), 'Invite deleted.')}
                 className="ml-2 rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
               >
-                Delete
+                {pending === `delete:${invite.id}` ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           ))}
         </div>
       )}
+      <ActionOutcome outcome={outcome} />
     </div>
   );
 }
 
 // ── Events Tab ──────────────────────────────────────────
 
-function EventsTab({ events, serverId, onCreate, onDelete, onRsvp }: {
+function EventsTab({ events, channels, rsvps, userId, serverId, onCreate, onDelete, onRsvp, onRemoveRsvp, onListRsvps, onStatus }: {
   events: EventInfo[];
+  channels: ChannelInfo[];
+  rsvps: Record<string, RsvpInfo[]>;
+  userId?: string;
   serverId: string;
-  onCreate: (serverId: string, name: string, startTime: string, options?: { description?: string; channelId?: string; endTime?: string; imageUrl?: string }) => void;
-  onDelete: (serverId: string, eventId: string) => void;
-  onRsvp: (serverId: string, eventId: string, status: string) => void;
+  onCreate: (serverId: string, name: string, startTime: string, options?: { description?: string; channelId?: string; endTime?: string; imageUrl?: string }) => Promise<void>;
+  onDelete: (serverId: string, eventId: string) => Promise<void>;
+  onRsvp: (serverId: string, eventId: string, status: string) => Promise<void>;
+  onRemoveRsvp: (serverId: string, eventId: string) => Promise<void>;
+  onListRsvps: (eventId: string) => void;
+  onStatus: (serverId: string, eventId: string, status: string) => Promise<void>;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [channelId, setChannelId] = useState('');
+  const { pending, outcome, run } = useActionStatus();
+
+  useEffect(() => {
+    for (const event of events) onListRsvps(event.id);
+  }, [events, onListRsvps]);
 
   const handleCreate = () => {
     if (!name.trim() || !startTime) return;
-    onCreate(serverId, name.trim(), new Date(startTime).toISOString(), {
+    void run('create', () => onCreate(serverId, name.trim(), new Date(startTime).toISOString(), {
       description: description.trim() || undefined,
+      channelId: channelId || undefined,
       endTime: endTime ? new Date(endTime).toISOString() : undefined,
+    }), 'Event created.', () => {
+      setShowForm(false);
+      setName('');
+      setDescription('');
+      setStartTime('');
+      setEndTime('');
+      setChannelId('');
     });
-    setShowForm(false);
-    setName('');
-    setDescription('');
-    setStartTime('');
-    setEndTime('');
   };
 
   const statusColors: Record<string, string> = {
@@ -291,6 +372,7 @@ function EventsTab({ events, serverId, onCreate, onDelete, onRsvp }: {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-text-secondary">Scheduled Events</h3>
         <button
+          disabled={pending !== null}
           onClick={() => setShowForm(!showForm)}
           className="rounded bg-bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-bg-accent/80"
         >
@@ -301,8 +383,9 @@ function EventsTab({ events, serverId, onCreate, onDelete, onRsvp }: {
       {showForm && (
         <div className="rounded bg-bg-secondary p-3 space-y-3">
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Event Name *</label>
+            <label htmlFor="community-event-name" className="block text-xs font-medium text-text-muted mb-1">Event Name *</label>
             <input
+              id="community-event-name"
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
@@ -311,8 +394,9 @@ function EventsTab({ events, serverId, onCreate, onDelete, onRsvp }: {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Description</label>
+            <label htmlFor="community-event-description" className="block text-xs font-medium text-text-muted mb-1">Description</label>
             <textarea
+              id="community-event-description"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="What's this event about?"
@@ -322,8 +406,9 @@ function EventsTab({ events, serverId, onCreate, onDelete, onRsvp }: {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-text-muted mb-1">Start Time *</label>
+              <label htmlFor="community-event-start" className="block text-xs font-medium text-text-muted mb-1">Start Time *</label>
               <input
+                id="community-event-start"
                 type="datetime-local"
                 value={startTime}
                 onChange={e => setStartTime(e.target.value)}
@@ -331,8 +416,9 @@ function EventsTab({ events, serverId, onCreate, onDelete, onRsvp }: {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-muted mb-1">End Time</label>
+              <label htmlFor="community-event-end" className="block text-xs font-medium text-text-muted mb-1">End Time</label>
               <input
+                id="community-event-end"
                 type="datetime-local"
                 value={endTime}
                 onChange={e => setEndTime(e.target.value)}
@@ -340,12 +426,24 @@ function EventsTab({ events, serverId, onCreate, onDelete, onRsvp }: {
               />
             </div>
           </div>
+          <div>
+            <label htmlFor="community-event-channel" className="block text-xs font-medium text-text-muted mb-1">Linked Channel</label>
+            <select
+              id="community-event-channel"
+              value={channelId}
+              onChange={event => setChannelId(event.target.value)}
+              className="w-full rounded bg-bg-tertiary px-3 py-1.5 text-sm text-text-primary outline-none focus:ring-1 focus:ring-bg-accent"
+            >
+              <option value="">No linked channel</option>
+              {channels.map(channel => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
+            </select>
+          </div>
           <button
             onClick={handleCreate}
-            disabled={!name.trim() || !startTime}
+            disabled={!name.trim() || !startTime || pending !== null}
             className="rounded bg-bg-accent px-4 py-1.5 text-xs font-medium text-white hover:bg-bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Create Event
+            {pending === 'create' ? 'Creating…' : 'Create Event'}
           </button>
         </div>
       )}
@@ -371,8 +469,14 @@ function EventsTab({ events, serverId, onCreate, onDelete, onRsvp }: {
                     {formatDate(evt.start_time)}
                     {evt.end_time && ` - ${formatDate(evt.end_time)}`}
                   </div>
+                  {evt.channel_id && (
+                    <div className="mt-1 text-xs text-text-muted">
+                      Linked channel: #{channels.find(channel => channel.id === evt.channel_id)?.name ?? evt.channel_id}
+                    </div>
+                  )}
                   <div className="mt-1 text-xs text-text-muted">
-                    {evt.interested_count} interested
+                    {(rsvps[evt.id] ?? []).filter(rsvp => rsvp.status === 'going').length} going,{' '}
+                    {(rsvps[evt.id] ?? []).filter(rsvp => rsvp.status === 'interested').length} interested
                     <span className="ml-2">by {evt.created_by}</span>
                   </div>
                 </div>
@@ -380,23 +484,60 @@ function EventsTab({ events, serverId, onCreate, onDelete, onRsvp }: {
                   {evt.status === 'scheduled' && (
                     <>
                       <button
-                        onClick={() => onRsvp(serverId, evt.id, 'interested')}
+                        disabled={pending !== null}
+                        onClick={() => run(`rsvp:${evt.id}`, () => onRsvp(serverId, evt.id, 'interested'), 'RSVP updated.')}
                         className="rounded bg-bg-tertiary px-2 py-1 text-xs text-text-muted hover:text-text-primary"
                         title="Mark as interested"
                       >
                         Interested
                       </button>
                       <button
-                        onClick={() => onRsvp(serverId, evt.id, 'going')}
+                        disabled={pending !== null}
+                        onClick={() => run(`rsvp:${evt.id}`, () => onRsvp(serverId, evt.id, 'going'), 'RSVP updated.')}
                         className="rounded bg-bg-accent/20 px-2 py-1 text-xs text-bg-accent hover:bg-bg-accent/30"
                         title="Mark as going"
                       >
                         Going
                       </button>
+                      {(rsvps[evt.id] ?? []).some(rsvp => rsvp.user_id === userId) && (
+                        <button
+                          disabled={pending !== null}
+                          onClick={() => run(`rsvp:${evt.id}`, () => onRemoveRsvp(serverId, evt.id), 'RSVP cleared.')}
+                          className="rounded bg-bg-tertiary px-2 py-1 text-xs text-text-muted hover:text-text-primary"
+                        >
+                          Clear RSVP
+                        </button>
+                      )}
+                      <button
+                        disabled={pending !== null}
+                        onClick={() => run(`status:${evt.id}`, () => onStatus(serverId, evt.id, 'active'), 'Event started.')}
+                        className="rounded bg-green-600/20 px-2 py-1 text-xs text-green-400"
+                      >
+                        Start
+                      </button>
                     </>
                   )}
+                  {evt.status === 'active' && (
+                    <button
+                      disabled={pending !== null}
+                      onClick={() => run(`status:${evt.id}`, () => onStatus(serverId, evt.id, 'completed'), 'Event completed.')}
+                      className="rounded bg-bg-accent/20 px-2 py-1 text-xs text-bg-accent"
+                    >
+                      Complete
+                    </button>
+                  )}
+                  {evt.status !== 'completed' && evt.status !== 'cancelled' && (
+                    <button
+                      disabled={pending !== null}
+                      onClick={() => run(`status:${evt.id}`, () => onStatus(serverId, evt.id, 'cancelled'), 'Event cancelled.')}
+                      className="rounded bg-red-600/20 px-2 py-1 text-xs text-red-400"
+                    >
+                      Cancel
+                    </button>
+                  )}
                   <button
-                    onClick={() => onDelete(serverId, evt.id)}
+                    disabled={pending !== null}
+                    onClick={() => run(`delete:${evt.id}`, () => onDelete(serverId, evt.id), 'Event deleted.')}
                     className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
                   >
                     Delete
@@ -407,19 +548,133 @@ function EventsTab({ events, serverId, onCreate, onDelete, onRsvp }: {
           ))}
         </div>
       )}
+      <ActionOutcome outcome={outcome} />
+    </div>
+  );
+}
+
+function AnnouncementsTab({
+  serverId,
+  serverChannels,
+  allChannels,
+  follows,
+  onSetAnnouncement,
+  onFollow,
+  onUnfollow,
+  onList,
+}: {
+  serverId: string;
+  serverChannels: ChannelInfo[];
+  allChannels: ChannelInfo[];
+  follows: Record<string, ChannelFollowInfo[]>;
+  onSetAnnouncement: (serverId: string, channel: string, isAnnouncement: boolean) => Promise<void>;
+  onFollow: (sourceChannelId: string, targetChannelId: string) => Promise<void>;
+  onUnfollow: (followId: string) => Promise<void>;
+  onList: (channelId: string) => void;
+}) {
+  const [sourceId, setSourceId] = useState('');
+  const [targetId, setTargetId] = useState('');
+  const { pending, outcome, run } = useActionStatus();
+  const source = serverChannels.find(channel => channel.id === sourceId);
+  const sourceFollows = sourceId ? follows[sourceId] ?? [] : [];
+
+  useEffect(() => {
+    if (sourceId) onList(sourceId);
+  }, [sourceId, onList]);
+
+  const channelLabel = (channelId: string) => {
+    const channel = allChannels.find(candidate => candidate.id === channelId);
+    return channel ? `${channel.server_id} / #${channel.name}` : channelId;
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="announcement-source" className="mb-1 block text-sm font-medium text-text-secondary">Announcement source</label>
+        <select
+          id="announcement-source"
+          value={sourceId}
+          onChange={event => setSourceId(event.target.value)}
+          className="w-full rounded bg-bg-tertiary px-3 py-2 text-sm text-text-primary"
+        >
+          <option value="">Select a channel</option>
+          {serverChannels.map(channel => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
+        </select>
+      </div>
+
+      {source && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            disabled={pending !== null}
+            onClick={() => run('announcement', () => onSetAnnouncement(serverId, source.name, true), 'Announcement channel enabled.')}
+            className="rounded bg-bg-accent px-3 py-2 text-sm text-white"
+          >
+            Enable announcements
+          </button>
+          <button
+            disabled={pending !== null}
+            onClick={() => run('announcement', () => onSetAnnouncement(serverId, source.name, false), 'Announcement channel disabled.')}
+            className="rounded bg-bg-tertiary px-3 py-2 text-sm text-text-secondary"
+          >
+            Disable announcements
+          </button>
+        </div>
+      )}
+
+      <div>
+        <label htmlFor="announcement-target" className="mb-1 block text-sm font-medium text-text-secondary">Cross-post destination</label>
+        <div className="flex gap-2">
+          <select
+            id="announcement-target"
+            value={targetId}
+            onChange={event => setTargetId(event.target.value)}
+            className="min-w-0 flex-1 rounded bg-bg-tertiary px-3 py-2 text-sm text-text-primary"
+          >
+            <option value="">Select a destination</option>
+            {allChannels.filter(channel => channel.id !== sourceId).map(channel => (
+              <option key={channel.id} value={channel.id}>{channel.server_id} / #{channel.name}</option>
+            ))}
+          </select>
+          <button
+            disabled={!sourceId || !targetId || pending !== null}
+            onClick={() => run('follow', () => onFollow(sourceId, targetId), 'Channel followed.', () => setTargetId(''))}
+            className="rounded bg-bg-accent px-3 py-2 text-sm text-white disabled:opacity-50"
+          >
+            {pending === 'follow' ? 'Following…' : 'Follow'}
+          </button>
+        </div>
+      </div>
+
+      {sourceId && sourceFollows.length === 0 && (
+        <p className="text-sm text-text-muted">This channel has no outgoing follows.</p>
+      )}
+      {sourceFollows.map(follow => (
+        <div key={follow.id} className="flex items-center justify-between rounded bg-bg-secondary p-3">
+          <span className="text-sm text-text-secondary">Cross-posts to {channelLabel(follow.target_channel_id)}</span>
+          <button
+            disabled={pending !== null}
+            onClick={() => run(`unfollow:${follow.id}`, () => onUnfollow(follow.id), 'Channel unfollowed.')}
+            className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white"
+          >
+            {pending === `unfollow:${follow.id}` ? 'Unfollowing…' : 'Unfollow'}
+          </button>
+        </div>
+      ))}
+      <ActionOutcome outcome={outcome} />
     </div>
   );
 }
 
 // ── Settings Tab ────────────────────────────────────────
 
-function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate, onDeleteTemplate }: {
+function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate, onDeleteTemplate, onInstantiateTemplate }: {
   serverId: string;
   settings?: ServerCommunityInfo;
   templates: TemplateInfo[];
-  onUpdate: (serverId: string, settings: { description?: string; isDiscoverable: boolean; welcomeMessage?: string; rulesText?: string; category?: string }) => void;
-  onCreateTemplate: (serverId: string, name: string, description?: string) => void;
-  onDeleteTemplate: (serverId: string, templateId: string) => void;
+  onUpdate: (serverId: string, settings: { description?: string; isDiscoverable: boolean; welcomeMessage?: string; rulesText?: string; category?: string }) => Promise<void>;
+  onCreateTemplate: (serverId: string, name: string, description?: string) => Promise<void>;
+  onDeleteTemplate: (serverId: string, templateId: string) => Promise<void>;
+  onInstantiateTemplate: (templateId: string, serverName: string) => Promise<void>;
 }) {
   const [description, setDescription] = useState(settings?.description ?? '');
   const [isDiscoverable, setIsDiscoverable] = useState(settings?.is_discoverable ?? false);
@@ -429,6 +684,8 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
   const [templateName, setTemplateName] = useState('');
   const [templateDesc, setTemplateDesc] = useState('');
   const [showTemplateForm, setShowTemplateForm] = useState(false);
+  const [templateServerNames, setTemplateServerNames] = useState<Record<string, string>>({});
+  const { pending, outcome, run } = useActionStatus();
 
   // Sync form when settings load (render-time adjustment per React docs)
   const [prevSettings, setPrevSettings] = useState(settings);
@@ -442,21 +699,22 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
   }
 
   const handleSave = () => {
-    onUpdate(serverId, {
+    void run('settings', () => onUpdate(serverId, {
       description: description || undefined,
       isDiscoverable,
       welcomeMessage: welcomeMessage || undefined,
       rulesText: rulesText || undefined,
       category: category || undefined,
-    });
+    }), 'Community settings saved.');
   };
 
   const handleCreateTemplate = () => {
     if (!templateName.trim()) return;
-    onCreateTemplate(serverId, templateName.trim(), templateDesc.trim() || undefined);
-    setTemplateName('');
-    setTemplateDesc('');
-    setShowTemplateForm(false);
+    void run('create-template', () => onCreateTemplate(serverId, templateName.trim(), templateDesc.trim() || undefined), 'Template created.', () => {
+      setTemplateName('');
+      setTemplateDesc('');
+      setShowTemplateForm(false);
+    });
   };
 
   return (
@@ -466,8 +724,9 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
         <h3 className="text-sm font-semibold text-text-secondary">Community Settings</h3>
 
         <div>
-          <label className="block text-xs font-medium text-text-muted mb-1">Server Description</label>
+          <label htmlFor="community-description" className="block text-xs font-medium text-text-muted mb-1">Server Description</label>
           <textarea
+            id="community-description"
             value={description}
             onChange={e => setDescription(e.target.value)}
             placeholder="Tell people about your server..."
@@ -490,8 +749,9 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-text-muted mb-1">Welcome Message</label>
+          <label htmlFor="community-welcome" className="block text-xs font-medium text-text-muted mb-1">Welcome Message</label>
           <textarea
+            id="community-welcome"
             value={welcomeMessage}
             onChange={e => setWelcomeMessage(e.target.value)}
             placeholder="Welcome new members with a message..."
@@ -501,8 +761,9 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-text-muted mb-1">Server Rules</label>
+          <label htmlFor="community-rules" className="block text-xs font-medium text-text-muted mb-1">Server Rules</label>
           <textarea
+            id="community-rules"
             value={rulesText}
             onChange={e => setRulesText(e.target.value)}
             placeholder="Define rules that members must accept..."
@@ -512,8 +773,9 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-text-muted mb-1">Category</label>
+          <label htmlFor="community-category" className="block text-xs font-medium text-text-muted mb-1">Category</label>
           <select
+            id="community-category"
             value={category}
             onChange={e => setCategory(e.target.value)}
             className="w-full rounded bg-bg-tertiary px-3 py-1.5 text-sm text-text-primary outline-none focus:ring-1 focus:ring-bg-accent"
@@ -529,10 +791,11 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
         </div>
 
         <button
+          disabled={pending !== null}
           onClick={handleSave}
           className="rounded bg-bg-accent px-4 py-1.5 text-xs font-medium text-white hover:bg-bg-accent/80"
         >
-          Save Settings
+          {pending === 'settings' ? 'Saving…' : 'Save Settings'}
         </button>
       </div>
 
@@ -541,6 +804,7 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-text-secondary">Server Templates</h3>
           <button
+            disabled={pending !== null}
             onClick={() => setShowTemplateForm(!showTemplateForm)}
             className="rounded bg-bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-bg-accent/80"
           >
@@ -551,8 +815,9 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
         {showTemplateForm && (
           <div className="rounded bg-bg-secondary p-3 space-y-3">
             <div>
-              <label className="block text-xs font-medium text-text-muted mb-1">Template Name *</label>
+              <label htmlFor="community-template-name" className="block text-xs font-medium text-text-muted mb-1">Template Name *</label>
               <input
+                id="community-template-name"
                 type="text"
                 value={templateName}
                 onChange={e => setTemplateName(e.target.value)}
@@ -561,8 +826,9 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-muted mb-1">Description</label>
+              <label htmlFor="community-template-description" className="block text-xs font-medium text-text-muted mb-1">Description</label>
               <input
+                id="community-template-description"
                 type="text"
                 value={templateDesc}
                 onChange={e => setTemplateDesc(e.target.value)}
@@ -572,10 +838,10 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
             </div>
             <button
               onClick={handleCreateTemplate}
-              disabled={!templateName.trim()}
+              disabled={!templateName.trim() || pending !== null}
               className="rounded bg-bg-accent px-4 py-1.5 text-xs font-medium text-white hover:bg-bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create Template
+              {pending === 'create-template' ? 'Creating…' : 'Create Template'}
             </button>
           </div>
         )}
@@ -585,7 +851,8 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
         ) : (
           <div className="space-y-2">
             {templates.map(tpl => (
-              <div key={tpl.id} className="flex items-center justify-between rounded bg-bg-secondary p-3">
+              <div key={tpl.id} className="rounded bg-bg-secondary p-3 space-y-2">
+                <div className="flex items-center justify-between">
                 <div>
                   <span className="text-sm font-medium text-text-primary">{tpl.name}</span>
                   {tpl.description && (
@@ -596,16 +863,40 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
                   </p>
                 </div>
                 <button
-                  onClick={() => onDeleteTemplate(serverId, tpl.id)}
+                  disabled={pending !== null}
+                  onClick={() => run(`delete-template:${tpl.id}`, () => onDeleteTemplate(serverId, tpl.id), 'Template deleted.')}
                   className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
                 >
-                  Delete
+                  {pending === `delete-template:${tpl.id}` ? 'Deleting…' : 'Delete'}
                 </button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={templateServerNames[tpl.id] ?? ''}
+                    onChange={e => setTemplateServerNames(names => ({ ...names, [tpl.id]: e.target.value }))}
+                    placeholder="New server name"
+                    aria-label={`New server name for ${tpl.name}`}
+                    className="min-w-0 flex-1 rounded bg-bg-tertiary px-3 py-1.5 text-sm text-text-primary outline-none focus:ring-1 focus:ring-bg-accent"
+                  />
+                  <button
+                    onClick={() => {
+                      const name = (templateServerNames[tpl.id] ?? '').trim();
+                      if (!name) return;
+                      void run(`instantiate:${tpl.id}`, () => onInstantiateTemplate(tpl.id, name), 'Server created from template.', () => setTemplateServerNames(names => ({ ...names, [tpl.id]: '' })));
+                    }}
+                    disabled={!(templateServerNames[tpl.id] ?? '').trim() || pending !== null}
+                    className="rounded bg-bg-accent px-3 py-1 text-xs font-medium text-white hover:bg-bg-accent/80 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {pending === `instantiate:${tpl.id}` ? 'Creating…' : 'Create Server'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+      <ActionOutcome outcome={outcome} />
     </div>
   );
 }
@@ -614,16 +905,17 @@ function SettingsTab({ serverId, settings, templates, onUpdate, onCreateTemplate
 
 function DiscoveryTab({ servers, onJoin, onRefresh }: {
   servers: ServerCommunityInfo[];
-  onJoin: (code: string) => void;
+  onJoin: (code: string) => Promise<void>;
   onRefresh: (category?: string) => void;
 }) {
   const [filterCategory, setFilterCategory] = useState('');
   const [joinCode, setJoinCode] = useState('');
+  const { pending, outcome, run } = useActionStatus();
 
   const handleJoinByCode = () => {
     if (!joinCode.trim()) return;
-    onJoin(joinCode.trim());
-    setJoinCode('');
+    const code = joinCode.trim();
+    void run('join', () => onJoin(code), 'Invite accepted.', () => setJoinCode(''));
   };
 
   return (
@@ -633,6 +925,7 @@ function DiscoveryTab({ servers, onJoin, onRefresh }: {
         <h3 className="text-sm font-semibold text-text-secondary">Join by Invite Code</h3>
         <div className="flex gap-2">
           <input
+            aria-label="Invite code"
             type="text"
             value={joinCode}
             onChange={e => setJoinCode(e.target.value)}
@@ -642,13 +935,14 @@ function DiscoveryTab({ servers, onJoin, onRefresh }: {
           />
           <button
             onClick={handleJoinByCode}
-            disabled={!joinCode.trim()}
+            disabled={!joinCode.trim() || pending !== null}
             className="rounded bg-bg-accent px-4 py-1.5 text-xs font-medium text-white hover:bg-bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Join
+            {pending === 'join' ? 'Joining…' : 'Join'}
           </button>
         </div>
       </div>
+      <ActionOutcome outcome={outcome} />
 
       {/* Browse servers */}
       <div className="space-y-3">
@@ -656,6 +950,7 @@ function DiscoveryTab({ servers, onJoin, onRefresh }: {
           <h3 className="text-sm font-semibold text-text-secondary">Discover Servers</h3>
           <div className="flex items-center gap-2">
             <select
+              aria-label="Discovery category"
               value={filterCategory}
               onChange={e => {
                 setFilterCategory(e.target.value);

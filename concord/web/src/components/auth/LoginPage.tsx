@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { useAuthStore } from '../../stores/authStore';
 
 export function LoginPage() {
+  const authError = useAuthStore((state) => state.error);
+  const checkAuth = useAuthStore((state) => state.checkAuth);
   const [handle, setHandle] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,6 +23,14 @@ export function LoginPage() {
         </div>
 
         <div className="space-y-3">
+          {authError && (
+            <div role="alert" className="flex items-center gap-3 rounded-md bg-red-950/50 px-3 py-2 text-sm text-red-300">
+              <span className="min-w-0 flex-1">{authError}</span>
+              <button type="button" onClick={() => void checkAuth()} className="shrink-0 font-medium text-accent">
+                Retry sign-in check
+              </button>
+            </div>
+          )}
           <div className="flex gap-2">
             <input
               type="text"

@@ -1,0 +1,187 @@
+[WebServer] (node:2474603) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 1 test using 1 worker
+
+(node:2475154) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node-22 --trace-warnings ...` to show where the warning was created)
+
+
+[1/1] tests/authenticated/authenticated.spec.ts:503:1 › IRC and browser share canonical channel delivery, opaque history, and reconnect recovery
+tests/authenticated/authenticated.spec.ts:503:1 › IRC and browser share canonical channel delivery, opaque history, and reconnect recovery
+[alice-irc:console:debug] [vite] connecting...
+
+[alice-irc:ws:received] {"type":"connected"}
+
+[alice-irc:console:debug] [vite] connected.
+
+[alice-irc:console:info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+
+[alice-irc:ws:sent] {"type":"list_servers"}
+
+[alice-irc:ws:sent] {"type":"list_direct_conversations"}
+
+[alice-irc:ws:sent] {"type":"get_server_limits"}
+
+[alice-irc:ws:sent] {"type":"sync","request_id":"d6f13fab-2f2f-4332-9c63-1bf49c47c3a4","protocol_version":2,"subscriptions":[],"limit":100}
+
+[alice-irc:ws:received] {"type":"own_presence","requested_status":"online","effective_status":"online","custom_status":null,"status_emoji":null}
+
+[alice-irc:ws:received] {"type":"server_list","servers":[{"id":"browser-server","name":"Browser fixture","member_count":3,"role":"owner","my_permissions":32636159}]}
+
+[alice-irc:ws:sent] {"type":"list_channels","server_id":"browser-server"}
+
+[alice-irc:ws:sent] {"type":"get_unread_counts","server_id":"browser-server"}
+
+[alice-irc:ws:sent] {"type":"get_community_settings","server_id":"browser-server"}
+
+[alice-irc:ws:sent] {"type":"list_channels","server_id":"browser-server"}
+
+[alice-irc:ws:sent] {"type":"get_unread_counts","server_id":"browser-server"}
+
+[alice-irc:ws:received] {"type":"direct_conversation_list","conversations":[{"id":"browser-dm","peer_id":"browser-bob","peer_username":"bob","last_message_at":"2026-09-06 09:44:36","unread_count":1}]}
+
+[alice-irc:ws:sent] {"type":"sync","request_id":"dea0f842-90d8-4dbf-861f-7a5fbd513655","protocol_version":2,"subscriptions":["browser-dm"],"limit":100}
+
+[alice-irc:ws:received] {"type":"server_limits","max_message_length":4000,"max_file_size_mb":10}
+
+[alice-irc:ws:received] {"type":"sync_snapshot","request_id":"d6f13fab-2f2f-4332-9c63-1bf49c47c3a4","snapshot":{"protocol_version":2,"operation_generation":"af81da2c6f594ad76b4383ea6653d5ad","cursor":"ad-2ei8x6C6w_BmWC2yxzrMHFRi0Ah5dRbpgu8CfvibqvWbbAVJdWgGnZEf1v6vfJcrlL0J41WvyzYpEmtgkERQA1MBI1vZ7QxlFwCe7t5X_wR2Tp-1uQS1lUnlsuUqeTVvZPwHdADzts0sdhpkzye_wE_nCasTZ2tzbXsbpPKW0rxZoGMCiD9gQxvjcZzUOH70wtc59KB_MoZCS9cUfIHwFAdRpANEidJg5dePkI2dxvoQCNGnKlIMOH6mxKIM-3F6xLotHjEtgEbO8wx_GIdQ9YgZ3r9nU7W_VvRAtkgQnSkoFhgTxTQGWS6tmKBY9RVC
+
+[alice-irc:ws:received] {"type":"channel_list","server_id":"browser-server","channels":[{"id":"browser-general","conversation_id":"channel:62726F777365722D67656E6572616C","server_id":"browser-server","name":"#general","topic":"","member_count":0,"position":0,"is_private":false,"channel_type":"text","archived":false,"slowmode_seconds":0,"is_nsfw":false}]}
+
+[alice-irc:ws:sent] {"type":"list_roles","server_id":"browser-server"}
+
+[alice-irc:ws:sent] {"type":"list_categories","server_id":"browser-server"}
+
+[alice-irc:ws:sent] {"type":"get_presences","server_id":"browser-server"}
+
+[alice-irc:ws:sent] {"type":"get_notification_settings","server_id":"browser-server"}
+
+[alice-irc:ws:sent] {"type":"sync","request_id":"4bcea7d5-d5e0-4d3a-9734-db43c521894c","protocol_version":2,"subscriptions":["browser-dm","channel:62726F777365722D67656E6572616C"],"limit":100}
+
+[alice-irc:ws:received] {"type":"unread_counts","server_id":"browser-server","counts":[{"channel_name":"#general","count":3}]}
+
+[alice-irc:ws:received] {"type":"server_community","community":{"server_id":"browser-server","is_discoverable":false,"rules_accepted":false}}
+
+[alice-irc:ws:received] {"type":"channel_list","server_id":"browser-server","channels":[{"id":"browser-general","conversation_id":"channel:62726F777365722D67656E6572616C","server_id":"browser-server","name":"#general","topic":"","member_count":0,"position":0,"is_private":false,"channel_type":"text","archived":false,"slowmode_seconds":0,"is_nsfw":false}]}
+
+[alice-irc:ws:received] {"type":"unread_counts","server_id":"browser-server","counts":[{"channel_name":"#general","count":3}]}
+
+[alice-irc:ws:received] {"type":"sync_snapshot","request_id":"dea0f842-90d8-4dbf-861f-7a5fbd513655","snapshot":{"protocol_version":2,"operation_generation":"af81da2c6f594ad76b4383ea6653d5ad","cursor":"OvaCDYWs9Qx8G9GuTNZvt7cGP1CrCggNrEKbGtKid2zKDf6pM1eyFPB6DNW1RgjvUMIrPiL_IR1Aaj51cJLzalkN82XoirEZTIs7DhNmwHZZe8fLC1b3ob2G4lSmfMunpLoS-7mdW2Q9JxcmAbUxZyjZ4BpC_EkMuoT0fTgdxb7gaWJtfaJBYIqi7hfChFKemkDqS7McLfha1O9Ws_lZq0y5QV6eb4DVkO_wZBCRYgsRLE-TKn5licMEQyVhl-J810H80Uv1gCP7G74K6tTI_GyPyaq5Oqnsg9lPYDYTef0g72faxa189PSCc8gFzONU6GF
+
+[alice-irc:ws:received] {"type":"role_list","server_id":"browser-server","version":0,"roles":[{"id":"889cd214-f334-4d07-a91b-87ff3ec9d96d","server_id":"browser-server","name":"Owner","position":3,"permissions":32636159,"is_default":false},{"id":"c619cb93-3bae-4b5b-a1f8-0477852091b7","server_id":"browser-server","name":"Admin","position":2,"permissions":130175,"is_default":false},{"id":"0ed4cd16-df64-483f-9009-2b6aa0c26858","server_id":"browser-server","name":"Moderator","position":1,"permissions":130097,"is_default":fa
+
+[alice-irc:ws:received] {"type":"category_list","server_id":"browser-server","categories":[]}
+
+[alice-irc:ws:received] {"type":"presence_list","server_id":"browser-server","presences":[{"user_id":"browser-alice","nickname":"alice","status":"online"},{"user_id":"browser-bob","nickname":"bob","status":"offline"},{"user_id":"browser-helper-bot","nickname":"helper-bot","status":"offline"}]}
+
+[alice-irc:ws:received] {"type":"notification_settings","server_id":"browser-server","settings":[]}
+
+[alice-irc:ws:received] {"type":"sync_snapshot","request_id":"4bcea7d5-d5e0-4d3a-9734-db43c521894c","snapshot":{"protocol_version":2,"operation_generation":"af81da2c6f594ad76b4383ea6653d5ad","cursor":"OPBMOdEPndq3yPaIR05_XkSfJfweco1XLgC_N-FRB63NGS7afbCsKqVerjpmo1D2skTlOAG73RClo8L95Sa1mplEY1ITOmWdTZ_GvgEVsmAmz7BnZoL94EjC829NBu2IEwnRHRxudSeOMIMVLwWiOqTRiwbeYuMe7UIuMWL1QBZij-HxCMzB-1SPXEcQh7jFD1BWk2uQwm2pz3LKZGljyA59A-EkZC_jrCpJOCrKUnG8aS8RWzUrgcYTG1rdhjaGybI435MZPCftXc_o9fpljN6AfhBYk68_NWUPWCoR1JiCJTeMtf-HDS3JCod7ElVn7k0
+
+[alice-irc:ws:sent] {"type":"list_channels","server_id":"browser-server"}
+
+[alice-irc:ws:received] {"type":"channel_list","server_id":"browser-server","channels":[{"id":"browser-general","conversation_id":"channel:62726F777365722D67656E6572616C","server_id":"browser-server","name":"#general","topic":"","member_count":0,"position":0,"is_private":false,"channel_type":"text","archived":false,"slowmode_seconds":0,"is_nsfw":false}]}
+
+[alice-irc:ws:sent] {"type":"join_channel","server_id":"browser-server","channel":"#general"}
+
+[alice-irc:ws:sent] {"type":"get_members","server_id":"browser-server","channel":"#general"}
+
+[alice-irc:ws:sent] {"type":"fetch_history","server_id":"browser-server","channel":"#general","limit":50}
+
+[alice-irc:ws:sent] {"type":"list_threads","server_id":"browser-server","channel":"#general"}
+
+[alice-irc:ws:sent] {"type":"list_forum_tags","server_id":"browser-server","channel":"#general"}
+
+[alice-irc:ws:sent] {"type":"mark_read","operation_generation":"af81da2c6f594ad76b4383ea6653d5ad","request_id":"0b93dbe9-4c7d-4a64-ba5f-1d59775ba7fc","client_message_id":"0b93dbe9-4c7d-4a64-ba5f-1d59775ba7fc","server_id":"browser-server","channel":"#general","message_id":" historical:界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 "}
+
+[alice-irc:ws:sent] {"type":"list_slash_commands","server_id":"browser-server"}
+
+[alice-irc:ws:sent] {"type":"list_channels","server_id":"browser-server"}
+
+[alice-irc:ws:sent] {"type":"get_unread_counts","server_id":"browser-server"}
+
+[alice-irc:ws:sent] {"type":"join_channel","server_id":"browser-server","channel":"#general"}
+
+[alice-irc:ws:sent] {"type":"get_members","server_id":"browser-server","channel":"#general"}
+
+[alice-irc:ws:sent] {"type":"fetch_history","server_id":"browser-server","channel":"#general","limit":50}
+
+[alice-irc:ws:sent] {"type":"list_threads","server_id":"browser-server","channel":"#general"}
+
+[alice-irc:ws:sent] {"type":"list_forum_tags","server_id":"browser-server","channel":"#general"}
+
+[alice-irc:ws:sent] {"type":"list_slash_commands","server_id":"browser-server"}
+
+[alice-irc:ws:received] {"type":"join","nickname":"alice","server_id":"browser-server","channel":"#general","user_id":"browser-alice","role_ids":["889cd214-f334-4d07-a91b-87ff3ec9d96d"]}
+
+[alice-irc:console:error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+[alice-irc:ws:received] {"type":"names","server_id":"browser-server","channel":"#general","members":[{"nickname":"alice","user_id":"browser-alice","role_ids":["889cd214-f334-4d07-a91b-87ff3ec9d96d"]}]}
+
+[alice-irc:ws:received] {"type":"names","server_id":"browser-server","channel":"#general","members":[{"nickname":"alice","user_id":"browser-alice","role_ids":["889cd214-f334-4d07-a91b-87ff3ec9d96d"]}]}
+
+[alice-irc:ws:received] {"type":"history","server_id":"browser-server","channel":"#general","messages":[{"id":" historical:界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 ","from":"bob","content":"historical long unicode identifier","timestamp":"2024-01-02T08:04:07.987654321Z"},{"id":"  padded historical message id  ","from":"bob","content":"historical offset timestamp","timestamp":"2024-
+
+[alice-irc:ws:received] {"type":"thread_list","server_id":"browser-server","channel":"#general","threads":[]}
+
+[alice-irc:ws:received] {"type":"error","code":"INVALID_INPUT","message":"forum tags require a forum channel"}
+
+[alice-irc:console:error] Server error [INVALID_INPUT]: forum tags require a forum channel
+
+[alice-irc:ws:received] {"type":"command_committed","receipt":{"request_id":"0b93dbe9-4c7d-4a64-ba5f-1d59775ba7fc","client_message_id":"0b93dbe9-4c7d-4a64-ba5f-1d59775ba7fc","message_id":" historical:界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 ","sequence":"3","entity_version":1,"persisted_at":"2026-09-06T09:44:43.346226943+00:00","replayed":false}}
+
+[alice-irc:ws:received] {"type":"slash_command_list","server_id":"browser-server","commands":[{"id":"browser-command","bot_user_id":"browser-helper-bot","name":"journey","description":"Exercise bot interactions","options":[]}]}
+
+[alice-irc:ws:received] {"type":"channel_list","server_id":"browser-server","channels":[{"id":"browser-general","conversation_id":"channel:62726F777365722D67656E6572616C","server_id":"browser-server","name":"#general","topic":"","member_count":1,"position":0,"is_private":false,"channel_type":"text","archived":false,"slowmode_seconds":0,"is_nsfw":false}]}
+
+[alice-irc:ws:received] {"type":"unread_counts","server_id":"browser-server","counts":[]}
+
+[alice-irc:ws:received] {"type":"join","nickname":"alice","server_id":"browser-server","channel":"#general","user_id":"browser-alice","role_ids":["889cd214-f334-4d07-a91b-87ff3ec9d96d"]}
+
+[alice-irc:ws:received] {"type":"names","server_id":"browser-server","channel":"#general","members":[{"nickname":"alice","user_id":"browser-alice","role_ids":["889cd214-f334-4d07-a91b-87ff3ec9d96d"]}]}
+
+[alice-irc:ws:received] {"type":"names","server_id":"browser-server","channel":"#general","members":[{"nickname":"alice","user_id":"browser-alice","role_ids":["889cd214-f334-4d07-a91b-87ff3ec9d96d"]}]}
+
+[alice-irc:ws:received] {"type":"history","server_id":"browser-server","channel":"#general","messages":[{"id":" historical:界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 ","from":"bob","content":"historical long unicode identifier","timestamp":"2024-01-02T08:04:07.987654321Z"},{"id":"  padded historical message id  ","from":"bob","content":"historical offset timestamp","timestamp":"2024-
+
+[alice-irc:ws:received] {"type":"thread_list","server_id":"browser-server","channel":"#general","threads":[]}
+
+[alice-irc:ws:received] {"type":"error","code":"INVALID_INPUT","message":"forum tags require a forum channel"}
+
+[alice-irc:console:error] Server error [INVALID_INPUT]: forum tags require a forum channel
+
+[alice-irc:ws:received] {"type":"slash_command_list","server_id":"browser-server","commands":[{"id":"browser-command","bot_user_id":"browser-helper-bot","name":"journey","description":"Exercise bot interactions","options":[]}]}
+
+[alice-irc:ws:received] {"type":"join","nickname":"u-d72fc956b683264273716f30b05431","server_id":"browser-server","channel":"#general","user_id":"browser-bob"}
+
+[alice-irc:ws:received] {"type":"message","id":"f200ed62-deda-4de6-984c-75317b14b6d5","server_id":"browser-server","from":"bob","target":"#general","content":"message from a real IRC stream","timestamp":"2026-09-06T09:44:43.667Z"}
+
+[alice-irc:ws:received] {"type":"durable_event","event":{"kind":"read_advanced","conversation_id":"channel:62726F777365722D67656E6572616C","entity_type":"read_state","entity_id":"23e3671e3e222558338e610e9b9f6d83388fdcb6493c8c1575585f7bc713b0b1","entity_version":1,"message":null,"reaction":null,"read_state":{"conversation_id":"channel:62726F777365722D67656E6572616C","message_id":" historical:界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界
+
+[alice-irc:ws:received] {"type":"durable_event","event":{"kind":"message_created","conversation_id":"channel:62726F777365722D67656E6572616C","entity_type":"message","entity_id":"f200ed62-deda-4de6-984c-75317b14b6d5","entity_version":1,"message":{"message_id":"f200ed62-deda-4de6-984c-75317b14b6d5","conversation_id":"channel:62726F777365722D67656E6572616C","sequence":"4","entity_version":1,"sender_id":"browser-bob","sender_nick":"bob","content":"message from a real IRC stream","content_format":"plain","created_at":"2026-
+
+[alice-irc:ws:sent] {"type":"mark_read","operation_generation":"af81da2c6f594ad76b4383ea6653d5ad","request_id":"ba00f15a-cf03-48d2-9e15-133521c1bf01","client_message_id":"ba00f15a-cf03-48d2-9e15-133521c1bf01","server_id":"browser-server","channel":"#general","message_id":"f200ed62-deda-4de6-984c-75317b14b6d5"}
+
+[alice-irc:ws:received] {"type":"command_committed","receipt":{"request_id":"ba00f15a-cf03-48d2-9e15-133521c1bf01","client_message_id":"ba00f15a-cf03-48d2-9e15-133521c1bf01","message_id":"f200ed62-deda-4de6-984c-75317b14b6d5","sequence":"4","entity_version":2,"persisted_at":"2026-09-06T09:44:44.111451337+00:00","replayed":false}}
+
+[alice-irc:ws:sent] {"type":"typing","server_id":"browser-server","channel":"#general"}
+
+[alice-irc:ws:sent] {"type":"send_message","operation_generation":"af81da2c6f594ad76b4383ea6653d5ad","request_id":"54399167-cc6d-41e8-be63-5b1717beaec1","client_message_id":"54399167-cc6d-41e8-be63-5b1717beaec1","server_id":"browser-server","channel":"#general","content":"browser response to IRC","nonce":"54399167-cc6d-41e8-be63-5b1717beaec1"}
+
+[alice-irc:ws:received] {"type":"message_ack","id":"7689bad7-f5d5-4f26-8b11-08fa87b36be3","server_id":"browser-server","channel":"#general","request_id":"54399167-cc6d-41e8-be63-5b1717beaec1","client_message_id":"54399167-cc6d-41e8-be63-5b1717beaec1","sequence":"5","persisted_at":"2026-09-06 09:44:44.491","replayed":false,"nonce":"54399167-cc6d-41e8-be63-5b1717beaec1"}
+
+[alice-irc:ws:received] {"type":"message","id":"7689bad7-f5d5-4f26-8b11-08fa87b36be3","server_id":"browser-server","from":"alice","target":"#general","content":"browser response to IRC","timestamp":"2026-09-06T09:44:44.491Z"}
+
+[alice-irc:ws:received] {"type":"quit","nickname":"u-d72fc956b683264273716f30b05431","reason":null}
+
+[alice-irc:ws:received] {"type":"presence_update","server_id":"browser-server","presence":{"user_id":"browser-bob","nickname":"bob","status":"offline"}}
+
+[alice-irc:ws:received] {"type":"own_presence","requested_status":"online","effective_status":"online","custom_status":null,"status_emoji":null}
+
+[alice-irc:ws:sent] {"type":"fetch_history","server_id":"browser-server","channel":"#general","limit":20}
+
+[alice-irc:ws:received] {"type":"history","server_id":"browser-server","channel":"#general","messages":[{"id":"7689bad7-f5d5-4f26-8b11-08fa87b36be3","from":"alice","content":"browser response to IRC","timestamp":"2026-09-06T09:44:44.491Z"},{"id":"f200ed62-deda-4de6-984c-75317b14b6d5","from":"bob","content":"message from a real IRC stream","timestamp":"2026-09-06T09:44:43.667Z"},{"id":" historical:界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界
+
+  1 passed (6.3s)

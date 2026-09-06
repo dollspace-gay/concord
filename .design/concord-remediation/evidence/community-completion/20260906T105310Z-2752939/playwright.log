@@ -1,0 +1,12 @@
+[WebServer] (node:2753136) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 1 test using 1 worker
+
+(node:2753202) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node-22 --trace-warnings ...` to show where the warning was created)
+
+
+[1/1] tests/authenticated/completion.spec.ts:172:1 › bot UI token lifecycle drives correlated slash and component outcomes over real sockets
+  1 passed (7.6s)

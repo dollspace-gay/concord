@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8"><title>Dialog harness</title></head>
+  <body><div id="root"></div><script type="module">
+    import React, { useState } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { Dialog } from '/src/components/Dialog.tsx';
+    function Harness() {
+      const [outer, setOuter] = useState(false);
+      const [inner, setInner] = useState(false);
+      return React.createElement(React.Fragment, null,
+        React.createElement('button', { onClick: () => setOuter(true) }, 'Open outer'),
+        outer && React.createElement(Dialog, { label: 'Outer', onClose: () => setOuter(false), panelClassName: 'p-4' },
+          React.createElement('input', { type: 'hidden' }),
+          React.createElement('button', { onClick: () => setInner(true) }, 'Open inner'),
+          React.createElement('button', null, 'Outer last'),
+          inner && React.createElement(Dialog, { label: 'Inner', onClose: () => setInner(false), panelClassName: 'p-4' },
+            React.createElement('input', { type: 'file', hidden: true }),
+            React.createElement('button', null, 'Inner first'),
+            React.createElement('button', null, 'Inner last'))));
+    }
+    createRoot(document.getElementById('root')).render(React.createElement(Harness));
+  </script></body>
+</html>

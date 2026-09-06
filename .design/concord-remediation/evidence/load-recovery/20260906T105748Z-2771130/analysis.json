@@ -1,0 +1,80 @@
+{
+  "classification": "bounded-local-smoke",
+  "context": {
+    "cpu_count": 24,
+    "dataset_sha256": "c56e6ab7cf2c3e53ca308b1b854791b9595846c6f754b1d55d4dc78593328b18",
+    "generator_hostname": "dollspace-laptop",
+    "memory_bytes": 33033777152,
+    "separate_load_generator": false,
+    "server_sha256": "fe16292d5d0300cdd49707660cb7e18fe8e564fbe3335f7615640063ac124562",
+    "source_revision": "cff0df246b91461f959d8dbe9154ba50bba2331c",
+    "target_hostname": "dollspace-laptop"
+  },
+  "full_acceptance_claimed": false,
+  "mode": "smoke",
+  "resource": {
+    "baseline_rss_bytes": 82546688,
+    "final_active_counts": {
+      "connections": 0,
+      "jobs": 0,
+      "uploads": 0
+    },
+    "full_occupancy_sample_ratio": null,
+    "high_water_rss_bytes": 90005504,
+    "maximum_steady_sample_gap_seconds": 1.000159502029419,
+    "nondecreasing_tail_growth_bytes": 208896,
+    "nondecreasing_tail_samples": 6,
+    "phase_samples": {
+      "post_disconnect": 5,
+      "steady": 9,
+      "stress": 17,
+      "warmup": 5
+    },
+    "post_disconnect_limit_bytes": 149655552,
+    "post_disconnect_rss_bytes": 59981824,
+    "sample_count": 36,
+    "scope": "bounded",
+    "steady_span_seconds": 8.00021505355835,
+    "telemetry_supplied": true
+  },
+  "result_checks": {
+    "closed_or_resynced": 1,
+    "commit_ack_p95_ms": 12.72585999686271,
+    "commit_ack_p99_ms": 12.72585999686271,
+    "concurrent_uploads": 4,
+    "core_chat_acks_during_failure": 1,
+    "history_p95_ms": 8.354651974514127,
+    "history_requests": 22,
+    "media_file_bytes_each": 1048576,
+    "messages_sent": 8,
+    "messages_verified": 8,
+    "no_duplicate_accepted_messages": true,
+    "provider_failure_terminal": false,
+    "recipient_deliveries_verified": 40,
+    "reconnect_convergence_seconds": 3.045187851996161,
+    "reconnect_declared_target": 2,
+    "reconnect_recovered": 2,
+    "restart_restore_messages_verified": 8,
+    "search_p95_ms": 4.190618987195194,
+    "search_requests": 22,
+    "slow_clients": 1
+  },
+  "schema_version": 1,
+  "supporting_artifacts": {
+    "required": false
+  },
+  "time_series_samples": 36,
+  "workload": {
+    "accepted_message_rate_per_second": 1.0,
+    "database_profile": "FULL/WAL",
+    "duration_seconds": 8.0,
+    "irc_sessions": 3,
+    "mean_fanout": 5.0,
+    "messages_sent": 8,
+    "seeded_messages": 3,
+    "senders": 1,
+    "servers": 1,
+    "sessions": 5,
+    "web_sessions": 2
+  }
+}

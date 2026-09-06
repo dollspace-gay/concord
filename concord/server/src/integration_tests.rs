@@ -11,10 +11,11 @@ mod tests {
     use crate::db::models::{
         CreateAuditLogParams, CreateAutomodRuleParams, CreateServerEventParams, CreateWebhookParams,
     };
-    use crate::db::pool::{create_pool, run_migrations};
+    use crate::db::pool::{create_pool, current_schema_version, run_migrations};
     use crate::db::queries;
     use crate::engine::chat_engine::ChatEngine;
     use crate::engine::events::ChatEvent;
+    use crate::engine::ids::ConnectionId;
     use crate::engine::permissions::{
         ChannelOverride, DEFAULT_EVERYONE, DEFAULT_MODERATOR, OverrideTargetType, Permissions,
         compute_effective_permissions,
@@ -33,7 +34,9 @@ mod tests {
     /// Create a ChatEngine backed by a fresh in-memory database.
     async fn setup_engine() -> (ChatEngine, SqlitePool) {
         let pool = setup_db().await;
-        let engine = ChatEngine::new(Some(pool.clone()), 4000, 100);
+        let auth =
+            crate::auth::authority::AuthService::new(pool.clone(), "integration-secret".into(), 1);
+        let engine = ChatEngine::new(pool.clone(), auth, "session-secret", 4000, 100);
         (engine, pool)
     }
 
@@ -62,7 +65,7 @@ mod tests {
         engine: &ChatEngine,
         user_id: Option<&str>,
         nickname: &str,
-    ) -> (uuid::Uuid, tokio::sync::mpsc::Receiver<ChatEvent>) {
+    ) -> (ConnectionId, tokio::sync::mpsc::Receiver<ChatEvent>) {
         engine
             .connect(
                 user_id.map(|s| s.to_string()),
@@ -71,6 +74,24 @@ mod tests {
                 None,
             )
             .unwrap()
+    }
+
+    async fn authenticate_session(
+        engine: &ChatEngine,
+        pool: &SqlitePool,
+        user_id: &str,
+        session_id: ConnectionId,
+    ) {
+        let auth =
+            crate::auth::authority::AuthService::new(pool.clone(), "integration-secret".into(), 1);
+        let (_, actor) = auth.issue_web_session(user_id).await.unwrap();
+        engine.bind_authenticated_actor(session_id, actor).unwrap();
+    }
+
+    async fn actor_for(pool: &SqlitePool, user_id: &str) -> crate::auth::authority::Actor {
+        let auth =
+            crate::auth::authority::AuthService::new(pool.clone(), "integration-secret".into(), 1);
+        auth.issue_web_session(user_id).await.unwrap().1
     }
 
     /// Drain all pending events from a receiver.
@@ -84,17 +105,28 @@ mod tests {
 
     #[tokio::test]
     async fn test_all_migrations_apply_cleanly() {
-        // Running setup_db applies all 11 migrations to a fresh database.
+        // Running setup_db applies every registered migration to a fresh database.
         // If any migration fails, this test will panic.
         let pool = setup_db().await;
 
-        // Verify that schema_version has all 11 entries
+        // Verify the current registered target and its checksum ledger agree.
         let max_version: i64 =
             sqlx::query_scalar("SELECT COALESCE(MAX(version), 0) FROM schema_version")
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(max_version, 16, "All 16 migrations should be recorded");
+        assert_eq!(
+            max_version,
+            current_schema_version(),
+            "All registered migrations should be recorded"
+        );
+        let verified_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM schema_version v JOIN migration_metadata m USING(version)",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(verified_count, max_version);
     }
 
     #[tokio::test]
@@ -104,12 +136,18 @@ mod tests {
         // Run migrations a second time. Should not error (INSERT OR IGNORE).
         run_migrations(&pool).await.unwrap();
 
-        // Verify version is still 11, not duplicated.
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM schema_version")
+        // Verify neither the version ledger nor checksum metadata duplicated.
+        let counts: (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT COUNT(*) FROM schema_version), (SELECT COUNT(*) FROM migration_metadata)",
+        )
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count, 16, "No duplicate migration entries after re-run");
+        assert_eq!(
+            counts,
+            (current_schema_version(), current_schema_version()),
+            "No duplicate migration entries after re-run"
+        );
     }
 
     #[tokio::test]
@@ -181,7 +219,7 @@ mod tests {
 
         // Step 2: Create a server via the engine
         let server_id = engine
-            .create_server("My Server".into(), owner_id.clone(), None)
+            .create_server_for_actor(&actor_for(&pool, &owner_id).await, "My Server".into(), None)
             .await
             .unwrap();
 
@@ -233,7 +271,11 @@ mod tests {
         let joiner_id = create_test_user(&pool, "bob").await;
 
         let server_id = engine
-            .create_server("Test Server".into(), owner_id.clone(), None)
+            .create_server_for_actor(
+                &actor_for(&pool, &owner_id).await,
+                "Test Server".into(),
+                None,
+            )
             .await
             .unwrap();
 
@@ -265,13 +307,21 @@ mod tests {
 
         let user_id = create_test_user(&pool, "alice").await;
         let server_id = engine
-            .create_server("Msg Test Server".into(), user_id.clone(), None)
+            .create_server_for_actor(
+                &actor_for(&pool, &user_id).await,
+                "Msg Test Server".into(),
+                None,
+            )
             .await
             .unwrap();
 
         // Connect user and join #general
         let (sid, mut rx) = connect_user(&engine, Some(&user_id), "alice");
-        engine.join_channel(sid, &server_id, "#general").unwrap();
+        authenticate_session(&engine, &pool, &user_id, sid).await;
+        engine
+            .join_channel(sid, &server_id, "#general")
+            .await
+            .unwrap();
         drain_events(&mut rx);
 
         // Send a message
@@ -351,7 +401,7 @@ mod tests {
         let user_id = create_test_user(&pool, "bob").await;
 
         let server_id = engine
-            .create_server("Kick Test".into(), owner_id.clone(), None)
+            .create_server_for_actor(&actor_for(&pool, &owner_id).await, "Kick Test".into(), None)
             .await
             .unwrap();
 
@@ -1438,12 +1488,16 @@ mod tests {
         let thread_id = Uuid::new_v4().to_string();
         queries::threads::create_thread(
             &pool,
-            &thread_id,
-            server_id,
-            "Discussion Thread",
-            "public_thread",
-            &parent_msg_id,
-            1440,
+            &crate::db::queries::threads::CreateThreadParams {
+                channel_id: &thread_id,
+                server_id,
+                name: "Discussion Thread",
+                channel_type: "public_thread",
+                parent_message_id: &parent_msg_id,
+                parent_channel_id: &channel_id,
+                creator_user_id: &owner_id,
+                auto_archive_minutes: 1440,
+            },
         )
         .await
         .unwrap();
@@ -1586,18 +1640,22 @@ mod tests {
         let thread_id = Uuid::new_v4().to_string();
         queries::threads::create_thread(
             &pool,
-            &thread_id,
-            server_id,
-            "How do I fix this bug?",
-            "public_thread",
-            &msg_id,
-            1440,
+            &crate::db::queries::threads::CreateThreadParams {
+                channel_id: &thread_id,
+                server_id,
+                name: "How do I fix this bug?",
+                channel_type: "public_thread",
+                parent_message_id: &msg_id,
+                parent_channel_id: &forum_channel_id,
+                creator_user_id: &owner_id,
+                auto_archive_minutes: 1440,
+            },
         )
         .await
         .unwrap();
 
         // Tag the thread
-        queries::forum_tags::set_thread_tags(&pool, &thread_id, &[tag1_id.clone()])
+        queries::forum_tags::set_thread_tags(&pool, &thread_id, std::slice::from_ref(&tag1_id))
             .await
             .unwrap();
 
@@ -1660,12 +1718,16 @@ mod tests {
             let thread_id = Uuid::new_v4().to_string();
             queries::threads::create_thread(
                 &pool,
-                &thread_id,
-                server_id,
-                &format!("Thread {i}"),
-                "public_thread",
-                &msg_id,
-                1440,
+                &crate::db::queries::threads::CreateThreadParams {
+                    channel_id: &thread_id,
+                    server_id,
+                    name: &format!("Thread {i}"),
+                    channel_type: "public_thread",
+                    parent_message_id: &msg_id,
+                    parent_channel_id: &channel_id,
+                    creator_user_id: &owner_id,
+                    auto_archive_minutes: 1440,
+                },
             )
             .await
             .unwrap();
@@ -1688,19 +1750,27 @@ mod tests {
 
         let user_id = create_test_user(&pool, "alice").await;
         let server_id = engine
-            .create_server("Event Test".into(), user_id.clone(), None)
+            .create_server_for_actor(&actor_for(&pool, &user_id).await, "Event Test".into(), None)
             .await
             .unwrap();
 
         let (sid1, _rx1) = connect_user(&engine, Some(&user_id), "alice");
-        engine.join_channel(sid1, &server_id, "#general").unwrap();
+        authenticate_session(&engine, &pool, &user_id, sid1).await;
+        engine
+            .join_channel(sid1, &server_id, "#general")
+            .await
+            .unwrap();
 
         // Create a second user to receive the event
         let user2_id = create_test_user(&pool, "bob").await;
         engine.join_server(&user2_id, &server_id).await.unwrap();
 
         let (sid2, mut rx2) = connect_user(&engine, Some(&user2_id), "bob");
-        engine.join_channel(sid2, &server_id, "#general").unwrap();
+        authenticate_session(&engine, &pool, &user2_id, sid2).await;
+        engine
+            .join_channel(sid2, &server_id, "#general")
+            .await
+            .unwrap();
         drain_events(&mut rx2);
 
         // Send a message
@@ -1727,7 +1797,7 @@ mod tests {
                 timestamp,
                 ..
             } => {
-                assert!(!id.is_nil(), "Message ID should be set");
+                assert!(!id.as_str().is_empty(), "Message ID should be set");
                 assert_eq!(evt_server_id, Some(server_id.clone()));
                 assert_eq!(from, "alice");
                 assert_eq!(target, "#general");
@@ -1744,12 +1814,16 @@ mod tests {
 
         let user_id = create_test_user(&pool, "alice").await;
         let server_id = engine
-            .create_server("Join Event".into(), user_id.clone(), None)
+            .create_server_for_actor(&actor_for(&pool, &user_id).await, "Join Event".into(), None)
             .await
             .unwrap();
 
         let (sid1, mut rx1) = connect_user(&engine, Some(&user_id), "alice");
-        engine.join_channel(sid1, &server_id, "#general").unwrap();
+        authenticate_session(&engine, &pool, &user_id, sid1).await;
+        engine
+            .join_channel(sid1, &server_id, "#general")
+            .await
+            .unwrap();
         drain_events(&mut rx1);
 
         // Second user joins
@@ -1757,7 +1831,11 @@ mod tests {
         engine.join_server(&user2_id, &server_id).await.unwrap();
 
         let (sid2, _rx2) = connect_user(&engine, Some(&user2_id), "bob");
-        engine.join_channel(sid2, &server_id, "#general").unwrap();
+        authenticate_session(&engine, &pool, &user2_id, sid2).await;
+        engine
+            .join_channel(sid2, &server_id, "#general")
+            .await
+            .unwrap();
 
         // Alice should receive the Join event for Bob
         let event = rx1.try_recv().unwrap();
@@ -1786,7 +1864,11 @@ mod tests {
         let mut server_ids = Vec::new();
         for i in 0..3 {
             let sid = engine
-                .create_server(format!("Server {i}"), user_id.clone(), None)
+                .create_server_for_actor(
+                    &actor_for(&pool, &user_id).await,
+                    format!("Server {i}"),
+                    None,
+                )
                 .await
                 .unwrap();
             server_ids.push(sid);
@@ -1997,9 +2079,10 @@ mod tests {
         assert!(!dup, "Duplicate reaction should be ignored");
 
         // Get reactions
-        let reactions = queries::messages::get_reactions_for_messages(&pool, &[msg_id.clone()])
-            .await
-            .unwrap();
+        let reactions =
+            queries::messages::get_reactions_for_messages(&pool, std::slice::from_ref(&msg_id))
+                .await
+                .unwrap();
         assert_eq!(reactions.len(), 3);
 
         // Remove a reaction
@@ -2009,7 +2092,7 @@ mod tests {
         assert!(removed);
 
         let reactions_after =
-            queries::messages::get_reactions_for_messages(&pool, &[msg_id.clone()])
+            queries::messages::get_reactions_for_messages(&pool, std::slice::from_ref(&msg_id))
                 .await
                 .unwrap();
         assert_eq!(reactions_after.len(), 2);
@@ -2751,7 +2834,7 @@ mod tests {
 
         let user_id = create_test_user(&pool, "alice").await;
         let server_id = engine
-            .create_server("To Delete".into(), user_id.clone(), None)
+            .create_server_for_actor(&actor_for(&pool, &user_id).await, "To Delete".into(), None)
             .await
             .unwrap();
 
@@ -2780,7 +2863,7 @@ mod tests {
         let u3 = create_test_user(&pool, "charlie").await;
 
         let server_id = engine
-            .create_server("3 Users".into(), u1.clone(), None)
+            .create_server_for_actor(&actor_for(&pool, &u1).await, "3 Users".into(), None)
             .await
             .unwrap();
 
@@ -2792,10 +2875,22 @@ mod tests {
         let (sid1, mut rx1) = connect_user(&engine, Some(&u1), "alice");
         let (sid2, mut rx2) = connect_user(&engine, Some(&u2), "bob");
         let (sid3, mut rx3) = connect_user(&engine, Some(&u3), "charlie");
+        authenticate_session(&engine, &pool, &u1, sid1).await;
+        authenticate_session(&engine, &pool, &u2, sid2).await;
+        authenticate_session(&engine, &pool, &u3, sid3).await;
 
-        engine.join_channel(sid1, &server_id, "#general").unwrap();
-        engine.join_channel(sid2, &server_id, "#general").unwrap();
-        engine.join_channel(sid3, &server_id, "#general").unwrap();
+        engine
+            .join_channel(sid1, &server_id, "#general")
+            .await
+            .unwrap();
+        engine
+            .join_channel(sid2, &server_id, "#general")
+            .await
+            .unwrap();
+        engine
+            .join_channel(sid3, &server_id, "#general")
+            .await
+            .unwrap();
 
         drain_events(&mut rx1);
         drain_events(&mut rx2);

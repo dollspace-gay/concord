@@ -1,0 +1,9 @@
+   Compiling concord-server v0.1.0 (/home/doll/concord/concord/server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.01s
+     Running tests/session_authority.rs (target/debug/deps/session_authority-47c720204aa66e41)
+
+running 1 test
+test active_websocket_logout_revocation_stops_commands_and_cleans_engine_session ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.25s
+

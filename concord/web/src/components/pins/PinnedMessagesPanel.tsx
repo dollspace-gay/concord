@@ -14,6 +14,7 @@ export function PinnedMessagesPanel() {
   const pins = useChatStore((s) => (key ? s.pinnedMessages[key] ?? EMPTY_PINS : EMPTY_PINS));
   const getPinnedMessages = useChatStore((s) => s.getPinnedMessages);
   const unpinMessage = useChatStore((s) => s.unpinMessage);
+  const setJumpToMessageId = useUiStore((s) => s.setJumpToMessageId);
 
   useEffect(() => {
     if (activeServer && activeChannel) {
@@ -21,8 +22,9 @@ export function PinnedMessagesPanel() {
     }
   }, [activeServer, activeChannel, getPinnedMessages]);
 
-  const handleJumpToMessage = () => {
-    // Future: scroll to specific message ID within the current channel
+  const handleJumpToMessage = (messageId: string) => {
+    setJumpToMessageId(messageId);
+    setShowPinnedMessages(false);
   };
 
   const handleUnpin = (pin: PinnedMessageInfo) => {
@@ -38,6 +40,7 @@ export function PinnedMessagesPanel() {
         <button
           onClick={() => setShowPinnedMessages(false)}
           className="text-text-muted hover:text-text-primary"
+          aria-label="Close pinned messages"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -75,7 +78,7 @@ export function PinnedMessagesPanel() {
                 </div>
                 <div className="mt-2 flex gap-2">
                   <button
-                    onClick={() => handleJumpToMessage()}
+                    onClick={() => handleJumpToMessage(pin.message_id)}
                     className="rounded bg-bg-tertiary px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary"
                   >
                     Jump to message

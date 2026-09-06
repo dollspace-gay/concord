@@ -2,8 +2,23 @@
 name = "concord-server"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.96"
 description = "Concord - Open source IRC-compatible chat server"
 license = "MIT"
+
+[features]
+storage-fault-injection = ["dep:libsqlite3-sys"]
+browser-fixtures = []
+
+[[bin]]
+name = "browser_fixture_seed"
+path = "src/bin/browser_fixture_seed.rs"
+required-features = ["browser-fixtures"]
+
+[[bin]]
+name = "load_qualification_seed"
+path = "src/bin/load_qualification_seed.rs"
+required-features = ["browser-fixtures"]
 
 [dependencies]
 # Async runtime
@@ -18,6 +33,7 @@ tower-http = { version = "0.6", features = ["cors", "fs", "limit"] }
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+schemars = { version = "=1.2.2", features = ["chrono04", "uuid1"] }
 
 # Concurrent data structures
 dashmap = "6.1"
@@ -35,20 +51,28 @@ chrono = { version = "0.4", features = ["serde"] }
 futures-util = "0.3"
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono", "uuid"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "chrono", "uuid", "macros", "migrate"] }
+libsqlite3-sys = { version = "0.30.1", features = ["bundled"], optional = true }
 
 # Authentication
-jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }
+jsonwebtoken = { version = "11.0", default-features = false, features = ["aws_lc_rs"] }
 argon2 = "0.5"
 rand = "0.8"
 base64 = "0.22"
 reqwest = { version = "0.12", features = ["json", "stream"] }
 
 # AT Protocol (Bluesky) OAuth
-atproto-oauth = { version = "0.13", default-features = false }
-atproto-identity = { version = "0.13", default-features = false }
+atproto-oauth = { version = "0.14.5", default-features = false }
+atproto-identity = { version = "0.14.5", default-features = false }
 urlencoding = "2.1"
+url = "2.5"
 anyhow = "1.0"
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "2"
+chacha20poly1305 = "0.10"
+cap-std = "3.4"
+fs2 = "0.4"
 
 # HTTP cookie/header utilities
 axum-extra = { version = "0.10", features = ["cookie", "typed-header"] }
@@ -61,8 +85,15 @@ clap = { version = "4.5", features = ["derive"] }
 
 # IRC TLS support
 tokio-rustls = "0.26"
-rustls-pemfile = "2"
+rustls-pki-types = { version = "1.14", features = ["std"] }
 
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+jsonschema = { version = "=0.33.0", default-features = false }
+tempfile = "3"
+
+[build-dependencies]
+cc = "1"

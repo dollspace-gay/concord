@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
+import { useAuthStore } from '../../stores/authStore';
 import { ServerList } from '../servers/ServerList';
 import { ChannelList } from '../channels/ChannelList';
 import { ChannelHeader } from '../chat/ChannelHeader';
@@ -17,10 +19,12 @@ import { BookmarksPanel } from '../bookmarks/BookmarksPanel';
 import { ModerationPanel } from '../moderation/ModerationPanel';
 import { CommunityPanel } from '../community/CommunityPanel';
 import { IntegrationsPanel } from '../integrations/IntegrationsPanel';
+import { Dialog } from '../Dialog';
 
 export function AppLayout() {
   const showMemberList = useUiStore((s) => s.showMemberList);
   const activeChannel = useUiStore((s) => s.activeChannel);
+  const activeDirectConversation = useUiStore((s) => s.activeDirectConversation);
   const showSettings = useUiStore((s) => s.showSettings);
   const showServerSettings = useUiStore((s) => s.showServerSettings);
   const showSearch = useUiStore((s) => s.showSearch);
@@ -37,15 +41,31 @@ export function AppLayout() {
   const showIntegrationsPanel = useUiStore((s) => s.showIntegrationsPanel);
   const setShowIntegrationsPanel = useUiStore((s) => s.setShowIntegrationsPanel);
   const activeServer = useUiStore((s) => s.activeServer);
+  const loadAllUserEmoji = useChatStore((s) => s.loadAllUserEmoji);
   const errorToast = useChatStore((s) => s.errorToast);
+  const protectedGeneration = useChatStore((s) => s.protectedGeneration);
+  const activeAccountId = useChatStore((s) => s.activeAccountId);
+  const authUserId = useAuthStore((s) => s.user?.id);
+  const community = useChatStore((s) => activeServer ? s.communitySettings[activeServer] : undefined);
+  const getCommunitySettings = useChatStore((s) => s.getCommunitySettings);
+  const acceptRules = useChatStore((s) => s.acceptRules);
+
+  useEffect(() => {
+    if (activeServer) {
+      loadAllUserEmoji(activeServer);
+      getCommunitySettings(activeServer);
+    }
+  }, [activeServer, loadAllUserEmoji, getCommunitySettings]);
 
   return (
     <div className="flex h-full">
       {/* Server icon strip */}
-      <ServerList />
+      <div className={activeChannel || activeDirectConversation ? 'hidden md:block' : ''}>
+        <ServerList />
+      </div>
 
       {/* Channel sidebar */}
-      <div className="w-60 shrink-0">
+      <div className={`${activeChannel || activeDirectConversation ? 'hidden md:block' : ''} w-[calc(100%_-_3.5rem)] shrink-0 md:w-60`}>
         <ChannelList />
       </div>
 
@@ -55,7 +75,7 @@ export function AppLayout() {
           <div className="flex-1">
             <ChannelHeader />
           </div>
-          <div className="flex items-center gap-1 border-b border-border-primary bg-bg-tertiary pr-2">
+          <div className="hidden items-center gap-1 border-b border-border-primary bg-bg-tertiary pr-2 sm:flex">
             {/* Pin icon button */}
             <button
               onClick={() => setShowPinnedMessages(!showPinnedMessages)}
@@ -131,11 +151,11 @@ export function AppLayout() {
           </div>
         </div>
         <MessageList />
-        {activeChannel && <MessageInput />}
+        {(activeChannel || activeDirectConversation) && <MessageInput />}
       </div>
 
       {/* Member list sidebar */}
-      {showMemberList && activeChannel && <MemberList />}
+      {showMemberList && activeChannel && <div className="hidden lg:block"><MemberList /></div>}
 
       {/* Pinned messages panel */}
       {showPinnedMessages && <PinnedMessagesPanel />}
@@ -150,7 +170,7 @@ export function AppLayout() {
       {showSearch && <SearchPanel />}
 
       {/* Settings modal */}
-      {showSettings && <SettingsPage />}
+      {showSettings && <SettingsPage key={`${authUserId ?? 'signed-out'}:${activeAccountId ?? 'none'}:${protectedGeneration}`} />}
 
       {/* Server settings modal */}
       {showServerSettings && <ServerSettings />}
@@ -170,6 +190,14 @@ export function AppLayout() {
         <IntegrationsPanel serverId={activeServer} onClose={() => setShowIntegrationsPanel(false)} />
       )}
 
+      {activeServer && community?.rules_text?.trim() && community.rules_accepted === false && (
+        <RulesAcceptanceDialog
+          key={activeServer}
+          rules={community.rules_text}
+          onAccept={() => acceptRules(activeServer)}
+        />
+      )}
+
       {/* Quick switcher modal (Ctrl+K) */}
       <QuickSwitcher />
 
@@ -183,5 +211,35 @@ export function AppLayout() {
         </div>
       )}
     </div>
+  );
+}
+
+function RulesAcceptanceDialog({ rules, onAccept }: { rules: string; onAccept: () => Promise<void> }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const accept = async () => {
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      await onAccept();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Rules acceptance was rejected.');
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <Dialog label="Accept server rules" onClose={() => undefined} panelClassName="w-full max-w-lg rounded-lg bg-bg-primary p-6 shadow-xl">
+      <h2 className="text-xl font-bold text-text-primary">Server rules</h2>
+      <p className="mt-2 text-sm text-text-secondary">Review and accept the current rules before continuing in this server.</p>
+      <div className="mt-4 max-h-72 overflow-y-auto whitespace-pre-wrap rounded bg-bg-secondary p-4 text-sm text-text-primary">{rules}</div>
+      {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
+      <div className="mt-4 flex justify-end">
+        <button type="button" disabled={pending} onClick={() => void accept()} className="rounded bg-bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          {pending ? 'Accepting…' : 'Accept rules'}
+        </button>
+      </div>
+    </Dialog>
   );
 }

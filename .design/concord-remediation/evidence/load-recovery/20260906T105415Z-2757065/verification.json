@@ -1,0 +1,25 @@
+{
+  "classification": "bounded-local-smoke",
+  "final_active_counts": {
+    "connections": 0,
+    "jobs": 0,
+    "uploads": 0
+  },
+  "full_one_hour_external_host_verified": false,
+  "maximum_stress_staging_uploads": 4,
+  "old_session_invalidated": true,
+  "restored_messages": {
+    "main": 8,
+    "media_stress": 1,
+    "provider": 1,
+    "restart": 1
+  },
+  "result": "PASS",
+  "telemetry_phase_counts": {
+    "post_disconnect": 5,
+    "steady": 9,
+    "stress": 26,
+    "warmup": 5
+  },
+  "telemetry_samples": 45
+}

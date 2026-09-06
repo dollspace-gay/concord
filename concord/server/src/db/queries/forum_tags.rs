@@ -225,12 +225,16 @@ mod tests {
         .unwrap();
         threads::create_thread(
             &pool,
-            "t1",
-            "s1",
-            "Help thread",
-            "public_thread",
-            "m1",
-            1440,
+            &crate::db::queries::threads::CreateThreadParams {
+                channel_id: "t1",
+                server_id: "s1",
+                name: "Help thread",
+                channel_type: "public_thread",
+                parent_message_id: "m1",
+                parent_channel_id: "c1",
+                creator_user_id: "u1",
+                auto_archive_minutes: 1440,
+            },
         )
         .await
         .unwrap();
@@ -271,9 +275,21 @@ mod tests {
         )
         .await
         .unwrap();
-        threads::create_thread(&pool, "t1", "s1", "Thread", "public_thread", "m1", 60)
-            .await
-            .unwrap();
+        threads::create_thread(
+            &pool,
+            &crate::db::queries::threads::CreateThreadParams {
+                channel_id: "t1",
+                server_id: "s1",
+                name: "Thread",
+                channel_type: "public_thread",
+                parent_message_id: "m1",
+                parent_channel_id: "c1",
+                creator_user_id: "u1",
+                auto_archive_minutes: 60,
+            },
+        )
+        .await
+        .unwrap();
 
         set_thread_tags(&pool, "t1", &["tag1".to_string()])
             .await

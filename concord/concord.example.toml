@@ -1,22 +1,37 @@
-# Concord Server Configuration
-# Copy this file to concord.toml and adjust as needed.
-# Environment variables override values in this file.
+# Generate a usable first-run file with: concord-server init --config concord.toml
 
 [server]
 web_address = "0.0.0.0:8080"
 irc_address = "0.0.0.0:6667"
+shutdown_timeout_seconds = 30
+# Non-loopback IRC listeners require both files.
+irc_tls_cert = "/etc/concord/tls/cert.pem"
+irc_tls_key = "/etc/concord/tls/key.pem"
 
 [database]
-url = "sqlite:concord.db?mode=rwc"
+url = "sqlite:/var/lib/concord/concord.db?mode=rwc"
 
 [auth]
-# IMPORTANT: Change this in production!
-jwt_secret = "change-me-to-a-random-secret"
-session_expiry_hours = 720  # 30 days
-public_url = "http://localhost:8080"
+jwt_secret_file = "/etc/concord/secrets/jwt.key"
+external_credentials_key_file = "/etc/concord/secrets/external-credentials.key"
+session_expiry_hours = 720
+public_url = "https://chat.example.com"
 
 [storage]
+data_dir = "/var/lib/concord"
+media_dir = "/var/lib/concord/media"
 max_file_size_mb = 100
+max_media_per_user_mb = 10240
+max_media_total_mb = 102400
+max_message_length = 4000
 
 [admin]
-admin_users = []
+# Stable verified identity IDs only. AT Protocol deployments use DIDs.
+admin_user_ids = ["did:plc:replace-with-an-operator-did"]
+
+[irc]
+motd = []
+
+[egress]
+# Exact origins for operator-controlled private integrations only.
+operator_allowed_origins = []

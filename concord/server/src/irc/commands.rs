@@ -1,7 +1,7 @@
 use tracing::warn;
 
 use crate::engine::chat_engine::{ChatEngine, DEFAULT_SERVER_ID};
-use crate::engine::events::SessionId;
+use crate::engine::events::ConnectionId;
 
 use super::formatter;
 use super::parser::IrcMessage;
@@ -38,7 +38,7 @@ pub fn to_irc_channel(engine: &ChatEngine, server_id: &str, channel_name: &str) 
         return channel_name.to_string();
     }
 
-    if let Some(server_name) = engine.get_server_name(server_id) {
+    if let Some(server_name) = engine.get_server_alias(server_id) {
         let bare_channel = channel_name.strip_prefix('#').unwrap_or(channel_name);
         format!("#{server_name}/{bare_channel}")
     } else {
@@ -48,17 +48,17 @@ pub fn to_irc_channel(engine: &ChatEngine, server_id: &str, channel_name: &str) 
 
 /// Process a single IRC command from a registered (authenticated) client.
 /// Returns a list of lines to send back to the client.
-pub fn handle_command(
+pub async fn handle_command(
     engine: &ChatEngine,
-    session_id: SessionId,
+    session_id: ConnectionId,
     nick: &str,
     msg: &IrcMessage,
 ) -> Vec<String> {
     match msg.command.as_str() {
-        "JOIN" => handle_join(engine, session_id, nick, msg),
-        "PART" => handle_part(engine, session_id, nick, msg),
-        "PRIVMSG" => handle_privmsg(engine, session_id, nick, msg),
-        "TOPIC" => handle_topic(engine, session_id, nick, msg),
+        "JOIN" => handle_join(engine, session_id, nick, msg).await,
+        "PART" => handle_part(engine, session_id, nick, msg).await,
+        "PRIVMSG" => handle_privmsg(engine, session_id, nick, msg).await,
+        "TOPIC" => handle_topic(engine, session_id, nick, msg).await,
         "NAMES" => vec![], // Handled async in connection.rs
         "LIST" => handle_list(engine, nick, msg),
         "WHO" => vec![],   // Handled async in connection.rs
@@ -83,7 +83,11 @@ pub fn handle_command(
         "MODE" => {
             if let Some(target) = msg.params.first() {
                 if target.starts_with('#') {
-                    let (server_id, channel_name) = parse_irc_channel(engine, target);
+                    let Ok((server_id, channel_name)) =
+                        resolve_actor_channel(engine, session_id, target).await
+                    else {
+                        return vec![formatter::err_nosuchchannel(nick, target)];
+                    };
                     let irc_channel = to_irc_channel(engine, &server_id, &channel_name);
                     let modes = engine.get_channel_modes(&server_id, &channel_name);
                     vec![format!(
@@ -110,9 +114,9 @@ pub fn handle_command(
     }
 }
 
-fn handle_join(
+async fn handle_join(
     engine: &ChatEngine,
-    session_id: SessionId,
+    session_id: ConnectionId,
     nick: &str,
     msg: &IrcMessage,
 ) -> Vec<String> {
@@ -128,9 +132,17 @@ fn handle_join(
             continue;
         }
 
-        let (server_id, channel_name) = parse_irc_channel(engine, channel);
+        let Ok((server_id, channel_name)) =
+            resolve_actor_channel(engine, session_id, channel).await
+        else {
+            replies.push(formatter::err_nosuchchannel(nick, channel));
+            continue;
+        };
 
-        match engine.join_channel(session_id, &server_id, &channel_name) {
+        match engine
+            .join_channel(session_id, &server_id, &channel_name)
+            .await
+        {
             Ok(()) => {}
             Err(e) => {
                 warn!(error = %e, %channel, "JOIN failed");
@@ -142,9 +154,9 @@ fn handle_join(
     replies
 }
 
-fn handle_part(
+async fn handle_part(
     engine: &ChatEngine,
-    session_id: SessionId,
+    session_id: ConnectionId,
     nick: &str,
     msg: &IrcMessage,
 ) -> Vec<String> {
@@ -161,7 +173,12 @@ fn handle_part(
             continue;
         }
 
-        let (server_id, channel_name) = parse_irc_channel(engine, channel);
+        let Ok((server_id, channel_name)) =
+            resolve_actor_channel(engine, session_id, channel).await
+        else {
+            replies.push(formatter::err_notonchannel(nick, channel));
+            continue;
+        };
 
         if let Err(e) = engine.part_channel(session_id, &server_id, &channel_name, reason.clone()) {
             warn!(error = %e, %channel, "PART failed");
@@ -172,9 +189,9 @@ fn handle_part(
     replies
 }
 
-fn handle_privmsg(
+async fn handle_privmsg(
     engine: &ChatEngine,
-    session_id: SessionId,
+    session_id: ConnectionId,
     nick: &str,
     msg: &IrcMessage,
 ) -> Vec<String> {
@@ -187,36 +204,59 @@ fn handle_privmsg(
 
     // Handle CTCP messages (\x01...\x01)
     if let Some(ctcp) = parse_ctcp(raw_content) {
-        return handle_ctcp(engine, session_id, nick, target, &ctcp);
+        return handle_ctcp(engine, session_id, nick, target, &ctcp).await;
     }
 
     if target.starts_with('#') {
         // Channel message — parse server/channel from IRC name
-        let (server_id, channel_name) = parse_irc_channel(engine, target);
-        if let Err(e) = engine.send_message(
-            session_id,
-            &server_id,
-            &channel_name,
-            raw_content,
-            None,
-            None,
-            None,
-        ) {
+        let Ok((server_id, channel_name)) = resolve_actor_channel(engine, session_id, target).await
+        else {
+            return vec![formatter::err_nosuchnick(nick, target)];
+        };
+        let operation_id = uuid::Uuid::new_v4().to_string();
+        if let Err(e) = engine
+            .submit_channel_message(
+                session_id,
+                crate::engine::messaging::SendMessageCommand {
+                    request_id: &operation_id,
+                    client_message_id: &operation_id,
+                    operation_generation: None,
+                    conversation_id: None,
+                    server_id: &server_id,
+                    channel: &channel_name,
+                    content: raw_content,
+                    content_format: crate::engine::messaging::ContentFormat::Plain,
+                    reply_to_id: None,
+                    attachment_ids: &[],
+                    mentions: &[],
+                },
+                None,
+            )
+            .await
+        {
             warn!(error = %e, %target, "PRIVMSG failed");
             return vec![formatter::err_nosuchnick(nick, target)];
         }
     } else {
-        // DM — use default server
-        if let Err(e) = engine.send_message(
-            session_id,
-            DEFAULT_SERVER_ID,
-            target,
-            raw_content,
-            None,
-            None,
-            None,
-        ) {
-            warn!(error = %e, %target, "PRIVMSG failed");
+        let operation_id = uuid::Uuid::new_v4().to_string();
+        if let Err(error) = engine
+            .submit_direct_message(
+                session_id,
+                crate::engine::messaging::SendDirectMessageCommand {
+                    request_id: &operation_id,
+                    client_message_id: &operation_id,
+                    operation_generation: None,
+                    recipient: target,
+                    content: raw_content,
+                    content_format: crate::engine::messaging::ContentFormat::Plain,
+                    reply_to_id: None,
+                    attachment_ids: &[],
+                },
+                None,
+            )
+            .await
+        {
+            warn!(%error, %target, "direct PRIVMSG failed");
             return vec![formatter::err_nosuchnick(nick, target)];
         }
     }
@@ -247,9 +287,9 @@ fn parse_ctcp(content: &str) -> Option<CtcpMessage> {
 }
 
 /// Handle CTCP commands: ACTION → /me, VERSION/PING/TIME → reply.
-fn handle_ctcp(
+async fn handle_ctcp(
     engine: &ChatEngine,
-    session_id: SessionId,
+    session_id: ConnectionId,
     nick: &str,
     target: &str,
     ctcp: &CtcpMessage,
@@ -260,29 +300,36 @@ fn handle_ctcp(
             let action_text = ctcp.params.as_deref().unwrap_or("");
             let content = format!("/me {action_text}");
             if target.starts_with('#') {
-                let (server_id, channel_name) = parse_irc_channel(engine, target);
-                if let Err(e) = engine.send_message(
-                    session_id,
-                    &server_id,
-                    &channel_name,
-                    &content,
-                    None,
-                    None,
-                    None,
-                ) {
+                let Ok((server_id, channel_name)) =
+                    resolve_actor_channel(engine, session_id, target).await
+                else {
+                    return vec![formatter::err_nosuchnick(nick, target)];
+                };
+                let operation_id = uuid::Uuid::new_v4().to_string();
+                if let Err(e) = engine
+                    .submit_channel_message(
+                        session_id,
+                        crate::engine::messaging::SendMessageCommand {
+                            request_id: &operation_id,
+                            client_message_id: &operation_id,
+                            operation_generation: None,
+                            conversation_id: None,
+                            server_id: &server_id,
+                            channel: &channel_name,
+                            content: &content,
+                            content_format: crate::engine::messaging::ContentFormat::Plain,
+                            reply_to_id: None,
+                            attachment_ids: &[],
+                            mentions: &[],
+                        },
+                        None,
+                    )
+                    .await
+                {
                     warn!(error = %e, %target, "CTCP ACTION failed");
                     return vec![formatter::err_nosuchnick(nick, target)];
                 }
-            } else if let Err(e) = engine.send_message(
-                session_id,
-                DEFAULT_SERVER_ID,
-                target,
-                &content,
-                None,
-                None,
-                None,
-            ) {
-                warn!(error = %e, %target, "CTCP ACTION failed");
+            } else {
                 return vec![formatter::err_nosuchnick(nick, target)];
             }
             vec![]
@@ -308,9 +355,9 @@ fn handle_ctcp(
     }
 }
 
-fn handle_topic(
+async fn handle_topic(
     engine: &ChatEngine,
-    session_id: SessionId,
+    session_id: ConnectionId,
     nick: &str,
     msg: &IrcMessage,
 ) -> Vec<String> {
@@ -318,11 +365,18 @@ fn handle_topic(
         return vec![formatter::err_needmoreparams(nick, "TOPIC")];
     };
 
-    let (server_id, channel_name) = parse_irc_channel(engine, channel_param);
+    let Ok((server_id, channel_name)) =
+        resolve_actor_channel(engine, session_id, channel_param).await
+    else {
+        return vec![formatter::err_nosuchchannel(nick, channel_param)];
+    };
     let irc_channel = to_irc_channel(engine, &server_id, &channel_name);
 
     if let Some(new_topic) = msg.params.get(1) {
-        if let Err(e) = engine.set_topic(session_id, &server_id, &channel_name, new_topic.clone()) {
+        if let Err(e) = engine
+            .set_topic(session_id, &server_id, &channel_name, new_topic.clone())
+            .await
+        {
             warn!(error = %e, %channel_name, "TOPIC set failed");
             return vec![formatter::err_notonchannel(nick, &irc_channel)];
         }
@@ -344,6 +398,17 @@ fn handle_topic(
             Err(_) => vec![formatter::err_nosuchchannel(nick, &irc_channel)],
         }
     }
+}
+
+async fn resolve_actor_channel(
+    engine: &ChatEngine,
+    session_id: ConnectionId,
+    irc_name: &str,
+) -> Result<(String, String), String> {
+    let actor = engine
+        .get_authenticated_actor(session_id)
+        .ok_or_else(|| "authentication unavailable".to_string())?;
+    engine.resolve_irc_channel_for_actor(&actor, irc_name).await
 }
 
 fn handle_list(engine: &ChatEngine, nick: &str, msg: &IrcMessage) -> Vec<String> {
@@ -381,4 +446,3 @@ fn handle_list(engine: &ChatEngine, nick: &str, msg: &IrcMessage) -> Vec<String>
 
     replies
 }
-

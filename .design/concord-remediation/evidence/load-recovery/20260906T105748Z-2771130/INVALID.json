@@ -1,0 +1,4 @@
+{
+  "acceptance_eligible": false,
+  "reason": "Superseded: the restore probe used an unregistered operation type and did not prove fencing of publishable work."
+}

@@ -7,11 +7,35 @@ const EMPTY_CHANNELS: ChannelInfo[] = [];
 export function ChannelHeader() {
   const activeServer = useUiStore((s) => s.activeServer);
   const activeChannel = useUiStore((s) => s.activeChannel);
+  const activeDirectConversation = useUiStore((s) => s.activeDirectConversation);
+  const directConversation = useChatStore((s) => s.directConversations.find((dm) => dm.id === activeDirectConversation));
   const channels = useChatStore((s) => (activeServer ? s.channels[activeServer] ?? EMPTY_CHANNELS : EMPTY_CHANNELS));
   const toggleMemberList = useUiStore((s) => s.toggleMemberList);
   const showMemberList = useUiStore((s) => s.showMemberList);
+  const setActiveChannel = useUiStore((s) => s.setActiveChannel);
+  const setActiveDirectConversation = useUiStore((s) => s.setActiveDirectConversation);
+
+  const mobileBack = (
+    <button
+      className="mr-1 rounded p-1 text-text-muted md:hidden"
+      aria-label="Back to conversations"
+      onClick={() => activeDirectConversation ? setActiveDirectConversation('') : setActiveChannel(null)}
+    >
+      <span aria-hidden="true">‹</span>
+    </button>
+  );
 
   const channel = channels.find((c) => c.name === activeChannel);
+
+  if (activeDirectConversation) {
+    return (
+      <div className="flex h-12 items-center border-b border-border-primary bg-bg-tertiary px-4">
+        {mobileBack}
+        <span className="mr-2 text-lg text-text-muted">@</span>
+        <span className="font-semibold text-text-primary">{directConversation?.peer_username ?? 'Direct message'}</span>
+      </div>
+    );
+  }
 
   if (!activeChannel) {
     return <div className="flex h-12 items-center border-b border-border-primary bg-bg-tertiary px-4" />;
@@ -20,6 +44,7 @@ export function ChannelHeader() {
   return (
     <div className="flex h-12 items-center justify-between border-b border-border-primary bg-bg-tertiary px-4">
       <div className="flex min-w-0 items-center gap-2">
+        {mobileBack}
         <span className="text-lg text-text-muted">#</span>
         <span className="font-semibold text-text-primary">
           {activeChannel.replace(/^#/, '')}

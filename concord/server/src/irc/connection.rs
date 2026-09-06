@@ -2,14 +2,15 @@ use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 use sqlx::SqlitePool;
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
-/// Maximum bytes per IRC line (RFC 2812 says 512; we allow 4096 for safety).
-const MAX_LINE_LENGTH: usize = 4096;
-/// Idle timeout — disconnect clients that send nothing for 5 minutes.
-const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
+/// Registration must complete promptly so unauthenticated clients cannot retain sockets.
+const REGISTRATION_TIMEOUT: Duration = Duration::from_secs(60);
+/// Registered clients must answer periodic server heartbeat probes.
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(60);
 /// Command rate limit: burst capacity (commands allowed in a rapid burst).
 const CMD_RATE_BURST: f64 = 10.0;
 /// Command rate limit: refill rate (commands per second).
@@ -28,6 +29,23 @@ struct ClientCaps {
     message_tags: bool,
     sasl: bool,
 }
+
+struct Outbound {
+    tx: mpsc::Sender<OutboundLine>,
+    failed: CancellationToken,
+    actor: Arc<std::sync::RwLock<Option<Actor>>>,
+    queued_bytes: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+struct OutboundLine {
+    line: String,
+    guard: Option<crate::engine::user_session::DeliveryGuard>,
+}
+
+type GuardedCommandReplies = Result<(Vec<String>, crate::engine::user_session::DeliveryGuard), ()>;
+
+const MAX_OUTBOUND_DESCRIPTORS: usize = 256;
+const MAX_OUTBOUND_BYTES: usize = 1024 * 1024;
 
 /// Set the MOTD lines from config. Call once at startup.
 pub fn set_motd(lines: Vec<String>) {
@@ -63,51 +81,16 @@ impl CommandRateLimit {
     }
 }
 
-use crate::auth::token::verify_irc_token;
-use crate::db::queries::{presence, users};
+use crate::auth::authority::{Actor, AuthService};
 use crate::engine::chat_engine::{ChatEngine, DEFAULT_SERVER_ID};
-use crate::engine::events::{ChatEvent, SessionId};
+use crate::engine::events::{ChatEvent, ConnectionId};
 use crate::engine::user_session::Protocol;
 
-use super::commands::{self, parse_irc_channel, to_irc_channel};
-use crate::engine::permissions::Permissions;
+use super::commands::{self, to_irc_channel};
 use super::formatter;
+use super::framing::IrcLineDecoder;
 use super::parser::IrcMessage;
-
-/// Read a line from the IRC connection, capped at MAX_LINE_LENGTH bytes.
-/// Returns Ok(0) on EOF, Ok(n) on success, Err on I/O error or line too long.
-async fn read_bounded_line<R: AsyncRead + Unpin>(
-    reader: &mut BufReader<R>,
-    buf: &mut String,
-) -> std::io::Result<usize> {
-    // Fill the internal buffer and check for a newline within MAX_LINE_LENGTH
-    loop {
-        let available = reader.buffer();
-        if let Some(pos) = available.iter().position(|&b| b == b'\n') {
-            // Found newline within buffered data
-            let line_bytes = &available[..=pos];
-            let line = String::from_utf8_lossy(line_bytes).into_owned();
-            let len = line_bytes.len();
-            buf.push_str(&line);
-            reader.consume(len);
-            return Ok(len);
-        }
-        if available.len() >= MAX_LINE_LENGTH {
-            // Too long without a newline — discard and signal error
-            let discard_len = available.len();
-            reader.consume(discard_len);
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "IRC line exceeds maximum length",
-            ));
-        }
-        // Need more data
-        let filled = reader.fill_buf().await?;
-        if filled.is_empty() {
-            return Ok(0); // EOF
-        }
-    }
-}
+use crate::engine::permissions::Permissions;
 
 /// IRC registration state machine.
 /// Clients must send NICK and USER (optionally PASS first) before they are registered.
@@ -119,7 +102,11 @@ enum RegState {
         user_received: bool,
     },
     /// Fully registered with the chat engine.
-    Registered { session_id: SessionId, nick: String },
+    Registered {
+        session_id: ConnectionId,
+        nick: String,
+        actor: Actor,
+    },
 }
 
 /// Handle a single IRC client connection from accept to close.
@@ -128,25 +115,113 @@ pub async fn handle_irc_connection<S>(
     stream: S,
     peer: String,
     engine: Arc<ChatEngine>,
-    db: SqlitePool,
+    _db: SqlitePool,
+    auth: AuthService,
+) where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    handle_irc_connection_until(stream, peer, engine, _db, auth, CancellationToken::new()).await;
+}
+
+/// Handles one connection until the peer closes or the owning listener cancels it.
+pub async fn handle_irc_connection_until<S>(
+    stream: S,
+    peer: String,
+    engine: Arc<ChatEngine>,
+    _db: SqlitePool,
+    auth: AuthService,
+    cancel: CancellationToken,
+) where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    handle_irc_connection_with_timing(stream, peer, engine, _db, auth, cancel, HEARTBEAT_INTERVAL)
+        .await;
+}
+
+async fn handle_irc_connection_with_timing<S>(
+    stream: S,
+    peer: String,
+    engine: Arc<ChatEngine>,
+    _db: SqlitePool,
+    auth: AuthService,
+    cancel: CancellationToken,
+    heartbeat_interval: Duration,
 ) where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
 {
     info!(%peer, "IRC client connected");
 
     let (reader, writer) = tokio::io::split(stream);
-    let mut reader = BufReader::new(reader);
+    let mut reader = reader;
     let mut writer = writer;
 
-    // Bounded channel for outbound lines — prevents unbounded memory growth
-    // if a slow client can't keep up. Messages are dropped via try_send.
-    let (out_tx, mut out_rx) = mpsc::channel::<String>(1024);
+    // Bounded channel for outbound lines. Saturation marks the transport failed so
+    // a slow client cannot silently lose events while retaining an engine session.
+    let (out_tx, mut out_rx) = mpsc::channel::<OutboundLine>(MAX_OUTBOUND_DESCRIPTORS);
+    let transport_failed = CancellationToken::new();
+    let authority_failed = CancellationToken::new();
+    let outbound_actor = Arc::new(std::sync::RwLock::new(None));
+    let queued_bytes = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let out = Outbound {
+        tx: out_tx,
+        failed: transport_failed.clone(),
+        actor: outbound_actor.clone(),
+        queued_bytes: queued_bytes.clone(),
+    };
 
     // Spawn writer task
+    let writer_failed = transport_failed.clone();
+    let writer_auth = auth.clone();
+    let writer_engine = engine.clone();
+    let writer_cancel = cancel.clone();
+    let writer_authority_failed = authority_failed.clone();
     let write_handle = tokio::spawn(async move {
-        while let Some(line) = out_rx.recv().await {
-            let data = format!("{}\r\n", line);
-            if writer.write_all(data.as_bytes()).await.is_err() {
+        loop {
+            let outbound = tokio::select! {
+                _ = writer_cancel.cancelled() => break,
+                _ = writer_failed.cancelled() => break,
+                _ = writer_authority_failed.cancelled() => break,
+                outbound = out_rx.recv() => match outbound {
+                    Some(outbound) => outbound,
+                    None => break,
+                },
+            };
+            queued_bytes.fetch_sub(outbound.line.len(), std::sync::atomic::Ordering::AcqRel);
+            let actor = outbound_actor
+                .read()
+                .expect("IRC actor lock poisoned")
+                .clone();
+            if let Some(actor) = actor.as_ref()
+                && writer_auth.validate_actor(actor).await.is_err()
+            {
+                writer_failed.cancel();
+                break;
+            }
+            if let (Some(actor), Some(guard)) = (actor.as_ref(), outbound.guard.as_ref())
+                && !writer_engine.delivery_guard_is_current(actor, guard).await
+            {
+                if matches!(
+                    guard,
+                    crate::engine::user_session::DeliveryGuard::ServerPermissions(_)
+                ) {
+                    continue;
+                }
+                writer_failed.cancel();
+                break;
+            }
+            let sanitized = sanitize_outbound_line(&outbound.line);
+            let data = format!("{sanitized}\r\n");
+            let wrote = tokio::select! {
+                _ = writer_cancel.cancelled() => break,
+                _ = writer_failed.cancelled() => break,
+                _ = writer_authority_failed.cancelled() => break,
+                result = tokio::time::timeout(
+                    Duration::from_secs(5),
+                    writer.write_all(data.as_bytes()),
+                ) => matches!(result, Ok(Ok(()))),
+            };
+            if !wrote {
+                writer_failed.cancel();
                 break;
             }
         }
@@ -158,43 +233,83 @@ pub async fn handle_irc_connection<S>(
         user_received: false,
     };
 
-    let mut line_buf = String::new();
+    let mut decoder = IrcLineDecoder::new();
     let mut event_rx: Option<mpsc::Receiver<ChatEvent>> = None;
+    let mut credential_lease: Option<crate::auth::authority::CredentialLease> = None;
+    let mut credential_expiry: Option<i64> = None;
     let mut cmd_rate = CommandRateLimit::new();
     let mut caps = ClientCaps::default();
+    let registration_deadline = tokio::time::Instant::now() + REGISTRATION_TIMEOUT;
+    let mut heartbeat = tokio::time::interval(heartbeat_interval);
+    heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    heartbeat.tick().await;
+    let mut awaiting_pong: Option<String> = None;
 
     loop {
         // When registered, also select on engine events
         if let Some(ref mut rx) = event_rx {
+            let registered_session = match state {
+                RegState::Registered { session_id, .. } => engine.get_session(session_id),
+                RegState::Unregistered { .. } => None,
+            };
+            let overflow_cancel = registered_session
+                .as_ref()
+                .map(|session| session.overflow_cancellation_token())
+                .expect("registered IRC state has an engine session");
             tokio::select! {
-                result = tokio::time::timeout(IDLE_TIMEOUT, read_bounded_line(&mut reader, &mut line_buf)) => {
-                    match result {
-                        Ok(Ok(0)) | Ok(Err(_)) | Err(_) => break, // EOF, error, or timeout
-                        Ok(Ok(_)) => {}
+                _ = cancel.cancelled() => break,
+                _ = transport_failed.cancelled() => break,
+                _ = overflow_cancel.cancelled() => break,
+                _ = credential_lease.as_ref().expect("registered credentials have cancellation").cancelled() => break,
+                _ = crate::auth::authority::wait_for_expiry(credential_expiry) => break,
+                _ = heartbeat.tick() => {
+                    if awaiting_pong.is_some() {
+                        warn!(%peer, "IRC heartbeat timed out");
+                        break;
                     }
-
-                    let line = line_buf.trim_end().to_string();
-                    line_buf.clear();
-
+                    let nonce = format!("{}-{}", formatter::server_name(), chrono::Utc::now().timestamp_millis());
+                    send_line(&out, &format!("PING :{nonce}"));
+                    awaiting_pong = Some(nonce);
+                    continue;
+                }
+                result = decoder.read_line(&mut reader) => {
+                    let line = match result {
+                        Ok(Some(line)) => line,
+                        Ok(None) | Err(_) => break,
+                    };
                     if line.is_empty() {
+                        continue;
+                    }
+                    let msg = match IrcMessage::parse(&line) {
+                        Ok(m) => m,
+                        Err(_) => continue,
+                    };
+                    if msg.command == "PONG"
+                        && msg.params.last() == awaiting_pong.as_ref()
+                    {
+                        awaiting_pong = None;
                         continue;
                     }
 
                     // Enforce per-connection command rate limit
-                    if !cmd_rate.check() {
+                    let admitted = cmd_rate.check();
+                    crate::runtime_metrics::record(
+                        crate::runtime_metrics::Operation::CommandAdmission,
+                        admitted,
+                        Duration::ZERO,
+                    );
+                    if !admitted {
                         warn!(%peer, "IRC command rate limited");
                         continue;
                     }
 
-                    if let RegState::Registered { ref session_id, ref nick } = state {
-                        let msg = match IrcMessage::parse(&line) {
-                            Ok(m) => m,
-                            Err(_) => continue,
-                        };
-
+                    if let RegState::Registered { ref session_id, ref nick, ref actor } = state {
+                        if auth.validate_actor(actor).await.is_err() {
+                            break;
+                        }
                         if msg.command == "QUIT" {
                             let reason = msg.params.first().cloned();
-                            send_line(&out_tx, &format!(
+                            send_line(&out, &format!(
                                 "ERROR :Closing Link: {} (Quit: {})",
                                 nick,
                                 reason.as_deref().unwrap_or("Client quit")
@@ -208,68 +323,114 @@ pub async fn handle_irc_connection<S>(
                             if let Some(lines) = motd
                                 && !lines.is_empty()
                             {
-                                send_line(&out_tx, &formatter::rpl_motdstart(nick));
+                                send_line(&out, &formatter::rpl_motdstart(nick));
                                 for line in lines {
-                                    send_line(&out_tx, &formatter::rpl_motd(nick, line));
+                                    send_line(&out, &formatter::rpl_motd(nick, line));
                                 }
-                                send_line(&out_tx, &formatter::rpl_endofmotd(nick));
+                                send_line(&out, &formatter::rpl_endofmotd(nick));
                             } else {
-                                send_line(&out_tx, &formatter::err_nomotd(nick));
+                                send_line(&out, &formatter::err_nomotd(nick));
                             }
                             continue;
                         }
 
                         // Async commands — need DB lookups or engine async methods
-                        if matches!(msg.command.as_str(), "KICK" | "AWAY" | "INVITE" | "WHOIS" | "NAMES" | "WHO") {
+                        if matches!(msg.command.as_str(), "KICK" | "AWAY" | "INVITE" | "WHOIS" | "NAMES" | "WHO" | "LIST" | "HISTORY") {
+                            if matches!(msg.command.as_str(), "NAMES" | "WHO" | "WHOIS" | "LIST" | "HISTORY") {
+                                let guarded = match msg.command.as_str() {
+                                    "NAMES" => handle_names_async(&engine, *session_id, nick, &msg).await,
+                                    "WHO" => handle_who_async(&engine, *session_id, nick, &msg).await,
+                                    "WHOIS" => handle_whois(&engine, *session_id, nick, &msg).await,
+                                    "LIST" => handle_list_async(&engine, *session_id, nick, &msg).await,
+                                    "HISTORY" => handle_history_async(&engine, *session_id, nick, &msg, &caps).await,
+                                    _ => unreachable!(),
+                                };
+                                let Ok((replies, guard)) = guarded else {
+                                    transport_failed.cancel(); break;
+                                };
+                                for reply in replies {
+                                    send_line_guarded(&out, &reply, Some(guard.clone()));
+                                }
+                                continue;
+                            }
                             let replies = match msg.command.as_str() {
-                                "KICK" => handle_kick(&engine, &db, *session_id, nick, &msg).await,
+                                "KICK" => handle_kick(&engine, *session_id, nick, &msg).await,
                                 "AWAY" => handle_away(&engine, *session_id, nick, &msg).await,
-                                "INVITE" => handle_invite(&engine, &db, *session_id, nick, &msg).await,
-                                "WHOIS" => handle_whois(&engine, &db, nick, &msg).await,
-                                "NAMES" => handle_names_async(&engine, nick, &msg).await,
-                                "WHO" => handle_who_async(&engine, nick, &msg).await,
+                                "INVITE" => handle_invite(&engine, *session_id, nick, &msg).await,
+                                "NAMES" | "WHO" | "WHOIS" | "LIST" | "HISTORY" => unreachable!(),
                                 _ => unreachable!(),
                             };
+                            let Ok(guard) = irc_command_delivery_guard(&engine, actor, &msg).await else {
+                                transport_failed.cancel(); break;
+                            };
                             for reply in replies {
-                                send_line(&out_tx, &reply);
+                                send_line_guarded(&out, &reply, Some(guard.clone()));
                             }
                             continue;
                         }
 
-                        let replies = commands::handle_command(&engine, *session_id, nick, &msg);
+                        let replies = commands::handle_command(&engine, *session_id, nick, &msg).await;
+                        let Ok(guard) = irc_command_delivery_guard(&engine, actor, &msg).await else {
+                            transport_failed.cancel();
+                            break;
+                        };
                         for reply in replies {
-                            send_line(&out_tx, &reply);
+                            send_line_guarded(&out, &reply, Some(guard.clone()));
                         }
                     }
                 }
                 event = rx.recv() => {
                     let Some(event) = event else { break };
-                    if let RegState::Registered { ref nick, .. } = state {
+                    if let RegState::Registered { ref nick, ref actor, .. } = state {
+                        if auth.validate_actor(actor).await.is_err() {
+                            break;
+                        }
+                        let delivery_guard = registered_session
+                            .as_ref()
+                            .and_then(|session| session.take_delivery_guard());
+                        if let Some(guard) = delivery_guard.as_ref()
+                            && !engine.delivery_guard_is_current(actor, guard).await
+                        {
+                            if matches!(
+                                guard,
+                                crate::engine::user_session::DeliveryGuard::ServerPermissions(_)
+                            ) {
+                                continue;
+                            }
+                            break;
+                        }
                         let lines = event_to_irc_lines(&engine, nick, &event, &caps);
                         for line in lines {
-                            send_line(&out_tx, &line);
+                            send_line_guarded(&out, &line, delivery_guard.clone());
                         }
                     }
                 }
             }
         } else {
             // Not registered yet — just read lines (with timeout)
-            match tokio::time::timeout(IDLE_TIMEOUT, read_bounded_line(&mut reader, &mut line_buf))
-                .await
-            {
-                Ok(Ok(0)) | Ok(Err(_)) | Err(_) => break, // EOF, error, or timeout
-                Ok(Ok(_)) => {}
-            }
-
-            let line = line_buf.trim_end().to_string();
-            line_buf.clear();
+            let line = tokio::select! {
+                _ = cancel.cancelled() => break,
+                _ = transport_failed.cancelled() => break,
+                result = tokio::time::timeout_at(registration_deadline, decoder.read_line(&mut reader)) => {
+                    match result {
+                        Ok(Ok(Some(line))) => line,
+                        Ok(Ok(None)) | Ok(Err(_)) | Err(_) => break,
+                    }
+                }
+            };
 
             if line.is_empty() {
                 continue;
             }
 
             // Rate limit registration commands too (prevents brute-force token guessing)
-            if !cmd_rate.check() {
+            let admitted = cmd_rate.check();
+            crate::runtime_metrics::record(
+                crate::runtime_metrics::Operation::CommandAdmission,
+                admitted,
+                Duration::ZERO,
+            );
+            if !admitted {
                 warn!(%peer, "IRC registration rate limited");
                 continue;
             }
@@ -284,7 +445,7 @@ pub async fn handle_irc_connection<S>(
                 let sn = formatter::server_name();
                 match msg.params.first().map(|s| s.as_str()) {
                     Some("LS") => {
-                        send_line(&out_tx, &format!(":{sn} CAP * LS :{SUPPORTED_CAPS}"));
+                        send_line(&out, &format!(":{sn} CAP * LS :{SUPPORTED_CAPS}"));
                     }
                     Some("REQ") => {
                         // Client requests specific capabilities
@@ -308,7 +469,7 @@ pub async fn handle_irc_connection<S>(
                                 }
                             }
                             if !ack.is_empty() {
-                                send_line(&out_tx, &format!(":{sn} CAP * ACK :{}", ack.join(" ")));
+                                send_line(&out, &format!(":{sn} CAP * ACK :{}", ack.join(" ")));
                             }
                         }
                     }
@@ -324,13 +485,10 @@ pub async fn handle_irc_connection<S>(
                 if let Some(param) = msg.params.first() {
                     if param == "PLAIN" {
                         // Acknowledge, ask for credentials
-                        send_line(&out_tx, "AUTHENTICATE +");
+                        send_line(&out, "AUTHENTICATE +");
                     } else if param == "*" {
                         // Client aborts SASL
-                        send_line(
-                            &out_tx,
-                            &format!(":{sn} 906 * :SASL authentication aborted"),
-                        );
+                        send_line(&out, &format!(":{sn} 906 * :SASL authentication aborted"));
                     } else {
                         // base64 payload: \0username\0token
                         use base64::Engine as _;
@@ -344,43 +502,39 @@ pub async fn handle_irc_connection<S>(
                                 let passwd = String::from_utf8_lossy(parts[2]);
                                 // Validate the token
                                 let nick_hint = if authcid.is_empty() { "*" } else { &authcid };
-                                match validate_irc_pass(&db, &passwd, nick_hint).await {
-                                    Ok(Some(uid)) => {
+                                match auth.authenticate_irc(&passwd, nick_hint).await {
+                                    Ok(actor) => {
                                         if let RegState::Unregistered { ref mut pass, .. } = state {
                                             *pass = Some(passwd.into_owned());
                                         }
                                         send_line(
-                                            &out_tx,
+                                            &out,
                                             &format!(
-                                                ":{sn} 900 * {uid} :You are now logged in as {uid}"
+                                                ":{sn} 900 * {} :You are now logged in as {}",
+                                                actor.user_id().as_str(),
+                                                actor.user_id().as_str(),
                                             ),
                                         );
                                         send_line(
-                                            &out_tx,
+                                            &out,
                                             &format!(":{sn} 903 * :SASL authentication successful"),
-                                        );
-                                    }
-                                    Ok(None) => {
-                                        send_line(
-                                            &out_tx,
-                                            &format!(":{sn} 904 * :SASL authentication failed"),
                                         );
                                     }
                                     Err(_) => {
                                         send_line(
-                                            &out_tx,
+                                            &out,
                                             &format!(":{sn} 904 * :SASL authentication failed"),
                                         );
                                     }
                                 }
                             } else {
                                 send_line(
-                                    &out_tx,
+                                    &out,
                                     &format!(":{sn} 904 * :SASL authentication failed"),
                                 );
                             }
                         } else {
-                            send_line(&out_tx, &format!(":{sn} 904 * :SASL authentication failed"));
+                            send_line(&out, &format!(":{sn} 904 * :SASL authentication failed"));
                         }
                     }
                 }
@@ -396,12 +550,12 @@ pub async fn handle_irc_connection<S>(
                 }
                 "NICK" => {
                     let Some(wanted_nick) = msg.params.first() else {
-                        send_line(&out_tx, &formatter::err_nonicknamegiven("*"));
+                        send_line(&out, &formatter::err_nonicknamegiven("*"));
                         continue;
                     };
 
                     if !engine.is_nick_available(wanted_nick) {
-                        send_line(&out_tx, &formatter::err_nicknameinuse("*", wanted_nick));
+                        send_line(&out, &formatter::err_nicknameinuse("*", wanted_nick));
                         continue;
                     }
 
@@ -420,7 +574,7 @@ pub async fn handle_irc_connection<S>(
                 }
                 "QUIT" => break,
                 _ => {
-                    send_line(&out_tx, &formatter::err_notregistered());
+                    send_line(&out, &formatter::err_notregistered());
                     continue;
                 }
             }
@@ -435,11 +589,11 @@ pub async fn handle_irc_connection<S>(
             {
                 // If a PASS was provided, validate it as an IRC token
                 let user_id = if let Some(pass_token) = pass {
-                    match validate_irc_pass(&db, pass_token, nick_val).await {
-                        Ok(Some(uid)) => Some(uid),
-                        Ok(None) => {
+                    match auth.authenticate_irc(pass_token, nick_val).await {
+                        Ok(actor) => Some(actor),
+                        Err(crate::auth::authority::AuthError::Invalid) => {
                             send_line(
-                                &out_tx,
+                                &out,
                                 &format!(
                                     ":{} 464 {} :Password incorrect",
                                     formatter::server_name(),
@@ -451,7 +605,7 @@ pub async fn handle_irc_connection<S>(
                         Err(e) => {
                             warn!(error = %e, "IRC token validation error");
                             send_line(
-                                &out_tx,
+                                &out,
                                 &format!(
                                     ":{} 464 {} :Authentication error",
                                     formatter::server_name(),
@@ -464,7 +618,7 @@ pub async fn handle_irc_connection<S>(
                 } else {
                     // No PASS provided — reject anonymous connections
                     send_line(
-                        &out_tx,
+                        &out,
                         &format!(
                             ":{} 464 {} :You must provide a password (PASS) to connect. Generate an IRC token in the web UI.",
                             formatter::server_name(),
@@ -475,39 +629,85 @@ pub async fn handle_irc_connection<S>(
                 };
 
                 // Try to register with the engine
-                match engine.connect(user_id, nick_val.clone(), Protocol::Irc, None) {
+                let actor = user_id.expect("authenticated registration has actor");
+                let canonical_nick = match auth.canonical_irc_nickname(&actor).await {
+                    Ok(nickname) => nickname,
+                    Err(error) => {
+                        warn!(%error, "IRC canonical nickname lookup failed");
+                        send_line(
+                            &out,
+                            &format!(
+                                ":{} 464 {} :Authentication error",
+                                formatter::server_name(),
+                                nick_val,
+                            ),
+                        );
+                        break;
+                    }
+                };
+                match engine.connect(
+                    Some(actor.user_id().as_str().to_owned()),
+                    canonical_nick.clone(),
+                    Protocol::Irc,
+                    None,
+                ) {
                     Ok((sid, rx)) => {
-                        let nick_owned = nick_val.clone();
+                        let nick_owned = canonical_nick;
+                        if engine.bind_authenticated_actor(sid, actor.clone()).is_err() {
+                            engine.disconnect(sid);
+                            break;
+                        }
+                        credential_lease = auth.register_live(&actor).await.ok();
+                        credential_expiry = actor.expires_at();
+                        if credential_lease.is_none() {
+                            engine.disconnect(sid);
+                            break;
+                        }
+                        let credential_cancel = credential_lease
+                            .as_ref()
+                            .expect("credential lease was checked")
+                            .cancellation_token();
+                        let authority_cancel = authority_failed.clone();
+                        let expires_at = actor.expires_at();
+                        tokio::spawn(async move {
+                            tokio::select! {
+                                _ = credential_cancel.cancelled() => {},
+                                _ = crate::auth::authority::wait_for_expiry(expires_at) => {},
+                            }
+                            authority_cancel.cancel();
+                        });
+                        *out.actor.write().expect("IRC actor lock poisoned") = Some(actor.clone());
 
                         // Send welcome burst
-                        send_line(&out_tx, &formatter::rpl_welcome(&nick_owned));
-                        send_line(&out_tx, &formatter::rpl_yourhost(&nick_owned));
-                        send_line(&out_tx, &formatter::rpl_created(&nick_owned));
-                        send_line(&out_tx, &formatter::rpl_myinfo(&nick_owned));
+                        send_line(&out, &formatter::rpl_welcome(&nick_owned));
+                        send_line(&out, &formatter::rpl_yourhost(&nick_owned));
+                        send_line(&out, &formatter::rpl_created(&nick_owned));
+                        send_line(&out, &formatter::rpl_myinfo(&nick_owned));
 
                         // Send MOTD or ERR_NOMOTD
                         let motd = MOTD_LINES.get();
                         if let Some(lines) = motd
                             && !lines.is_empty()
                         {
-                            send_line(&out_tx, &formatter::rpl_motdstart(&nick_owned));
+                            send_line(&out, &formatter::rpl_motdstart(&nick_owned));
                             for line in lines {
-                                send_line(&out_tx, &formatter::rpl_motd(&nick_owned, line));
+                                send_line(&out, &formatter::rpl_motd(&nick_owned, line));
                             }
-                            send_line(&out_tx, &formatter::rpl_endofmotd(&nick_owned));
+                            send_line(&out, &formatter::rpl_endofmotd(&nick_owned));
                         } else {
-                            send_line(&out_tx, &formatter::err_nomotd(&nick_owned));
+                            send_line(&out, &formatter::err_nomotd(&nick_owned));
                         }
 
                         state = RegState::Registered {
                             session_id: sid,
                             nick: nick_owned,
+                            actor: actor.clone(),
                         };
                         event_rx = Some(rx);
                     }
                     Err(e) => {
                         warn!(error = %e, "IRC registration failed");
-                        send_line(&out_tx, &formatter::err_nicknameinuse("*", nick_val));
+                        send_line(&out, &formatter::err_nicknameinuse("*", &canonical_nick));
                     }
                 }
             }
@@ -515,50 +715,109 @@ pub async fn handle_irc_connection<S>(
     }
 
     // Disconnect from engine if registered
-    if let RegState::Registered { session_id, nick } = state {
+    if let RegState::Registered {
+        session_id, nick, ..
+    } = state
+    {
         engine.disconnect(session_id);
         info!(%peer, %nick, "IRC client disconnected");
     } else {
         info!(%peer, "IRC client disconnected (unregistered)");
     }
 
-    write_handle.abort();
-}
-
-/// Validate an IRC PASS token against stored hashes.
-/// Returns Ok(Some(user_id)) if the token matches, Ok(None) if not.
-async fn validate_irc_pass(
-    db: &SqlitePool,
-    token: &str,
-    nickname: &str,
-) -> Result<Option<String>, String> {
-    // Scoped lookup: only fetch tokens for this nickname (O(1) per user instead of O(n) global)
-    let hashes = users::get_irc_token_hashes_by_nick(db, nickname)
+    drop(event_rx);
+    drop(out);
+    let mut write_handle = write_handle;
+    if tokio::time::timeout(Duration::from_secs(1), &mut write_handle)
         .await
-        .map_err(|e| format!("DB error: {}", e))?;
-
-    for (user_id, token_hash) in &hashes {
-        if verify_irc_token(token, token_hash) {
-            // Update last_used timestamp (fire-and-forget)
-            let pool = db.clone();
-            let uid = user_id.clone();
-            let hash = token_hash.clone();
-            tokio::spawn(async move {
-                let _ = users::touch_irc_token(&pool, &uid, &hash).await;
-            });
-            return Ok(Some(user_id.clone()));
-        }
+        .is_err()
+    {
+        write_handle.abort();
+        let _ = write_handle.await;
     }
-
-    Ok(None)
 }
 
 /// Handle IRC KICK command: KICK #channel user [:reason]
 /// Requires async because it does a DB lookup (nickname → user_id) and calls engine.kick_member().
+async fn resolve_registered_channel(
+    engine: &ChatEngine,
+    session_id: ConnectionId,
+    irc_name: &str,
+) -> Result<(String, String), String> {
+    let actor = engine
+        .get_authenticated_actor(session_id)
+        .ok_or_else(|| "authentication unavailable".to_string())?;
+    engine.resolve_irc_channel_for_actor(&actor, irc_name).await
+}
+
+async fn irc_command_delivery_guard(
+    engine: &ChatEngine,
+    actor: &Actor,
+    message: &IrcMessage,
+) -> Result<crate::engine::user_session::DeliveryGuard, ()> {
+    use crate::engine::user_session::DeliveryGuard;
+
+    if message.command == "LIST" {
+        let alias = message.params.first().and_then(|pattern| {
+            pattern
+                .strip_prefix('#')
+                .unwrap_or(pattern)
+                .strip_suffix("/*")
+        });
+        return engine
+            .resolve_irc_server_for_actor(actor, alias)
+            .await
+            .map(|server_id| DeliveryGuard::ServerMembership(vec![server_id]))
+            .map_err(|_| ());
+    }
+
+    let channel_parameter = match message.command.as_str() {
+        "INVITE" => message.params.get(1),
+        "JOIN" | "PART" | "PRIVMSG" | "TOPIC" | "MODE" | "NAMES" | "WHO" | "HISTORY" | "KICK" => {
+            message.params.first()
+        }
+        _ => None,
+    };
+    let Some(channel_parameter) = channel_parameter else {
+        return Ok(DeliveryGuard::ActorCurrent);
+    };
+    let mut channel_ids = Vec::new();
+    for irc_name in channel_parameter
+        .split(',')
+        .filter(|name| name.starts_with('#'))
+    {
+        let Ok((server_id, channel_name)) =
+            engine.resolve_irc_channel_for_actor(actor, irc_name).await
+        else {
+            return Err(());
+        };
+        let Ok(channel_id) = engine.resolve_channel_id(&server_id, &channel_name) else {
+            return Err(());
+        };
+        channel_ids.push(channel_id);
+    }
+    if channel_ids.is_empty() {
+        Ok(DeliveryGuard::ActorCurrent)
+    } else if message.command == "HISTORY" {
+        Ok(DeliveryGuard::ChannelActions(
+            channel_ids
+                .into_iter()
+                .map(|channel_id| {
+                    (
+                        channel_id,
+                        crate::engine::authorization::ChannelAction::ReadHistory,
+                    )
+                })
+                .collect(),
+        ))
+    } else {
+        Ok(DeliveryGuard::Channels(channel_ids))
+    }
+}
+
 async fn handle_kick(
     engine: &ChatEngine,
-    db: &SqlitePool,
-    session_id: SessionId,
+    session_id: ConnectionId,
     nick: &str,
     msg: &IrcMessage,
 ) -> Vec<String> {
@@ -573,19 +832,20 @@ async fn handle_kick(
         return vec![formatter::err_nosuchchannel(nick, target_channel)];
     }
 
-    let (server_id, channel_name) = commands::parse_irc_channel(engine, target_channel);
+    let Ok((server_id, channel_name)) =
+        resolve_registered_channel(engine, session_id, target_channel).await
+    else {
+        return vec![formatter::err_nosuchchannel(nick, target_channel)];
+    };
 
     // Resolve channel name → channel_id for channel-scoped permission check
     let channel_id = engine.resolve_channel_id(&server_id, &channel_name).ok();
 
-    // Resolve target nickname → user_id via DB
-    let target_user_id = match users::get_user_by_nickname(db, target_nick).await {
-        Ok(Some((uid, ..))) => uid,
-        Ok(None) => return vec![formatter::err_nosuchnick(nick, target_nick)],
-        Err(e) => {
-            warn!(error = %e, "KICK: DB error resolving nickname");
-            return vec![formatter::err_nosuchnick(nick, target_nick)];
-        }
+    let Some(target_user_id) = engine
+        .get_session_id_by_nick(target_nick)
+        .and_then(|target_session| engine.get_session_user_id(target_session))
+    else {
+        return vec![formatter::err_nosuchnick(nick, target_nick)];
     };
 
     match engine
@@ -624,7 +884,7 @@ async fn handle_kick(
 /// Handle IRC AWAY command: AWAY [:message] / AWAY (no params = back)
 async fn handle_away(
     engine: &ChatEngine,
-    session_id: SessionId,
+    session_id: ConnectionId,
     nick: &str,
     msg: &IrcMessage,
 ) -> Vec<String> {
@@ -652,8 +912,7 @@ async fn handle_away(
 /// Handle IRC INVITE command: INVITE target #channel
 async fn handle_invite(
     engine: &ChatEngine,
-    db: &SqlitePool,
-    _session_id: SessionId,
+    session_id: ConnectionId,
     nick: &str,
     msg: &IrcMessage,
 ) -> Vec<String> {
@@ -668,7 +927,11 @@ async fn handle_invite(
         return vec![formatter::err_nosuchchannel(nick, target_channel)];
     }
 
-    let (server_id, channel_name) = commands::parse_irc_channel(engine, target_channel);
+    let Ok((server_id, channel_name)) =
+        resolve_registered_channel(engine, session_id, target_channel).await
+    else {
+        return vec![formatter::err_nosuchchannel(nick, target_channel)];
+    };
 
     // Resolve target nickname → session_id
     let target_sid = match engine.get_session_id_by_nick(target_nick) {
@@ -676,14 +939,11 @@ async fn handle_invite(
         None => return vec![formatter::err_nosuchnick(nick, target_nick)],
     };
 
-    // Look up target user_id
-    let _target_user_id = match users::get_user_by_nickname(db, target_nick).await {
-        Ok(Some((uid, ..))) => uid,
-        _ => return vec![formatter::err_nosuchnick(nick, target_nick)],
-    };
-
     // Join target to the channel
-    if let Err(e) = engine.join_channel(target_sid, &server_id, &channel_name) {
+    if let Err(e) = engine
+        .join_channel(target_sid, &server_id, &channel_name)
+        .await
+    {
         return vec![format!(":{sn} NOTICE {nick} :INVITE failed: {e}")];
     }
 
@@ -694,18 +954,29 @@ async fn handle_invite(
 /// Handle IRC WHOIS command with channel list and away status.
 async fn handle_whois(
     engine: &ChatEngine,
-    db: &SqlitePool,
+    session_id: ConnectionId,
     nick: &str,
     msg: &IrcMessage,
-) -> Vec<String> {
+) -> GuardedCommandReplies {
+    use crate::engine::user_session::DeliveryGuard;
     let Some(target) = msg.params.first().or(msg.params.get(1)) else {
-        return vec![formatter::err_needmoreparams(nick, "WHOIS")];
+        return Ok((
+            vec![formatter::err_needmoreparams(nick, "WHOIS")],
+            DeliveryGuard::ActorCurrent,
+        ));
     };
     // Strip leading server param: WHOIS server target → use target
     let target = target.as_str();
 
     let Some(target_sid) = engine.get_session_id_by_nick(target) else {
-        return vec![formatter::err_nosuchnick(nick, target)];
+        return Ok((
+            vec![formatter::err_nosuchnick(nick, target)],
+            DeliveryGuard::ActorCurrent,
+        ));
+    };
+
+    let Some(actor) = engine.get_authenticated_actor(session_id) else {
+        return Err(());
     };
 
     let mut lines = vec![
@@ -714,38 +985,63 @@ async fn handle_whois(
     ];
 
     // 319 RPL_WHOISCHANNELS — list channels the target is in
-    let channels = engine.get_session_channels(target_sid);
-    if !channels.is_empty() {
-        let irc_names: Vec<String> = channels
-            .iter()
-            .map(|(sid, cname)| to_irc_channel(engine, sid, cname))
-            .collect();
+    let mut visible_channels = Vec::new();
+    let mut stamps = Vec::new();
+    let target_user_id = engine.get_session_user_id(target_sid);
+    let mut away_message = None;
+    for (server_id, channel_name) in engine.get_session_channels(target_sid) {
+        if let Ok((members, stamp)) = engine
+            .get_visible_members(&actor, &server_id, &channel_name)
+            .await
+            && members.iter().any(|member| member.nickname == target)
+        {
+            visible_channels.push(to_irc_channel(engine, &server_id, &channel_name));
+            stamps.push(stamp);
+            if away_message.is_none()
+                && let Some(target_user_id) = target_user_id.as_deref()
+                && let Ok(presences) = engine.get_server_presences(session_id, &server_id).await
+                && let Some(presence) = presences.iter().find(|item| {
+                    item.user_id == target_user_id && matches!(item.status.as_str(), "idle" | "dnd")
+                })
+            {
+                away_message = Some(
+                    presence
+                        .custom_status
+                        .clone()
+                        .unwrap_or_else(|| "Away".into()),
+                );
+            }
+        }
+    }
+    if !visible_channels.is_empty() {
         lines.push(formatter::rpl_whoischannels(
             nick,
             target,
-            &irc_names.join(" "),
+            &visible_channels.join(" "),
         ));
     }
 
     // 301 RPL_AWAY — if the target has an away/idle status with a custom message
-    if let Some(session) = engine.get_session(target_sid)
-        && let Some(ref uid) = session.user_id
-        && let Ok(Some(pres)) = presence::get_presence(db, uid).await
-        && (pres.status == "idle" || pres.status == "dnd")
-    {
-        let away_msg = pres.custom_status.as_deref().unwrap_or("Away");
-        lines.push(formatter::rpl_away(nick, target, away_msg));
+    if let Some(away_message) = away_message {
+        lines.push(formatter::rpl_away(nick, target, &away_message));
     }
 
     lines.push(formatter::rpl_endofwhois(nick, target));
-    lines
+    let guard = if stamps.is_empty() {
+        DeliveryGuard::ActorCurrent
+    } else {
+        DeliveryGuard::Stamps(stamps)
+    };
+    Ok((lines, guard))
 }
 
 /// Determine the IRC prefix character (@, +, or none) for a user in a server.
 /// @ = operator (MANAGE_CHANNELS, KICK_MEMBERS, BAN_MEMBERS, or ADMINISTRATOR)
 /// + = voice (MANAGE_MESSAGES but not operator-level)
 async fn irc_prefix_for_user(engine: &ChatEngine, server_id: &str, user_id: &str) -> &'static str {
-    let perms = engine.get_effective_permissions(server_id, None, user_id).await;
+    let perms = engine
+        .get_effective_permissions(server_id, None, user_id)
+        .await;
     if perms.contains(Permissions::ADMINISTRATOR)
         || perms.contains(Permissions::MANAGE_CHANNELS)
         || perms.contains(Permissions::KICK_MEMBERS)
@@ -762,67 +1058,222 @@ async fn irc_prefix_for_user(engine: &ChatEngine, server_id: &str, user_id: &str
 /// Handle IRC NAMES command with role-based prefixes (@/+).
 async fn handle_names_async(
     engine: &ChatEngine,
+    session_id: ConnectionId,
     nick: &str,
     msg: &IrcMessage,
-) -> Vec<String> {
+) -> GuardedCommandReplies {
+    use crate::engine::user_session::DeliveryGuard;
     let Some(channel_param) = msg.params.first() else {
-        return vec![formatter::err_needmoreparams(nick, "NAMES")];
+        return Ok((
+            vec![formatter::err_needmoreparams(nick, "NAMES")],
+            DeliveryGuard::ActorCurrent,
+        ));
     };
 
-    let (server_id, channel_name) = parse_irc_channel(engine, channel_param);
+    let Ok((server_id, channel_name)) =
+        resolve_registered_channel(engine, session_id, channel_param).await
+    else {
+        return Ok((
+            vec![formatter::rpl_endofnames(nick, channel_param)],
+            DeliveryGuard::ActorCurrent,
+        ));
+    };
     let irc_channel = to_irc_channel(engine, &server_id, &channel_name);
+    let actor = engine.get_authenticated_actor(session_id);
 
-    match engine.get_members(&server_id, &channel_name) {
-        Ok(member_infos) => {
-            let mut nicks = Vec::with_capacity(member_infos.len());
-            for m in &member_infos {
-                let uid = m.user_id.as_deref().unwrap_or("");
-                let prefix = irc_prefix_for_user(engine, &server_id, uid).await;
-                nicks.push(format!("{prefix}{}", m.nickname));
+    match actor {
+        Some(actor) => match engine
+            .get_visible_members(&actor, &server_id, &channel_name)
+            .await
+        {
+            Ok((member_infos, stamp)) => {
+                let mut nicks = Vec::with_capacity(member_infos.len());
+                for m in &member_infos {
+                    let uid = m.user_id.as_deref().unwrap_or("");
+                    let prefix = irc_prefix_for_user(engine, &server_id, uid).await;
+                    nicks.push(format!("{prefix}{}", m.nickname));
+                }
+                Ok((
+                    vec![
+                        formatter::rpl_namreply(nick, &irc_channel, &nicks),
+                        formatter::rpl_endofnames(nick, &irc_channel),
+                    ],
+                    DeliveryGuard::Stamps(vec![stamp]),
+                ))
             }
-            vec![
-                formatter::rpl_namreply(nick, &irc_channel, &nicks),
-                formatter::rpl_endofnames(nick, &irc_channel),
-            ]
-        }
-        Err(_) => vec![formatter::rpl_endofnames(nick, &irc_channel)],
+            Err(_) => Err(()),
+        },
+        None => Err(()),
     }
+}
+
+async fn handle_list_async(
+    engine: &ChatEngine,
+    session_id: ConnectionId,
+    nick: &str,
+    msg: &IrcMessage,
+) -> GuardedCommandReplies {
+    use crate::engine::user_session::DeliveryGuard;
+    let server_alias = msg.params.first().and_then(|pattern| {
+        pattern
+            .strip_prefix('#')
+            .unwrap_or(pattern)
+            .strip_suffix("/*")
+    });
+    let Some(actor) = engine.get_authenticated_actor(session_id) else {
+        return Err(());
+    };
+    let (channels, stamp) = {
+        let Ok(server_id) = engine
+            .resolve_irc_server_for_actor(&actor, server_alias)
+            .await
+        else {
+            return Ok((
+                vec![formatter::rpl_listend(nick)],
+                DeliveryGuard::ActorCurrent,
+            ));
+        };
+        match engine
+            .list_visible_channels_for_actor(&server_id, &actor)
+            .await
+        {
+            Ok((channels, stamp)) => (
+                channels
+                    .into_iter()
+                    .map(|channel| (server_id.clone(), channel))
+                    .collect::<Vec<_>>(),
+                stamp,
+            ),
+            Err(_) => return Err(()),
+        }
+    };
+    let mut replies = Vec::with_capacity(channels.len() + 1);
+    for (server_id, channel) in channels {
+        replies.push(formatter::rpl_list(
+            nick,
+            &to_irc_channel(engine, &server_id, &channel.name),
+            channel.member_count,
+            &channel.topic,
+        ));
+    }
+    replies.push(formatter::rpl_listend(nick));
+    Ok((replies, DeliveryGuard::Stamps(vec![stamp])))
+}
+
+async fn handle_history_async(
+    engine: &ChatEngine,
+    session_id: ConnectionId,
+    nick: &str,
+    msg: &IrcMessage,
+    caps: &ClientCaps,
+) -> GuardedCommandReplies {
+    use crate::engine::user_session::DeliveryGuard;
+    let Some(channel_param) = msg.params.first() else {
+        return Ok((
+            vec![formatter::err_needmoreparams(nick, "HISTORY")],
+            DeliveryGuard::ActorCurrent,
+        ));
+    };
+    let Some(actor) = engine.get_authenticated_actor(session_id) else {
+        return Err(());
+    };
+    let Ok((server_id, channel_name)) = engine
+        .resolve_irc_channel_for_actor(&actor, channel_param)
+        .await
+    else {
+        return Err(());
+    };
+    let limit = msg
+        .params
+        .get(1)
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(50)
+        .clamp(1, 100);
+    let Ok((messages, _, stamp)) = engine
+        .fetch_history(&server_id, &channel_name, None, limit, &actor)
+        .await
+    else {
+        return Err(());
+    };
+    let target = to_irc_channel(engine, &server_id, &channel_name);
+    let replies = messages
+        .into_iter()
+        .map(|message| {
+            let content = message.content.replace(['\r', '\n'], " ");
+            let tag_prefix = build_history_tag_prefix(caps, &message.id, &message.timestamp);
+            format!(
+                "{}:{}!{}@{} PRIVMSG {} :{}",
+                tag_prefix,
+                message.from,
+                message.from,
+                formatter::server_name(),
+                target,
+                content
+            )
+        })
+        .collect();
+    Ok((replies, DeliveryGuard::Stamps(vec![stamp])))
 }
 
 /// Handle IRC WHO command with role-based prefixes (@/+).
 async fn handle_who_async(
     engine: &ChatEngine,
+    session_id: ConnectionId,
     nick: &str,
     msg: &IrcMessage,
-) -> Vec<String> {
+) -> GuardedCommandReplies {
+    use crate::engine::user_session::DeliveryGuard;
     let Some(target) = msg.params.first() else {
-        return vec![formatter::err_needmoreparams(nick, "WHO")];
+        return Ok((
+            vec![formatter::err_needmoreparams(nick, "WHO")],
+            DeliveryGuard::ActorCurrent,
+        ));
     };
 
     let mut replies = Vec::new();
 
     if target.starts_with('#') {
-        let (server_id, channel_name) = parse_irc_channel(engine, target);
+        let Ok((server_id, channel_name)) =
+            resolve_registered_channel(engine, session_id, target).await
+        else {
+            return Ok((
+                vec![format!(
+                    ":{} {} {} {} :End of /WHO list",
+                    formatter::server_name(),
+                    super::numerics::RPL_ENDOFWHO,
+                    nick,
+                    target,
+                )],
+                DeliveryGuard::ActorCurrent,
+            ));
+        };
         let irc_channel = to_irc_channel(engine, &server_id, &channel_name);
 
-        if let Ok(members) = engine.get_members(&server_id, &channel_name) {
-            for member in &members {
-                let uid = member.user_id.as_deref().unwrap_or("");
-                let prefix = irc_prefix_for_user(engine, &server_id, uid).await;
-                // RFC 2812: 352 <requestor> <channel> <user> <host> <server> <nick> <H|G>[*][@|+] :<hopcount> <realname>
-                replies.push(format!(
-                    ":{} {} {} {} {} {} {} {} H{prefix} :0 {}",
-                    formatter::server_name(),
-                    super::numerics::RPL_WHOREPLY,
-                    nick,
-                    irc_channel,
-                    member.nickname,          // user (ident)
-                    formatter::server_name(), // host
-                    formatter::server_name(), // server
-                    member.nickname,          // nick
-                    member.nickname,          // realname
-                ));
-            }
+        let Some(actor) = engine.get_authenticated_actor(session_id) else {
+            return Err(());
+        };
+        let Ok((members, stamp)) = engine
+            .get_visible_members(&actor, &server_id, &channel_name)
+            .await
+        else {
+            return Err(());
+        };
+        for member in &members {
+            let uid = member.user_id.as_deref().unwrap_or("");
+            let prefix = irc_prefix_for_user(engine, &server_id, uid).await;
+            // RFC 2812: 352 <requestor> <channel> <user> <host> <server> <nick> <H|G>[*][@|+] :<hopcount> <realname>
+            replies.push(format!(
+                ":{} {} {} {} {} {} {} {} H{prefix} :0 {}",
+                formatter::server_name(),
+                super::numerics::RPL_WHOREPLY,
+                nick,
+                irc_channel,
+                member.nickname,          // user (ident)
+                formatter::server_name(), // host
+                formatter::server_name(), // server
+                member.nickname,          // nick
+                member.nickname,          // realname
+            ));
         }
 
         replies.push(format!(
@@ -832,6 +1283,7 @@ async fn handle_who_async(
             nick,
             irc_channel,
         ));
+        return Ok((replies, DeliveryGuard::Stamps(vec![stamp])));
     } else {
         replies.push(format!(
             ":{} {} {} {} :End of /WHO list",
@@ -842,7 +1294,44 @@ async fn handle_who_async(
         ));
     }
 
-    replies
+    Ok((replies, DeliveryGuard::ActorCurrent))
+}
+
+fn escape_ircv3_tag_value(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for character in value.chars() {
+        match character {
+            ';' => escaped.push_str("\\:"),
+            ' ' => escaped.push_str("\\s"),
+            '\\' => escaped.push_str("\\\\"),
+            '\r' => escaped.push_str("\\r"),
+            '\n' => escaped.push_str("\\n"),
+            _ => escaped.push(character),
+        }
+    }
+    escaped
+}
+
+fn build_history_tag_prefix(
+    caps: &ClientCaps,
+    message_id: &crate::engine::ids::MessageId,
+    timestamp: &chrono::DateTime<chrono::Utc>,
+) -> String {
+    let mut tags = Vec::new();
+    if caps.server_time {
+        tags.push(format!("time={}", timestamp.to_rfc3339()));
+    }
+    if caps.message_tags {
+        tags.push(format!(
+            "msgid={}",
+            escape_ircv3_tag_value(message_id.as_str())
+        ));
+    }
+    if tags.is_empty() {
+        String::new()
+    } else {
+        format!("@{} ", tags.join(";"))
+    }
 }
 
 /// Build an IRCv3 tag prefix string based on event metadata and negotiated caps.
@@ -860,7 +1349,7 @@ fn build_tag_prefix(caps: &ClientCaps, event: &ChatEvent) -> String {
     if caps.message_tags {
         // Attach message ID where available
         if let ChatEvent::Message { id, .. } = event {
-            tags.push(format!("msgid={id}"));
+            tags.push(format!("msgid={}", escape_ircv3_tag_value(id.as_str())));
         }
     }
     if tags.is_empty() {
@@ -1157,12 +1646,14 @@ fn event_to_irc_lines_inner(engine: &ChatEngine, my_nick: &str, event: &ChatEven
         | ChatEvent::RoleUpdate { .. }
         | ChatEvent::RoleDelete { .. }
         | ChatEvent::MemberRoleUpdate { .. }
+        | ChatEvent::ChannelPermissionOverrideList { .. }
         | ChatEvent::CategoryList { .. }
         | ChatEvent::CategoryUpdate { .. }
         | ChatEvent::CategoryDelete { .. }
         | ChatEvent::ChannelReorder { .. }
         | ChatEvent::PresenceUpdate { .. }
         | ChatEvent::PresenceList { .. }
+        | ChatEvent::OwnPresence { .. }
         | ChatEvent::UserProfile { .. }
         | ChatEvent::ServerNicknameUpdate { .. }
         | ChatEvent::NotificationSettings { .. }
@@ -1187,10 +1678,19 @@ fn event_to_irc_lines_inner(engine: &ChatEngine, my_nick: &str, event: &ChatEven
         | ChatEvent::ChannelFollowList { .. }
         | ChatEvent::ChannelFollowCreate { .. }
         | ChatEvent::ChannelFollowDelete { .. }
+        | ChatEvent::AnnouncementPublished { .. }
         | ChatEvent::TemplateList { .. }
         | ChatEvent::TemplateUpdate { .. }
         | ChatEvent::TemplateDelete { .. }
+        | ChatEvent::TemplateInstantiated { .. }
         // Phase 8: Integrations (web-only)
+        | ChatEvent::SyncSnapshot { .. }
+        | ChatEvent::ReplayBatch { .. }
+        | ChatEvent::DurableEvent { .. }
+        | ChatEvent::DirectConversationList { .. }
+        | ChatEvent::ResyncRequired { .. }
+        | ChatEvent::CommandError { .. }
+        | ChatEvent::CommandCommitted { .. }
         | ChatEvent::WebhookList { .. }
         | ChatEvent::WebhookUpdate { .. }
         | ChatEvent::WebhookDelete { .. }
@@ -1199,36 +1699,175 @@ fn event_to_irc_lines_inner(engine: &ChatEngine, my_nick: &str, event: &ChatEven
         | ChatEvent::SlashCommandDelete { .. }
         | ChatEvent::InteractionCreate { .. }
         | ChatEvent::InteractionResponse { .. }
+        | ChatEvent::InteractionInvoked { .. }
+        | ChatEvent::LifecycleCommandSucceeded { .. }
+        | ChatEvent::BotAccountList { .. }
+        | ChatEvent::BotCredentialCreated { .. }
         | ChatEvent::BotTokenList { .. }
         | ChatEvent::OAuth2AppList { .. }
         | ChatEvent::OAuth2AppUpdate { .. }
         | ChatEvent::BlueskyProfileSync { .. }
         | ChatEvent::BlueskyShareResult { .. }
         | ChatEvent::ServerAvatarUpdate { .. }
+        | ChatEvent::ThreadTagUpdate { .. }
         | ChatEvent::ServerLimits { .. } => vec![],
     }
 }
 
-fn send_line(tx: &mpsc::Sender<String>, line: &str) {
-    let _ = tx.try_send(line.to_string());
+fn send_line(out: &Outbound, line: &str) {
+    send_line_guarded(out, line, None);
+}
+
+fn sanitize_outbound_line(line: &str) -> String {
+    line.replace(['\r', '\n', '\0'], " ")
+}
+
+fn send_line_guarded(
+    out: &Outbound,
+    line: &str,
+    guard: Option<crate::engine::user_session::DeliveryGuard>,
+) {
+    let line = line.to_string();
+    let bytes = line.len();
+    if out
+        .queued_bytes
+        .fetch_update(
+            std::sync::atomic::Ordering::AcqRel,
+            std::sync::atomic::Ordering::Acquire,
+            |current| {
+                current
+                    .checked_add(bytes)
+                    .filter(|next| *next <= MAX_OUTBOUND_BYTES)
+            },
+        )
+        .is_err()
+    {
+        out.failed.cancel();
+        return;
+    }
+    if out.tx.try_send(OutboundLine { line, guard }).is_err() {
+        out.queued_bytes
+            .fetch_sub(bytes, std::sync::atomic::Ordering::AcqRel);
+        out.failed.cancel();
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::engine::events::{MemberInfo, PinnedMessageInfo, ThreadInfo};
+    use crate::engine::ids::MessageId;
     use chrono::Utc;
     use std::sync::Arc;
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
     use uuid::Uuid;
 
-    /// Create a minimal ChatEngine with no database for unit tests.
+    /// Create a minimal explicit in-memory harness for projection unit tests.
     fn test_engine() -> Arc<ChatEngine> {
-        Arc::new(ChatEngine::new(None, 4000, 100))
+        Arc::new(ChatEngine::test_harness(4000, 100))
     }
 
     /// Test helper — calls the inner (tag-free) event formatter.
     fn event_to_irc_lines(engine: &ChatEngine, my_nick: &str, event: &ChatEvent) -> Vec<String> {
         event_to_irc_lines_inner(engine, my_nick, event)
+    }
+
+    #[test]
+    fn ircv3_message_tags_preserve_historical_opaque_ids() {
+        let caps = ClientCaps {
+            server_time: true,
+            message_tags: true,
+            sasl: false,
+        };
+        let timestamp = chrono::DateTime::parse_from_rfc3339("2024-01-02T03:04:06.654321-05:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        let id = MessageId::from_stored("  legacy;message\\id  ").unwrap();
+        assert_eq!(
+            build_history_tag_prefix(&caps, &id, &timestamp),
+            "@time=2024-01-02T08:04:06.654321+00:00;msgid=\\s\\slegacy\\:message\\\\id\\s\\s "
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn heartbeat_accepts_exact_pong_then_disconnects_after_a_missed_probe() {
+        let db = crate::db::pool::create_pool("sqlite::memory:")
+            .await
+            .unwrap();
+        crate::db::pool::run_migrations(&db).await.unwrap();
+        sqlx::query("INSERT INTO users(id,username) VALUES('heartbeat-user','heartbeat')")
+            .execute(&db)
+            .await
+            .unwrap();
+        let auth = AuthService::new(db.clone(), "heartbeat-secret".into(), 1);
+        let web_actor = auth.issue_web_session("heartbeat-user").await.unwrap().1;
+        let token = auth
+            .issue_irc_token(web_actor.user_id(), Some("heartbeat test"))
+            .await
+            .unwrap();
+        let engine = Arc::new(ChatEngine::new(
+            db.clone(),
+            auth.clone(),
+            "heartbeat-secret",
+            4000,
+            100,
+        ));
+        let (server, client) = tokio::io::duplex(16 * 1024);
+        let cancel = CancellationToken::new();
+        let task = tokio::spawn(handle_irc_connection_with_timing(
+            server,
+            "heartbeat-peer".into(),
+            engine,
+            db,
+            auth,
+            cancel,
+            Duration::from_millis(100),
+        ));
+        let (reader, mut writer) = tokio::io::split(client);
+        let mut reader = BufReader::new(reader);
+        writer
+            .write_all(
+                format!(
+                    "PASS {}\r\nNICK heartbeat\r\nUSER heartbeat 0 * :Heartbeat\r\n",
+                    token.secret
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+
+        let first_nonce = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let mut line = String::new();
+                reader.read_line(&mut line).await.unwrap();
+                if let Some(nonce) = line.trim_end().strip_prefix("PING :") {
+                    break nonce.to_owned();
+                }
+            }
+        })
+        .await
+        .expect("registered client did not receive heartbeat probe");
+        writer
+            .write_all(format!("PONG :{first_nonce}\r\n").as_bytes())
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let mut line = String::new();
+                reader.read_line(&mut line).await.unwrap();
+                if line.starts_with("PING :") {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("exact PONG did not keep the connection alive for the next probe");
+
+        tokio::time::timeout(Duration::from_secs(1), task)
+            .await
+            .expect("client remained connected after missing the next heartbeat")
+            .unwrap();
     }
 
     // ── Message event ──
@@ -1240,8 +1879,9 @@ mod tests {
             &engine,
             "viewer",
             &ChatEvent::Message {
-                id: Uuid::new_v4(),
+                id: Uuid::new_v4().into(),
                 server_id: Some(DEFAULT_SERVER_ID.to_string()),
+                conversation_id: None,
                 from: "alice".into(),
                 target: "#general".into(),
                 content: "Hello world".into(),
@@ -1263,8 +1903,9 @@ mod tests {
             &engine,
             "bob",
             &ChatEvent::Message {
-                id: Uuid::new_v4(),
+                id: Uuid::new_v4().into(),
                 server_id: None,
+                conversation_id: None,
                 from: "alice".into(),
                 target: "bob".into(),
                 content: "Hey there".into(),
@@ -1291,6 +1932,9 @@ mod tests {
                 server_id: DEFAULT_SERVER_ID.into(),
                 channel: "#general".into(),
                 avatar_url: None,
+                user_id: Some("alice-id".into()),
+                server_avatar_url: None,
+                role_ids: Vec::new(),
             },
         );
         assert_eq!(lines.len(), 1);
@@ -1454,6 +2098,7 @@ mod tests {
                         status_emoji: None,
                         user_id: None,
                         server_avatar_url: None,
+                        role_ids: Vec::new(),
                     },
                     MemberInfo {
                         nickname: "bob".into(),
@@ -1463,6 +2108,7 @@ mod tests {
                         status_emoji: None,
                         user_id: None,
                         server_avatar_url: None,
+                        role_ids: Vec::new(),
                     },
                 ],
             },
@@ -1517,7 +2163,7 @@ mod tests {
             &engine,
             "viewer",
             &ChatEvent::MessageEdit {
-                id: Uuid::new_v4(),
+                id: Uuid::new_v4().into(),
                 server_id: DEFAULT_SERVER_ID.into(),
                 channel: "#general".into(),
                 content: "edited content".into(),
@@ -1537,7 +2183,7 @@ mod tests {
             &engine,
             "viewer",
             &ChatEvent::MessageDelete {
-                id: Uuid::new_v4(),
+                id: Uuid::new_v4().into(),
                 server_id: DEFAULT_SERVER_ID.into(),
                 channel: "#general".into(),
             },
@@ -1557,7 +2203,7 @@ mod tests {
             &engine,
             "viewer",
             &ChatEvent::ReactionAdd {
-                message_id: Uuid::new_v4(),
+                message_id: Uuid::new_v4().into(),
                 server_id: DEFAULT_SERVER_ID.into(),
                 channel: "#general".into(),
                 user_id: "uid1".into(),
@@ -1578,7 +2224,7 @@ mod tests {
             &engine,
             "viewer",
             &ChatEvent::ReactionRemove {
-                message_id: Uuid::new_v4(),
+                message_id: Uuid::new_v4().into(),
                 server_id: DEFAULT_SERVER_ID.into(),
                 channel: "#general".into(),
                 user_id: "uid1".into(),
@@ -1615,7 +2261,7 @@ mod tests {
             &engine,
             "viewer",
             &ChatEvent::MessageEmbed {
-                message_id: Uuid::new_v4(),
+                message_id: Uuid::new_v4().into(),
                 server_id: DEFAULT_SERVER_ID.into(),
                 channel: "#general".into(),
                 embeds: vec![],
@@ -1697,7 +2343,11 @@ mod tests {
                     name: "Discussion".into(),
                     channel_type: "public_thread".into(),
                     parent_message_id: None,
+                    creator_user_id: None,
                     archived: false,
+                    state_version: 1,
+                    tags_version: 1,
+                    tag_ids: Vec::new(),
                     auto_archive_minutes: 1440,
                     message_count: 0,
                     created_at: "2025-01-01".into(),
@@ -1722,7 +2372,11 @@ mod tests {
                     name: "Old thread".into(),
                     channel_type: "public_thread".into(),
                     parent_message_id: None,
+                    creator_user_id: None,
                     archived: true,
+                    state_version: 2,
+                    tags_version: 1,
+                    tag_ids: Vec::new(),
                     auto_archive_minutes: 1440,
                     message_count: 5,
                     created_at: "2025-01-01".into(),
@@ -1747,7 +2401,11 @@ mod tests {
                     name: "Revived thread".into(),
                     channel_type: "public_thread".into(),
                     parent_message_id: None,
+                    creator_user_id: None,
                     archived: false,
+                    state_version: 3,
+                    tags_version: 1,
+                    tag_ids: Vec::new(),
                     auto_archive_minutes: 1440,
                     message_count: 10,
                     created_at: "2025-01-01".into(),
@@ -1874,7 +2532,9 @@ mod tests {
             ChatEvent::ServerList { servers: vec![] },
             ChatEvent::RoleList {
                 server_id: DEFAULT_SERVER_ID.into(),
+                version: 0,
                 roles: vec![],
+                member_roles: Some(vec![]),
             },
             ChatEvent::CategoryList {
                 server_id: DEFAULT_SERVER_ID.into(),
@@ -1914,17 +2574,69 @@ mod tests {
 
     #[test]
     fn test_send_line_sends_to_channel() {
-        let (tx, mut rx) = mpsc::channel::<String>(1024);
-        send_line(&tx, "PRIVMSG #test :Hello");
+        let (tx, mut rx) = mpsc::channel::<OutboundLine>(1024);
+        let out = Outbound {
+            tx,
+            failed: CancellationToken::new(),
+            actor: Arc::new(std::sync::RwLock::new(None)),
+            queued_bytes: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        };
+        send_line(&out, "PRIVMSG #test :Hello");
         let received = rx.try_recv().unwrap();
-        assert_eq!(received, "PRIVMSG #test :Hello");
+        assert_eq!(received.line, "PRIVMSG #test :Hello");
+        assert!(received.guard.is_none());
+    }
+
+    #[test]
+    fn final_outbound_boundary_replaces_line_breaks_and_nul() {
+        assert_eq!(
+            sanitize_outbound_line(":alice PRIVMSG #general :one\r\nINJECT\0tail"),
+            ":alice PRIVMSG #general :one  INJECT tail"
+        );
     }
 
     #[test]
     fn test_send_line_closed_channel_does_not_panic() {
-        let (tx, rx) = mpsc::channel::<String>(1024);
+        let (tx, rx) = mpsc::channel::<OutboundLine>(1024);
         drop(rx); // Close the receiver
-        // Should not panic
-        send_line(&tx, "PRIVMSG #test :Hello");
+        let failed = CancellationToken::new();
+        let out = Outbound {
+            tx,
+            failed: failed.clone(),
+            actor: Arc::new(std::sync::RwLock::new(None)),
+            queued_bytes: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        };
+        send_line(&out, "PRIVMSG #test :Hello");
+        assert!(failed.is_cancelled());
+    }
+
+    #[test]
+    fn test_send_line_full_channel_marks_transport_failed() {
+        let (tx, _rx) = mpsc::channel::<OutboundLine>(1);
+        let failed = CancellationToken::new();
+        let out = Outbound {
+            tx,
+            failed: failed.clone(),
+            actor: Arc::new(std::sync::RwLock::new(None)),
+            queued_bytes: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        };
+        send_line(&out, "first");
+        send_line(&out, "overflow");
+        assert!(failed.is_cancelled());
+    }
+
+    #[test]
+    fn outbound_byte_budget_marks_transport_failed_before_enqueue() {
+        let (tx, mut rx) = mpsc::channel::<OutboundLine>(MAX_OUTBOUND_DESCRIPTORS);
+        let failed = CancellationToken::new();
+        let out = Outbound {
+            tx,
+            failed: failed.clone(),
+            actor: Arc::new(std::sync::RwLock::new(None)),
+            queued_bytes: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        };
+        send_line(&out, &"x".repeat(MAX_OUTBOUND_BYTES + 1));
+        assert!(failed.is_cancelled());
+        assert!(rx.try_recv().is_err());
     }
 }

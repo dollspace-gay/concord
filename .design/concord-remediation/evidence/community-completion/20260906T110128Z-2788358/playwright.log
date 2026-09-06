@@ -1,0 +1,14 @@
+[WebServer] (node:2788556) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 3 tests using 1 worker
+
+(node:2788600) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node-22 --trace-warnings ...` to show where the warning was created)
+
+
+[1/3] tests/authenticated/completion.spec.ts:68:1 › webhook UI completes one-time auth, duplicate-safe ingress, signed delivery retry, and revocation
+[2/3] tests/authenticated/completion.spec.ts:172:1 › bot UI token lifecycle drives correlated slash and component outcomes over real sockets
+[3/3] tests/authenticated/completion.spec.ts:339:1 › OAuth app UI completes public PKCE consent, replay, refresh, regrant, scope, and uninstall
+  3 passed (14.5s)

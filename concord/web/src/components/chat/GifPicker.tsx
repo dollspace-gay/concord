@@ -26,23 +26,24 @@ export function GifPicker({ onSelect, onClose }: GifPickerProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<TenorGif[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const fetchGifs = useCallback(async (searchQuery: string) => {
     if (!TENOR_API_KEY) return;
     setLoading(true);
+    setError(null);
     try {
       const endpoint = searchQuery.trim()
         ? `${TENOR_BASE}/search?q=${encodeURIComponent(searchQuery)}&key=${TENOR_API_KEY}&limit=20&media_filter=tinygif,gif`
         : `${TENOR_BASE}/featured?key=${TENOR_API_KEY}&limit=20&media_filter=tinygif,gif`;
       const res = await fetch(endpoint);
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data.results || []);
-      }
+      if (!res.ok) throw new Error(`GIF provider returned HTTP ${res.status}`);
+      const data = await res.json();
+      setResults(data.results || []);
     } catch (err) {
-      console.error('Tenor search failed:', err);
+      setError(err instanceof Error ? err.message : 'GIF search failed');
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,12 @@ export function GifPicker({ onSelect, onClose }: GifPickerProps) {
         </button>
       </div>
       <div className="flex-1 overflow-y-auto p-2">
-        {loading && results.length === 0 ? (
+        {error ? (
+          <div role="alert" className="flex flex-col items-center gap-2 py-8 text-sm text-text-muted">
+            <span>{error}</span>
+            <button className="font-medium text-accent" onClick={() => fetchGifs(query)}>Try again</button>
+          </div>
+        ) : loading && results.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-sm text-text-muted">Loading...</div>
         ) : results.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-sm text-text-muted">No GIFs found</div>

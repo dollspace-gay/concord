@@ -1,0 +1,59 @@
+{
+  "classification": "bounded-local-smoke",
+  "context": {
+    "cpu_count": 24,
+    "dataset_sha256": "472b3124e7131f4fb3a1d52bf266c85bebb9c3678f303ea4c37482a3b238420b",
+    "generator_hostname": "dollspace-laptop",
+    "memory_bytes": 33033777152,
+    "separate_load_generator": false,
+    "server_sha256": "bc3d09f33558fc323953eafe116a890c6f7a82896cdd2264145dd75229db9568",
+    "source_revision": "cff0df246b91461f959d8dbe9154ba50bba2331c",
+    "target_hostname": "dollspace-laptop"
+  },
+  "full_acceptance_claimed": false,
+  "mode": "smoke",
+  "resource": {
+    "scope": "bounded",
+    "telemetry_supplied": false
+  },
+  "result_checks": {
+    "closed_or_resynced": 1,
+    "commit_ack_p95_ms": 12.674735044129193,
+    "commit_ack_p99_ms": 12.674735044129193,
+    "concurrent_uploads": 4,
+    "core_chat_acks_during_failure": 1,
+    "history_p95_ms": 7.165485993027687,
+    "history_requests": 24,
+    "media_file_bytes_each": 1048576,
+    "messages_sent": 8,
+    "messages_verified": 8,
+    "no_duplicate_accepted_messages": true,
+    "provider_failure_terminal": false,
+    "recipient_deliveries_verified": 40,
+    "reconnect_convergence_seconds": 2.045565097942017,
+    "reconnect_declared_target": 2,
+    "reconnect_recovered": 2,
+    "restart_restore_messages_verified": 8,
+    "search_p95_ms": 3.6467990139499307,
+    "search_requests": 24,
+    "slow_clients": 1
+  },
+  "schema_version": 1,
+  "supporting_artifacts": {
+    "required": false
+  },
+  "time_series_samples": 19,
+  "workload": {
+    "accepted_message_rate_per_second": 0.999468522617673,
+    "database_profile": "FULL/WAL",
+    "duration_seconds": 8.004254080005921,
+    "irc_sessions": 3,
+    "mean_fanout": 5.0,
+    "messages_sent": 8,
+    "seeded_messages": 3,
+    "senders": 1,
+    "servers": 1,
+    "sessions": 5,
+    "web_sessions": 2
+  }
+}

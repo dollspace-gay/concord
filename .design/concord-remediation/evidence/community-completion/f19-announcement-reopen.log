@@ -1,0 +1,76 @@
+    Blocking waiting for file lock on build directory
+   Compiling concord-server v0.1.0 (/home/doll/concord/concord/server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.51s
+     Running unittests src/lib.rs (concord/target/debug/deps/concord_server-dc82ffb804d83609)
+
+running 1 test
+test engine::messaging::tests::announcement_lineage_survives_reopen_without_duplicate_destination ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1016 filtered out; finished in 0.25s
+
+     Running unittests src/main.rs (concord/target/debug/deps/concord_server-1e2f75da96094864)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running unittests src/bin/concord_operator.rs (concord/target/debug/deps/concord_operator-aa2aa599dff3f4c0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running unittests src/bin/generate_contract.rs (concord/target/debug/deps/generate_contract-ecd69bce7f4eaa1a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/storage_fault_probe.rs (concord/target/debug/deps/storage_fault_probe-84995193053e82b4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/backup_restore.rs (concord/target/debug/deps/backup_restore-9b9227b8c0876f9a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/config_cli.rs (concord/target/debug/deps/config_cli-f6a0d18426583876)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/irc_streams.rs (concord/target/debug/deps/irc_streams-d644fa3d490bbcff)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/migrations_upgrade.rs (concord/target/debug/deps/migrations_upgrade-ba2503c21268e0a7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/oauth2_lifecycle.rs (concord/target/debug/deps/oauth2_lifecycle-0a91323a1c94a4f1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/operator_cli.rs (concord/target/debug/deps/operator_cli-40e2a6655a230c69)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/session_authority.rs (concord/target/debug/deps/session_authority-47c720204aa66e41)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s
+

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8"><title>Concord state harness</title><style>
+    #message-list{height:600px}
+    #message-list>div{display:flex;height:100%;flex-direction:column}
+    #message-list [data-virtuoso-scroller]{flex:1}
+  </style></head>
+  <body>
+    <main id="ready">ready<div id="message-list"></div><div id="message-input"></div><div id="search-panel"></div></main>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { useChatStore } from '/src/stores/chatStore.ts';
+      import { useUiStore } from '/src/stores/uiStore.ts';
+      import { useAuthStore } from '/src/stores/authStore.ts';
+      import { MessageInput } from '/src/components/chat/MessageInput.tsx';
+      import { MessageList } from '/src/components/chat/MessageList.tsx';
+      import { SearchPanel } from '/src/components/search/SearchPanel.tsx';
+      window.chatStore = useChatStore;
+      window.uiStore = useUiStore;
+      window.authStore = useAuthStore;
+      createRoot(document.getElementById('message-list')).render(React.createElement(MessageList));
+      createRoot(document.getElementById('message-input')).render(React.createElement(MessageInput));
+      createRoot(document.getElementById('search-panel')).render(React.createElement(SearchPanel));
+    </script>
+  </body>
+</html>

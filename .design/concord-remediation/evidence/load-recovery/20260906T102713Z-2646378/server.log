@@ -1,0 +1,77 @@
+2026-09-06T10:27:42.242923Z  INFO concord_server::db::pool: database connected with WAL, synchronous=FULL, foreign_keys=ON database_url="sqlite:/tmp/tmp.wqpBPsN9H5/concord.db?mode=rwc"
+2026-09-06T10:27:42.465763Z  INFO concord_server::engine::chat_engine: bootstrapping default roles for existing server server_id=browser-server
+2026-09-06T10:27:42.470278Z  INFO concord_server::engine::chat_engine: loaded servers from database count=1
+2026-09-06T10:27:42.470697Z  INFO concord_server::engine::chat_engine: loaded channels from database count=1
+2026-09-06T10:27:42.471021Z  INFO concord_server::web::atproto: no persisted AT Protocol signing key found, generating new one
+2026-09-06T10:27:42.478534Z  INFO concord_server: Concord server starting — Web: 127.0.0.1:34567, IRC: 127.0.0.1:51087
+2026-09-06T10:27:42.478810Z  INFO concord_server::irc::listener: IRC listener started on 127.0.0.1:51087 (plaintext)
+2026-09-06T10:27:42.944818Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:52166
+2026-09-06T10:27:43.162668Z  INFO concord_server::engine::chat_engine: session connected session_id=ddbb309f-e60e-4835-a8f0-60f64c32bb9b nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T10:27:43.164176Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:52170
+2026-09-06T10:27:43.167904Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T10:27:43.374254Z  INFO concord_server::engine::chat_engine: session connected session_id=c046bea9-f31f-49f2-8905-efadf515084e nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T10:27:43.376333Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:52174
+2026-09-06T10:27:43.380288Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T10:27:43.581709Z  INFO concord_server::engine::chat_engine: session connected session_id=fde4304e-fa5e-43c8-a473-20ce63289059 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T10:27:43.585559Z  INFO concord_server::engine::chat_engine: session connected session_id=e6979d1b-ad1e-4773-9ec5-e9f89419268a nickname=alice protocol=WebSocket
+2026-09-06T10:27:43.588307Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T10:27:43.630894Z  INFO concord_server::engine::chat_engine: session connected session_id=ab76be71-1493-4630-ae44-fc897e42fbad nickname=bob protocol=WebSocket
+2026-09-06T10:27:43.631396Z  INFO concord_server::engine::chat_engine: joined channel nickname=alice server_id=browser-server channel_name=#general
+2026-09-06T10:27:43.675388Z  INFO concord_server::engine::chat_engine: joined channel nickname=bob server_id=browser-server channel_name=#general
+2026-09-06T10:27:46.968017Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T10:27:46.968693Z  INFO concord_server::engine::chat_engine: session disconnected session_id=ab76be71-1493-4630-ae44-fc897e42fbad nickname=bob
+2026-09-06T10:27:46.968709Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=ab76be71-1493-4630-ae44-fc897e42fbad nickname=bob
+2026-09-06T10:27:46.968018Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T10:27:46.968961Z  INFO concord_server::engine::chat_engine: session disconnected session_id=e6979d1b-ad1e-4773-9ec5-e9f89419268a nickname=alice
+2026-09-06T10:27:46.968975Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=e6979d1b-ad1e-4773-9ec5-e9f89419268a nickname=alice
+2026-09-06T10:27:48.962101Z  INFO concord_server::engine::chat_engine: session connected session_id=b4fe5478-8b7a-42e2-8ed6-5916cc89cd83 nickname=alice protocol=WebSocket
+2026-09-06T10:27:48.962250Z  INFO concord_server::engine::chat_engine: session connected session_id=e351c5d9-9ac2-463f-b53b-abb42ce52e35 nickname=bob protocol=WebSocket
+2026-09-06T10:27:49.007252Z  INFO concord_server::engine::chat_engine: joined channel nickname=alice server_id=browser-server channel_name=#general
+2026-09-06T10:27:49.007433Z  INFO concord_server::engine::chat_engine: joined channel nickname=bob server_id=browser-server channel_name=#general
+2026-09-06T10:27:52.969433Z  INFO concord_server::engine::chat_engine: session connected session_id=ca4148d5-e1ec-4d3d-859e-65887c58742b nickname=alice protocol=WebSocket
+2026-09-06T10:27:52.972936Z  WARN concord_server::web::ws_handler: invalid client message category=Data line=1 column=40
+2026-09-06T10:27:52.976635Z  WARN concord_server::web::ws_handler: WebSocket read error error=Space limit exceeded: Message too long: 66005 > 65536
+2026-09-06T10:27:52.976708Z  INFO concord_server::engine::chat_engine: session disconnected session_id=ca4148d5-e1ec-4d3d-859e-65887c58742b nickname=alice
+2026-09-06T10:27:52.976717Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=ca4148d5-e1ec-4d3d-859e-65887c58742b nickname=alice
+2026-09-06T10:27:52.978899Z  INFO concord_server::engine::chat_engine: session connected session_id=325bca54-067d-43b4-9b74-0cad68ed19a0 nickname=alice protocol=WebSocket
+2026-09-06T10:27:54.241402Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T10:27:54.241523Z  INFO concord_server::engine::chat_engine: session disconnected session_id=325bca54-067d-43b4-9b74-0cad68ed19a0 nickname=alice
+2026-09-06T10:27:54.241535Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=325bca54-067d-43b4-9b74-0cad68ed19a0 nickname=alice
+2026-09-06T10:27:54.262576Z  INFO concord_server::engine::chat_engine: session connected session_id=db578a4d-23ea-494e-82f6-e514725fcfd8 nickname=alice protocol=WebSocket
+2026-09-06T10:27:54.309015Z  INFO concord_server::engine::chat_engine: joined channel nickname=alice server_id=browser-server channel_name=#general
+2026-09-06T10:27:55.405637Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T10:27:55.405802Z  INFO concord_server::engine::chat_engine: session disconnected session_id=db578a4d-23ea-494e-82f6-e514725fcfd8 nickname=alice
+2026-09-06T10:27:55.405816Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=db578a4d-23ea-494e-82f6-e514725fcfd8 nickname=alice
+2026-09-06T10:27:55.407804Z  INFO concord_server::engine::chat_engine: session connected session_id=36b447ce-ecc3-413a-9a2e-879af2d906f1 nickname=alice protocol=WebSocket
+2026-09-06T10:27:55.454530Z  INFO concord_server::engine::chat_engine: joined channel nickname=alice server_id=browser-server channel_name=#general
+2026-09-06T10:27:55.500882Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T10:27:55.501020Z  INFO concord_server::engine::chat_engine: session disconnected session_id=36b447ce-ecc3-413a-9a2e-879af2d906f1 nickname=alice
+2026-09-06T10:27:55.501034Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=36b447ce-ecc3-413a-9a2e-879af2d906f1 nickname=alice
+2026-09-06T10:27:55.533012Z  INFO concord_server::engine::chat_engine: session connected session_id=96b3ba05-1e1c-4122-a44e-11f09e81db73 nickname=bob protocol=WebSocket
+2026-09-06T10:27:55.576535Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T10:27:55.576636Z  INFO concord_server::engine::chat_engine: session disconnected session_id=96b3ba05-1e1c-4122-a44e-11f09e81db73 nickname=bob
+2026-09-06T10:27:55.576646Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=96b3ba05-1e1c-4122-a44e-11f09e81db73 nickname=bob
+2026-09-06T10:27:55.721300Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T10:27:55.722313Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T10:27:55.722406Z  INFO concord_server::engine::chat_engine: session disconnected session_id=b4fe5478-8b7a-42e2-8ed6-5916cc89cd83 nickname=alice
+2026-09-06T10:27:55.722418Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=b4fe5478-8b7a-42e2-8ed6-5916cc89cd83 nickname=alice
+2026-09-06T10:27:55.722831Z  INFO concord_server::engine::chat_engine: session disconnected session_id=e351c5d9-9ac2-463f-b53b-abb42ce52e35 nickname=bob
+2026-09-06T10:27:55.722853Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=e351c5d9-9ac2-463f-b53b-abb42ce52e35 nickname=bob
+2026-09-06T10:27:55.724293Z  INFO concord_server::engine::chat_engine: session disconnected session_id=c046bea9-f31f-49f2-8905-efadf515084e nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T10:27:55.724310Z  INFO concord_server::engine::chat_engine: session disconnected session_id=fde4304e-fa5e-43c8-a473-20ce63289059 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T10:27:55.724325Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:52170 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T10:27:55.724340Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:52174 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T10:27:55.724818Z  INFO concord_server::engine::chat_engine: session disconnected session_id=ddbb309f-e60e-4835-a8f0-60f64c32bb9b nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T10:27:55.724841Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:52166 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T10:27:55.727629Z  INFO concord_server::engine::chat_engine: session connected session_id=886be8fe-9cd9-4aca-9125-db5fe551bda0 nickname=alice protocol=WebSocket
+2026-09-06T10:27:55.776009Z  INFO concord_server::engine::chat_engine: joined channel nickname=alice server_id=browser-server channel_name=#general
+2026-09-06T10:27:56.024838Z  INFO concord_server::db::pool: database connected with WAL, synchronous=FULL, foreign_keys=ON database_url="sqlite:/tmp/tmp.wqpBPsN9H5/concord.db?mode=rwc"
+2026-09-06T10:27:56.250418Z  INFO concord_server::engine::chat_engine: loaded servers from database count=1
+2026-09-06T10:27:56.250783Z  INFO concord_server::engine::chat_engine: loaded channels from database count=1
+2026-09-06T10:27:56.256363Z  INFO concord_server: Concord server starting — Web: 127.0.0.1:34567, IRC: 127.0.0.1:51087
+2026-09-06T10:27:56.256622Z  INFO concord_server::irc::listener: IRC listener started on 127.0.0.1:51087 (plaintext)
+2026-09-06T10:27:56.372756Z  INFO concord_server::engine::chat_engine: session connected session_id=fb829e19-1db4-4ba0-8efe-a79f6081949e nickname=alice protocol=WebSocket
+2026-09-06T10:27:56.419659Z  INFO concord_server::engine::chat_engine: joined channel nickname=alice server_id=browser-server channel_name=#general
+2026-09-06T10:27:56.469437Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T10:27:56.470121Z  INFO concord_server::engine::chat_engine: session disconnected session_id=fb829e19-1db4-4ba0-8efe-a79f6081949e nickname=alice
+2026-09-06T10:27:56.470143Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=fb829e19-1db4-4ba0-8efe-a79f6081949e nickname=alice

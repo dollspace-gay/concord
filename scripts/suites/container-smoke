@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+container_engine="${CONTAINER_ENGINE:-podman}"
+command -v "${container_engine}" >/dev/null 2>&1 || {
+  echo "container engine '${container_engine}' is unavailable; container smoke is unverified" >&2
+  exit 2
+}
+
+run_id="${RANDOM}-$$"
+image="localhost/concord-smoke:${run_id}"
+container="concord-smoke-${run_id}"
+temporary_directory="$(mktemp -d)"
+log_file="${CONTAINER_SMOKE_LOG:-/tmp/concord-container-smoke-${run_id}.log}"
+chmod 0777 "${temporary_directory}"
+
+cleanup() {
+  "${container_engine}" rm --force "${container}" >/dev/null 2>&1 || true
+  # Files created by the non-root runtime user can map to a subordinate host
+  # UID under rootless Podman. Remove them inside the same user namespace.
+  "${container_engine}" run --rm --user 0 \
+    --entrypoint /bin/sh \
+    --volume "${temporary_directory}:/work:Z" \
+    "${image}" -c 'rm -rf /work/* /work/.[!.]* /work/..?*' \
+    >/dev/null 2>&1 || true
+  "${container_engine}" image rm --force "${image}" >/dev/null 2>&1 || true
+  rm -rf "${temporary_directory}"
+}
+trap cleanup EXIT
+
+"${container_engine}" build --tag "${image}" "${repository_root}/concord"
+image_id="$("${container_engine}" image inspect --format '{{.Id}}' "${image}")"
+source_revision="$(git -C "${repository_root}" rev-parse HEAD)"
+if [[ -n "$(git -C "${repository_root}" status --short --untracked-files=all -- concord)" ]]; then
+  source_state=dirty
+else
+  source_state=clean
+fi
+source_input_sha256="$(python3 - "${repository_root}/concord" <<'PY'
+import hashlib
+import os
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+excluded = {"target", "node_modules", "dist", ".git"}
+digest = hashlib.sha256()
+for path in sorted(
+    candidate
+    for candidate in root.rglob("*")
+    if candidate.is_file() and not excluded.intersection(candidate.relative_to(root).parts)
+):
+    relative = path.relative_to(root).as_posix().encode()
+    digest.update(len(relative).to_bytes(8, "big"))
+    digest.update(relative)
+    with path.open("rb") as source:
+        while block := source.read(1024 * 1024):
+            digest.update(block)
+print(digest.hexdigest())
+PY
+)"
+
+runtime_uid="$("${container_engine}" run --rm --entrypoint /usr/bin/id "${image}" -u)"
+if [[ "${runtime_uid}" != "10001" ]]; then
+  echo "runtime image uses unexpected uid ${runtime_uid}" >&2
+  exit 1
+fi
+
+"${container_engine}" run --rm \
+  --volume "${temporary_directory}:/work:Z" \
+  "${image}" init --config /work/concord.toml
+
+"${container_engine}" run --detach --name "${container}" \
+  --volume "${temporary_directory}:/work:Z" \
+  --publish 127.0.0.1::8080 \
+  "${image}" serve --config /work/concord.toml >/dev/null
+
+published_port="$("${container_engine}" port "${container}" 8080/tcp | sed -n 's/.*://p' | head -n 1)"
+if [[ -z "${published_port}" ]]; then
+  echo "container engine did not publish the web port" >&2
+  exit 1
+fi
+
+for _attempt in $(seq 1 60); do
+  if curl --fail --silent "http://127.0.0.1:${published_port}/health/live" >/dev/null \
+    && curl --fail --silent "http://127.0.0.1:${published_port}/health/ready" >/dev/null; then
+    "${container_engine}" stop --time 10 "${container}" >/dev/null
+    "${container_engine}" logs "${container}" >"${log_file}" 2>&1
+    exit_code="$("${container_engine}" inspect --format '{{.State.ExitCode}}' "${container}")"
+    if [[ "${exit_code}" != "0" ]] \
+      || ! grep -Fq "shutdown signal received" "${log_file}" \
+      || ! grep -Fq "Concord server stopped" "${log_file}"; then
+      cat "${log_file}" >&2
+      echo "container did not complete a clean supervised shutdown (exit ${exit_code})" >&2
+      exit 1
+    fi
+    operator_hash="$("${container_engine}" run --rm --entrypoint /usr/bin/sha256sum \
+      "${image}" /app/concord-operator | awk '{print $1}')"
+    server_hash="$("${container_engine}" run --rm --entrypoint /usr/bin/sha256sum \
+      "${image}" /app/concord-server | awk '{print $1}')"
+    if [[ ! "${operator_hash}" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "container operator artifact has no valid SHA-256 identity" >&2
+      exit 1
+    fi
+    if [[ ! "${server_hash}" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "container server artifact has no valid SHA-256 identity" >&2
+      exit 1
+    fi
+    printf 'container_image_id=%s\n' "${image_id}" >> "${log_file}"
+    printf 'container_source_revision=%s source_state=%s source_input_sha256=%s\n' \
+      "${source_revision}" "${source_state}" "${source_input_sha256}" >> "${log_file}"
+    printf 'container_server_sha256=%s\n' "${server_hash}" >> "${log_file}"
+    printf 'container_operator_sha256=%s\n' "${operator_hash}" >> "${log_file}"
+    "${container_engine}" run --rm \
+      --volume "${temporary_directory}:/work:Z" \
+      --entrypoint /usr/bin/tini \
+      "${image}" -- /app/concord-operator --config /work/concord.toml migration-status \
+      > "${temporary_directory}/operator-status.json"
+    python3 - "${temporary_directory}/operator-status.json" >> "${log_file}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    report = json.load(source)
+if report.get("source_version") != report.get("target_version") or report.get("findings") != []:
+    raise SystemExit("container operator reported an unexpected migration state")
+print(
+    "container_operator_migration_status="
+    + json.dumps(
+        {
+            "source_version": report["source_version"],
+            "target_version": report["target_version"],
+            "findings": report["findings"],
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+)
+PY
+    echo "container smoke log retained at ${log_file}"
+    exit 0
+  fi
+  if [[ "$("${container_engine}" inspect --format '{{.State.Running}}' "${container}")" != "true" ]]; then
+    "${container_engine}" logs "${container}" >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+"${container_engine}" logs "${container}" >&2
+echo "container did not become ready within 60 seconds" >&2
+exit 1

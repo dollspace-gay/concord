@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
 import { PresenceIndicator } from '../presence/PresenceIndicator';
+import { Dialog } from '../Dialog';
+import { ExternalImage } from '../ExternalImage';
 
 export function UserProfileModal() {
   const userId = useUiStore((s) => s.showUserProfile);
@@ -21,22 +23,25 @@ export function UserProfileModal() {
   const presence = activeServer ? presences[activeServer]?.[userId] : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowUserProfile(null)}>
-      <div className="w-[340px] overflow-hidden rounded-lg bg-bg-primary shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <Dialog label={profile?.username ? `${profile.username} profile` : 'User profile'} onClose={() => setShowUserProfile(null)} panelClassName="w-[340px] overflow-hidden rounded-lg bg-bg-primary shadow-xl">
+      <div>
         {/* Banner */}
-        <div
-          className="h-[100px] bg-gradient-to-br from-indigo-500 to-purple-600"
-          style={profile?.banner_url ? { backgroundImage: `url(${profile.banner_url})`, backgroundSize: 'cover' } : {}}
-        />
+        <div className="h-[100px] overflow-hidden bg-gradient-to-br from-indigo-500 to-purple-600">
+          {profile?.banner_url && <ExternalImage src={profile.banner_url} alt="" label="profile banner" className="h-full w-full object-cover" privacyScopeKey={`profile:${userId}:banner`} />}
+        </div>
 
         {/* Avatar + Status */}
         <div className="relative px-4">
           <div className="relative -mt-10 mb-2 inline-block">
-            <img
-              src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.username || '?'}&background=5865F2&color=fff`}
-              className="h-20 w-20 rounded-full border-4 border-bg-primary"
+            {profile?.avatar_url ? <ExternalImage
+              src={profile.avatar_url}
+              className="h-20 w-20 rounded-full border-4 border-bg-primary object-cover"
               alt=""
-            />
+              label="profile avatar"
+              privacyScopeKey={`profile:${userId}:avatar`}
+            /> : <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-bg-primary bg-bg-accent text-2xl font-bold text-white">
+              {profile?.username?.[0]?.toUpperCase() ?? '?'}
+            </div>}
             {presence && (
               <PresenceIndicator
                 status={presence.status}
@@ -74,6 +79,6 @@ export function UserProfileModal() {
           </div>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

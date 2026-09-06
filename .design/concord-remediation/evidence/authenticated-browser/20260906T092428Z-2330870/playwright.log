@@ -1,0 +1,16 @@
+[WebServer] (node:2334850) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 1 test using 1 worker
+
+(node:2334921) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node-22 --trace-warnings ...` to show where the warning was created)
+
+
+[1/1] tests/authenticated/authenticated.spec.ts:284:1 › integration lifecycle preserves rejected input and retries an install after reconnect
+[WebServer] 4:25:03 AM [vite] ws proxy error:
+[WebServer] Error: connect ECONNREFUSED 127.0.0.1:56859
+[WebServer]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1638:16)
+
+  1 passed (8.9s)

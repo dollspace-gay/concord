@@ -6,11 +6,26 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test": "playwright test",
+    "test:browser": "playwright test",
+    "contracts:generate": "../../scripts/generate-contract.sh",
+    "contracts:check": "../../scripts/check-contract.sh",
+    "test:contract-fixtures": "../../scripts/check-contract-fixtures.sh",
+    "test:application-policy": "../../scripts/run-required-suite.sh application-policy",
+    "test:browser-socket": "../../scripts/run-required-suite.sh browser-socket",
+    "test:deterministic-jobs": "../../scripts/run-required-suite.sh deterministic-jobs",
+    "test:migration-fixtures": "../../scripts/run-required-suite.sh migration-fixtures",
+    "test:storage-faults": "../../scripts/run-required-suite.sh storage-faults",
+    "test:packaging-restore": "../../scripts/run-required-suite.sh packaging-restore",
+    "test:load-recovery": "../../scripts/run-required-suite.sh load-recovery",
+    "test:container-smoke": "../../scripts/run-required-suite.sh container-smoke",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-virtuoso": "^4.18.1",
@@ -19,16 +34,20 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "1.62.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.1.1",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "json-schema-to-typescript": "16.0.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "ws": "8.21.0"
   }
 }

@@ -1,8 +1,10 @@
 import { create } from 'zustand';
+import * as api from '../api/client';
 
 export interface ServerFolder {
   id: string;
   name: string;
+  color?: string;
   serverIds: string[];
   collapsed: boolean;
 }
@@ -10,6 +12,7 @@ export interface ServerFolder {
 interface UiState {
   activeServer: string | null;
   activeChannel: string | null;
+  activeDirectConversation: string | null;
   showMemberList: boolean;
   showSettings: boolean;
   showServerSettings: boolean;
@@ -17,6 +20,9 @@ interface UiState {
   collapsedCategories: Record<string, boolean>;
   /** Client-side server folder groupings (persisted to localStorage) */
   serverFolders: ServerFolder[];
+  folderRevision: number;
+  folderSyncStatus: 'idle' | 'saving' | 'error';
+  folderSyncError: string | null;
   showSearch: boolean;
   showUserProfile: string | null; // user_id to show, null = hidden
   showQuickSwitcher: boolean;
@@ -27,17 +33,21 @@ interface UiState {
   showModerationPanel: boolean;
   showCommunityPanel: boolean;
   showIntegrationsPanel: boolean;
+  jumpToMessageId: string | null;
 
   setActiveServer: (serverId: string | null) => void;
   setActiveChannel: (channel: string | null) => void;
+  setActiveDirectConversation: (conversationId: string | null) => void;
   toggleMemberList: () => void;
   setShowSettings: (show: boolean) => void;
   setShowServerSettings: (show: boolean) => void;
   toggleCategory: (categoryId: string) => void;
   setServerFolders: (folders: ServerFolder[]) => void;
+  hydrateServerFolders: (accountId: string | null, folders?: ServerFolder[]) => void;
   addServerFolder: (name: string, serverIds: string[]) => void;
   removeServerFolder: (folderId: string) => void;
   toggleServerFolder: (folderId: string) => void;
+  retryServerFolderSync: () => void;
   setShowSearch: (show: boolean) => void;
   setShowUserProfile: (userId: string | null) => void;
   setShowQuickSwitcher: (show: boolean) => void;
@@ -48,28 +58,88 @@ interface UiState {
   setShowModerationPanel: (show: boolean) => void;
   setShowCommunityPanel: (show: boolean) => void;
   setShowIntegrationsPanel: (show: boolean) => void;
+  setJumpToMessageId: (messageId: string | null) => void;
 }
 
-function loadFolders(): ServerFolder[] {
+let folderAccountId: string | null = null;
+let folderGeneration = 0;
+let pendingFolders: ServerFolder[] | null = null;
+let folderSaveRunning = false;
+
+function loadCollapsed(accountId: string): Record<string, boolean> {
   try {
-    const raw = localStorage.getItem('concord:server-folders');
+    const raw = localStorage.getItem(`concord:server-folder-state:${accountId}`);
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
-  return [];
+  return {};
 }
 
-function saveFolders(folders: ServerFolder[]) {
-  localStorage.setItem('concord:server-folders', JSON.stringify(folders));
+function saveCollapsed(folders: ServerFolder[]) {
+  if (!folderAccountId) return;
+  localStorage.setItem(
+    `concord:server-folder-state:${folderAccountId}`,
+    JSON.stringify(Object.fromEntries(folders.map((folder) => [folder.id, folder.collapsed]))),
+  );
 }
 
-export const useUiStore = create<UiState>((set) => ({
+function folderPayload(folders: ServerFolder[]): api.ServerFolderData[] {
+  return folders.map((folder) => ({
+    id: folder.id,
+    name: folder.name,
+    color: folder.color ?? null,
+    server_ids: folder.serverIds,
+    collapsed: folder.collapsed,
+  }));
+}
+
+export const useUiStore = create<UiState>((set, get) => {
+  const persistFolders = (folders: ServerFolder[]) => {
+    if (!folderAccountId) return;
+    pendingFolders = folders.map((folder) => ({ ...folder, serverIds: [...folder.serverIds] }));
+    if (folderSaveRunning) return;
+    folderSaveRunning = true;
+    const generation = folderGeneration;
+    const accountId = folderAccountId;
+    void (async () => {
+      while (pendingFolders && generation === folderGeneration && accountId === folderAccountId) {
+        const saving = pendingFolders;
+        pendingFolders = null;
+        set({ folderSyncStatus: 'saving', folderSyncError: null });
+        try {
+          await api.replaceServerFolders(folderPayload(saving));
+        } catch (error) {
+          if (generation === folderGeneration && accountId === folderAccountId) {
+            pendingFolders ??= saving;
+            set({ folderSyncStatus: 'error', folderSyncError: String(error) });
+          }
+          break;
+        }
+      }
+      folderSaveRunning = false;
+      if (generation === folderGeneration && accountId === folderAccountId && !pendingFolders) {
+        set({ folderSyncStatus: 'idle', folderSyncError: null });
+      }
+    })();
+  };
+
+  const setStructuralFolders = (folders: ServerFolder[]) => {
+    saveCollapsed(folders);
+    set((state) => ({ serverFolders: folders, folderRevision: state.folderRevision + 1 }));
+    persistFolders(folders);
+  };
+
+  return ({
   activeServer: null,
   activeChannel: null,
+  activeDirectConversation: null,
   showMemberList: true,
   showSettings: false,
   showServerSettings: false,
   collapsedCategories: {},
-  serverFolders: loadFolders(),
+  serverFolders: [],
+  folderRevision: 0,
+  folderSyncStatus: 'idle',
+  folderSyncError: null,
   showSearch: false,
   showUserProfile: null,
   showQuickSwitcher: false,
@@ -80,9 +150,15 @@ export const useUiStore = create<UiState>((set) => ({
   showModerationPanel: false,
   showCommunityPanel: false,
   showIntegrationsPanel: false,
+  jumpToMessageId: null,
 
-  setActiveServer: (serverId) => set({ activeServer: serverId, activeChannel: null }),
-  setActiveChannel: (channel) => set({ activeChannel: channel }),
+  setActiveServer: (serverId) => set({ activeServer: serverId, activeChannel: null, activeDirectConversation: null }),
+  setActiveChannel: (channel) => set({ activeChannel: channel, activeDirectConversation: null }),
+  setActiveDirectConversation: (conversationId) => set({
+    activeDirectConversation: conversationId,
+    activeServer: null,
+    activeChannel: null,
+  }),
   toggleMemberList: () => set((s) => ({ showMemberList: !s.showMemberList })),
   setShowSettings: (show) => set({ showSettings: show }),
   setShowServerSettings: (show) => set({ showServerSettings: show }),
@@ -96,12 +172,31 @@ export const useUiStore = create<UiState>((set) => ({
     })),
 
   setServerFolders: (folders) => {
-    saveFolders(folders);
-    set({ serverFolders: folders });
+    setStructuralFolders(folders);
   },
 
-  addServerFolder: (name, serverIds) =>
-    set((s) => {
+  hydrateServerFolders: (accountId, folders = []) => {
+    folderAccountId = accountId;
+    folderGeneration += 1;
+    pendingFolders = null;
+    if (!accountId) {
+      set({ serverFolders: [], folderRevision: 0, folderSyncStatus: 'idle', folderSyncError: null });
+      return;
+    }
+    const collapsed = loadCollapsed(accountId);
+    set({
+      serverFolders: folders.map((folder) => ({
+        ...folder,
+        collapsed: collapsed[folder.id] ?? folder.collapsed,
+      })),
+      folderRevision: 0,
+      folderSyncStatus: 'idle',
+      folderSyncError: null,
+    });
+  },
+
+  addServerFolder: (name, serverIds) => {
+    const s = get();
       const folder: ServerFolder = {
         id: crypto.randomUUID(),
         name,
@@ -109,25 +204,23 @@ export const useUiStore = create<UiState>((set) => ({
         collapsed: false,
       };
       const updated = [...s.serverFolders, folder];
-      saveFolders(updated);
-      return { serverFolders: updated };
-    }),
+      setStructuralFolders(updated);
+  },
 
-  removeServerFolder: (folderId) =>
-    set((s) => {
-      const updated = s.serverFolders.filter((f) => f.id !== folderId);
-      saveFolders(updated);
-      return { serverFolders: updated };
-    }),
+  removeServerFolder: (folderId) => {
+    setStructuralFolders(get().serverFolders.filter((folder) => folder.id !== folderId));
+  },
 
   toggleServerFolder: (folderId) =>
     set((s) => {
       const updated = s.serverFolders.map((f) =>
         f.id === folderId ? { ...f, collapsed: !f.collapsed } : f,
       );
-      saveFolders(updated);
+      saveCollapsed(updated);
       return { serverFolders: updated };
     }),
+
+  retryServerFolderSync: () => persistFolders(get().serverFolders),
 
   setShowSearch: (show) => set({ showSearch: show }),
   setShowUserProfile: (userId) => set({ showUserProfile: userId }),
@@ -139,4 +232,6 @@ export const useUiStore = create<UiState>((set) => ({
   setShowModerationPanel: (show) => set({ showModerationPanel: show }),
   setShowCommunityPanel: (show) => set({ showCommunityPanel: show }),
   setShowIntegrationsPanel: (show) => set({ showIntegrationsPanel: show }),
-}));
+  setJumpToMessageId: (messageId) => set({ jumpToMessageId: messageId }),
+  });
+});

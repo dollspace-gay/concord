@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
 import { channelKey, Permissions, hasPermission } from '../../api/types';
 import type { CategoryInfo, ChannelInfo } from '../../api/types';
+import { ThreadList } from '../threads/ThreadList';
 
 const EMPTY_CHANNELS: ChannelInfo[] = [];
 const EMPTY_UNREAD: Record<string, number> = {};
@@ -10,6 +11,9 @@ const EMPTY_CATEGORIES: CategoryInfo[] = [];
 
 export function ChannelList() {
   const activeServer = useUiStore((s) => s.activeServer);
+  const activeDirectConversation = useUiStore((s) => s.activeDirectConversation);
+  const setActiveDirectConversation = useUiStore((s) => s.setActiveDirectConversation);
+  const directConversations = useChatStore((s) => s.directConversations);
   const channels = useChatStore((s) => (activeServer ? s.channels[activeServer] ?? EMPTY_CHANNELS : EMPTY_CHANNELS));
   const categories = useChatStore((s) => (activeServer ? s.categories[activeServer] ?? EMPTY_CATEGORIES : EMPTY_CATEGORIES));
   const activeChannel = useUiStore((s) => s.activeChannel);
@@ -28,6 +32,7 @@ export function ChannelList() {
     return s.messages[channelKey(activeServer, activeChannel)];
   });
   const createChannel = useChatStore((s) => s.createChannel);
+  const lastMarkedReadRef = useRef<string | null>(null);
 
   const [creatingIn, setCreatingIn] = useState<string | null>(null); // category id or '__uncategorized__'
   const [newChannelName, setNewChannelName] = useState('');
@@ -47,16 +52,26 @@ export function ChannelList() {
   // Auto-mark-read when viewing a channel (clear unread for active channel)
   useEffect(() => {
     if (!activeServer || !activeChannel) return;
-    if (activeMessages && activeMessages.length > 0) {
+    const markVisible = () => {
+      if (document.visibilityState !== 'visible' || !activeMessages || activeMessages.length === 0) return;
       const lastMsg = activeMessages[activeMessages.length - 1];
+      if (!lastMsg.sequence) return;
+      const readKey = `${activeServer}:${activeChannel}:${lastMsg.id}`;
+      if (lastMarkedReadRef.current === readKey) return;
+      lastMarkedReadRef.current = readKey;
       markRead(activeServer, activeChannel, lastMsg.id);
-    }
+    };
+    markVisible();
+    document.addEventListener('visibilitychange', markVisible);
+    return () => document.removeEventListener('visibilitychange', markVisible);
   }, [activeServer, activeChannel, activeMessages, markRead]);
 
   // Group channels by category, sorted by position
   const grouped = useMemo(() => {
     const sortedCategories = [...categories].sort((a, b) => a.position - b.position);
-    const sortedChannels = [...channels].sort((a, b) => a.position - b.position);
+    const sortedChannels = channels
+      .filter((channel) => channel.channel_type !== 'public_thread' && channel.channel_type !== 'private_thread')
+      .sort((a, b) => a.position - b.position);
 
     const uncategorized = sortedChannels.filter((ch) => !ch.category_id);
     const groups: { category: CategoryInfo | null; channels: ChannelInfo[] }[] = [];
@@ -95,6 +110,42 @@ export function ChannelList() {
     setNewChannelName('');
     setNewChannelPrivate(false);
   };
+
+  if (!activeServer) {
+    return (
+      <div className="flex h-full flex-col bg-bg-secondary">
+        <div className="flex h-12 items-center border-b border-border-primary px-4">
+          <h2 className="font-semibold text-text-primary">Direct messages</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto px-2 pt-3">
+          {directConversations.length === 0 && (
+            <p className="px-2 py-3 text-sm text-text-muted">No direct conversations yet.</p>
+          )}
+          {directConversations.map((conversation) => (
+            <button
+              key={conversation.id}
+              onClick={() => setActiveDirectConversation(conversation.id)}
+              className={`mb-1 flex w-full items-center gap-3 rounded px-2 py-2 text-left ${
+                activeDirectConversation === conversation.id
+                  ? 'bg-bg-active text-text-primary'
+                  : 'text-text-muted hover:bg-bg-hover hover:text-text-secondary'
+              }`}
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-tertiary">
+                {conversation.peer_avatar_url
+                  ? <img src={conversation.peer_avatar_url} alt="" className="h-full w-full object-cover" />
+                  : conversation.peer_username.slice(0, 1).toUpperCase()}
+              </div>
+              <span className="min-w-0 flex-1 truncate">{conversation.peer_username}</span>
+              {conversation.unread_count > 0 && (
+                <span className="rounded-full bg-red-500 px-1.5 text-xs text-white">{conversation.unread_count}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col bg-bg-secondary">
@@ -254,6 +305,7 @@ export function ChannelList() {
             </div>
           );
         })}
+        {activeChannel && <ThreadList />}
       </div>
 
       <div className="border-t border-border-primary px-2 py-2">

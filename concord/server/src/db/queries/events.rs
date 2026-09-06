@@ -7,8 +7,8 @@ pub async fn create_event(
     params: &CreateServerEventParams<'_>,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO server_events (id, server_id, name, description, channel_id, start_time, end_time, image_url, created_by) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO server_events (id, server_id, name, description, channel_id, start_time, end_time, image_url, created_by, integrity_state) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')",
     )
     .bind(params.id)
     .bind(params.server_id)
@@ -28,10 +28,12 @@ pub async fn get_event(
     pool: &SqlitePool,
     event_id: &str,
 ) -> Result<Option<ServerEventRow>, sqlx::Error> {
-    sqlx::query_as::<_, ServerEventRow>("SELECT * FROM server_events WHERE id = ?")
-        .bind(event_id)
-        .fetch_optional(pool)
-        .await
+    sqlx::query_as::<_, ServerEventRow>(
+        "SELECT * FROM server_events WHERE id=? AND integrity_state='active'",
+    )
+    .bind(event_id)
+    .fetch_optional(pool)
+    .await
 }
 
 pub async fn list_server_events(
@@ -39,7 +41,7 @@ pub async fn list_server_events(
     server_id: &str,
 ) -> Result<Vec<ServerEventRow>, sqlx::Error> {
     sqlx::query_as::<_, ServerEventRow>(
-        "SELECT * FROM server_events WHERE server_id = ? ORDER BY start_time ASC",
+            "SELECT * FROM server_events WHERE server_id=? AND integrity_state='active' ORDER BY start_time ASC",
     )
     .bind(server_id)
     .fetch_all(pool)

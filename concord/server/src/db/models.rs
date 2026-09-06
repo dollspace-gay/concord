@@ -17,6 +17,7 @@ pub struct ServerRow {
     pub allow_external_emoji: i32,
     pub shareable_emoji: i32,
     pub vanity_code: Option<String>,
+    pub authorization_version: i64,
 }
 
 /// A server membership record.
@@ -74,10 +75,19 @@ pub struct ChannelRow {
     pub channel_type: String,
     pub thread_parent_message_id: Option<String>,
     pub thread_auto_archive_minutes: i32,
+    pub thread_last_activity_at: Option<String>,
+    pub thread_archive_due_at: Option<String>,
+    pub thread_archive_reason: Option<String>,
+    pub thread_state_version: i64,
     pub archived: i32,
     pub slowmode_seconds: i32,
     pub is_nsfw: i32,
     pub is_announcement: i32,
+    pub authorization_version: i64,
+    pub parent_channel_id: Option<String>,
+    pub visibility_repair_required: i32,
+    pub thread_creator_user_id: Option<String>,
+    pub thread_tags_version: i64,
 }
 
 /// A channel membership record.
@@ -139,6 +149,7 @@ pub struct ChannelPermissionOverrideRow {
 pub struct UserPresenceRow {
     pub user_id: String,
     pub status: String,
+    pub requested_status: String,
     pub custom_status: Option<String>,
     pub status_emoji: Option<String>,
     pub last_seen_at: String,
@@ -242,6 +253,8 @@ pub struct AuditLogRow {
     pub id: String,
     pub server_id: String,
     pub actor_id: String,
+    pub actor_username_snapshot: String,
+    pub actor_avatar_snapshot: Option<String>,
     pub action_type: String,
     pub target_type: Option<String>,
     pub target_id: Option<String>,
@@ -403,6 +416,16 @@ pub struct WebhookRow {
     pub url: Option<String>,
     pub created_by: String,
     pub created_at: String,
+    pub credential_id: Option<String>,
+    pub principal_user_id: Option<String>,
+    pub incoming_token_hash: Option<String>,
+    pub signing_key_id: Option<String>,
+    pub signing_ciphertext: Option<String>,
+    pub credential_state: String,
+    pub grant_version: i64,
+    pub revoked_at: Option<String>,
+    pub last_delivery_at: Option<String>,
+    pub last_safe_error_code: Option<String>,
 }
 
 /// Parameters for creating a webhook (avoids too-many-arguments).
@@ -461,6 +484,8 @@ pub struct CreateInteractionParams<'a> {
     pub server_id: &'a str,
     pub channel_id: &'a str,
     pub data_json: &'a str,
+    pub application_user_id: &'a str,
+    pub expires_at: &'a str,
 }
 
 /// An OAuth2 application.
@@ -512,6 +537,7 @@ pub struct CreateOAuth2AppParams<'a> {
     pub client_secret: &'a str,
     pub redirect_uris: &'a str,
     pub scopes: &'a str,
+    pub client_type: &'a str,
 }
 
 /// Parameters for creating an OAuth2 authorization (avoids too-many-arguments).

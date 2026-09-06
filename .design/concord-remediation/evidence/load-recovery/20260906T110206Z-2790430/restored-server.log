@@ -1,0 +1,8 @@
+2026-09-06T11:02:25.533545Z  INFO concord_server::db::pool: database connected with WAL, synchronous=FULL, foreign_keys=ON database_url="sqlite:/home/doll/.cache/concord-remediation-qualification/tmp/tmp.EatG9HAlnb/restored/concord.db?mode=rwc"
+2026-09-06T11:02:25.747486Z  INFO concord_server::engine::chat_engine: loaded servers from database count=1
+2026-09-06T11:02:25.747755Z  INFO concord_server::engine::chat_engine: loaded channels from database count=1
+2026-09-06T11:02:25.753679Z  INFO concord_server: Concord server starting — Web: 127.0.0.1:56759, IRC: 127.0.0.1:38493
+2026-09-06T11:02:25.753882Z  INFO concord_server::irc::listener: IRC listener started on 127.0.0.1:38493 (plaintext)
+2026-09-06T11:02:25.994859Z  INFO concord_server: shutdown signal received
+2026-09-06T11:02:25.995157Z  INFO concord_server::irc::listener: IRC listener shutting down
+2026-09-06T11:02:25.995250Z  INFO concord_server: Concord server stopped

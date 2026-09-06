@@ -2,6 +2,55 @@ use sqlx::SqlitePool;
 
 use crate::db::models::{ChannelMemberRow, ChannelRow};
 
+/// Atomically create a channel and its initial private visibility grant.
+pub struct CreateScopedChannel<'a> {
+    pub channel_id: &'a str,
+    pub server_id: &'a str,
+    pub name: &'a str,
+    pub category_id: Option<&'a str>,
+    pub is_private: bool,
+    pub channel_type: &'a str,
+    pub creator_user_id: &'a str,
+}
+
+pub async fn create_scoped_channel(
+    pool: &SqlitePool,
+    params: &CreateScopedChannel<'_>,
+) -> Result<(), sqlx::Error> {
+    let mut transaction = pool.begin().await?;
+    let inserted = sqlx::query(
+        "INSERT INTO channels(id,server_id,name,category_id,is_private,channel_type) \
+         SELECT ?,?,?,?,?,? WHERE ? IS NULL OR EXISTS( \
+            SELECT 1 FROM channel_categories WHERE id=? AND server_id=? \
+         )",
+    )
+    .bind(params.channel_id)
+    .bind(params.server_id)
+    .bind(params.name)
+    .bind(params.category_id)
+    .bind(params.is_private as i32)
+    .bind(params.channel_type)
+    .bind(params.category_id)
+    .bind(params.category_id)
+    .bind(params.server_id)
+    .execute(&mut *transaction)
+    .await?;
+    if inserted.rows_affected() != 1 {
+        return Err(sqlx::Error::Protocol(
+            "category does not belong to channel server".into(),
+        ));
+    }
+    if params.is_private {
+        sqlx::query("INSERT INTO channel_visibility_grants(channel_id,target_type,target_id) VALUES(?,'user',?)")
+            .bind(params.channel_id).bind(params.creator_user_id).execute(&mut *transaction).await?;
+    }
+    sqlx::query("UPDATE servers SET authorization_version=authorization_version+1 WHERE id=?")
+        .bind(params.server_id)
+        .execute(&mut *transaction)
+        .await?;
+    transaction.commit().await
+}
+
 /// Ensure a channel exists in a server, creating it if needed. Returns the channel ID.
 pub async fn ensure_channel(
     pool: &SqlitePool,

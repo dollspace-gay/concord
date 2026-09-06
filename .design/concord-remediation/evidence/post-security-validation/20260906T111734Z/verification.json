@@ -1,0 +1,47 @@
+{
+  "result": "PASS_WITH_DOCUMENTED_QUALIFICATION_AND_DEPENDENCY_RISKS",
+  "coding_complete": true,
+  "security_review": "SR-01 resolved; changed image privacy boundary rechecked; no remaining verified finding",
+  "correctness_review": "CR-01, CR-02, CR-03 resolved; seeder lint corrected",
+  "source_manifest_sha256": "dc4f758436a2285e17706a04b2d9c63331510861aa6bd87ada0dc6662b379a0f",
+  "workspace_all_features": {
+    "passed": 1073,
+    "failed": 0,
+    "ignored": 0,
+    "groups": 16
+  },
+  "workspace_default": {
+    "passed": 1070,
+    "failed": 0,
+    "ignored": 0,
+    "groups": 14
+  },
+  "browser_harness_passed": 51,
+  "authenticated_browser_passed": 20,
+  "files": {
+    "workspace-allfeatures.log": "0009d72d464edb8fee39c5ce89b0eb9145d7488d93da8c025b63da80634bb0db",
+    "workspace-default.log": "9533d7eb2441a1465f61c04e75ad07ee55c25ff73b1b4ea54de4605e949928d3",
+    "clippy-final.log": "9999d2aa2efd2e1eb3a73c7cae2b16ae44135353a9838efc8bba37a997bf780b",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "storage-faults.log": "a66d265676663e6eb321804984dc63f7cb35d9974eea19690f82a8e6672b9498",
+    "contracts.log": "c15d5ffe00c0df7a5df347d8f9b206e50330c89f5572681713b8efe3cc65d801",
+    "irc-clients-final.log": "4e2c4eacb7f929233559d1c5be9c17e017196c4b4444fa8d6cbaa3b89eddbb61",
+    "irc-client-report-final.log": "4e2c4eacb7f929233559d1c5be9c17e017196c4b4444fa8d6cbaa3b89eddbb61",
+    "web-build-final.log": "004d32a10da99e7da977d88a9135393e43c1784dea1a7a5aa2990280e44a61ee",
+    "web-lint-complete.log": "b14d175a92947de139ea8a592d6a7adef1230e4ff3f0c4b154398522cedb7dd8",
+    "browser-harness-final.log": "eeea59676032bb26ba3ce49b88353f390242e96b23688add7c39b08a2f2e166c",
+    "authenticated-browser-complete.log": "1127f5e6762256f82bc96043d1659aaa86b41df9c3a461616a9d7dadb2eb1b87",
+    "source-install-final.log": "d9108fd3afe985d4ac1e97cfa6e4eba96d9389c5f3ff8728dc8a1d68a105be8b",
+    "container-smoke-final.log": "49538670d5c487539e7df5f8214aea838c3b29ec9c60ed67eefdca6bcac6754d",
+    "container-runtime-final.log": "86805a3755780a00368f1c6420bb6f3f07123e501cdc77ca656b707ad54d6bee"
+  },
+  "unverified": [
+    "dedicated separate-host one-hour load acceptance",
+    "live external provider identities and cleanup",
+    "manual client and accessibility review",
+    "production reverse-proxy deployment",
+    "physical power loss and other platform/filesystem behavior"
+  ],
+  "dependency_audit": "non-green residual advisories and warnings; see concord/docs/dependency-audit.md",
+  "commit_push_deploy_performed": false
+}

@@ -98,6 +98,32 @@ export function WaveformPlayer({ src, filename, fileSize }: WaveformPlayerProps)
     setProgress(frac);
   }, []);
 
+  const seekTo = useCallback((fraction: number) => {
+    const audio = audioRef.current;
+    if (!audio || !audio.duration) return;
+    const bounded = Math.max(0, Math.min(1, fraction));
+    audio.currentTime = bounded * audio.duration;
+    setProgress(bounded);
+  }, []);
+
+  const handleSeekKey = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const audio = audioRef.current;
+    if (!audio?.duration) return;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      seekTo((audio.currentTime - 5) / audio.duration);
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      seekTo((audio.currentTime + 5) / audio.duration);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      seekTo(0);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      seekTo(1);
+    }
+  }, [seekTo]);
+
   useEffect(() => {
     return () => cancelAnimationFrame(animRef.current);
   }, []);
@@ -117,6 +143,7 @@ export function WaveformPlayer({ src, filename, fileSize }: WaveformPlayerProps)
       <div className="flex items-center gap-3">
         <button
           onClick={togglePlay}
+          aria-label={playing ? `Pause ${filename}` : `Play ${filename}`}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white transition-colors hover:bg-blue-500"
         >
           {playing ? (
@@ -134,6 +161,14 @@ export function WaveformPlayer({ src, filename, fileSize }: WaveformPlayerProps)
         <div
           className="flex h-8 flex-1 cursor-pointer items-end gap-px"
           onClick={handleBarClick}
+          onKeyDown={handleSeekKey}
+          role="slider"
+          tabIndex={0}
+          aria-label={`Seek ${filename}`}
+          aria-valuemin={0}
+          aria-valuemax={Math.round(duration)}
+          aria-valuenow={Math.round(currentTime)}
+          aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
         >
           {waveform.map((amp, i) => {
             const barProgress = i / waveform.length;

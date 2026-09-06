@@ -9,6 +9,51 @@ use tracing::{info, warn};
 
 use crate::db::queries::users;
 
+fn account_refresh_lock(user_id: &str) -> Result<std::sync::Arc<tokio::sync::Mutex<()>>> {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock, Weak};
+    static LOCKS: OnceLock<Mutex<HashMap<String, Weak<tokio::sync::Mutex<()>>>>> = OnceLock::new();
+    let mut locks = LOCKS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .map_err(|_| anyhow!("credential refresh coordinator unavailable"))?;
+    locks.retain(|_, lock| lock.strong_count() > 0);
+    if let Some(lock) = locks.get(user_id).and_then(Weak::upgrade) {
+        return Ok(lock);
+    }
+    if locks.len() >= 4096 {
+        return Err(anyhow!("credential refresh coordinator is busy"));
+    }
+    let lock = std::sync::Arc::new(tokio::sync::Mutex::new(()));
+    locks.insert(user_id.to_owned(), std::sync::Arc::downgrade(&lock));
+    Ok(lock)
+}
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum PdsRequestError {
+    #[error("PDS authentication was rejected")]
+    Authentication,
+    #[error("PDS returned status {status}")]
+    RemoteStatus {
+        status: reqwest::StatusCode,
+        body: Vec<u8>,
+    },
+    #[error("PDS request outcome is uncertain")]
+    Uncertain(#[source] crate::egress::EgressError),
+    #[error("PDS request could not be constructed")]
+    Local,
+}
+
+struct DpopRequest<'a> {
+    transport: &'a crate::egress::ControlledHttpClient,
+    key: &'a KeyData,
+    access_token: &'a str,
+    method: &'a str,
+    url: &'a str,
+    body: Option<&'a [u8]>,
+    content_type: &'a str,
+}
+
 /// Blob reference returned by the PDS after upload.
 #[derive(Debug, Clone)]
 pub struct BlobRef {
@@ -47,8 +92,7 @@ struct RefLink {
 
 /// Parameters for an authenticated XRPC call against a user's PDS.
 pub struct PdsXrpcParams<'a> {
-    pub pool: &'a SqlitePool,
-    pub user_id: &'a str,
+    pub session: &'a PdsSession<'a>,
     /// HTTP method: "GET" or "POST".
     pub method: &'a str,
     /// XRPC method name (e.g., "com.atproto.repo.createRecord").
@@ -57,6 +101,13 @@ pub struct PdsXrpcParams<'a> {
     pub body: Option<&'a [u8]>,
     /// Content-Type header (e.g., "application/json").
     pub content_type: &'a str,
+}
+
+pub struct PdsSession<'a> {
+    pub transport: &'a crate::egress::ControlledHttpClient,
+    pub pool: &'a SqlitePool,
+    pub vault: &'a crate::secrets::SecretVault,
+    pub user_id: &'a str,
     pub signing_key: &'a KeyData,
     pub client_id: &'a str,
     pub redirect_uri: &'a str,
@@ -67,7 +118,8 @@ pub struct PdsXrpcParams<'a> {
 /// Handles DPoP proof generation, nonce challenges, and automatic token refresh.
 /// Returns the raw response body as bytes on success.
 pub async fn pds_xrpc_call(p: &PdsXrpcParams<'_>) -> Result<Vec<u8>> {
-    let creds = users::get_atproto_credentials(p.pool, p.user_id)
+    let s = p.session;
+    let creds = users::get_atproto_credentials_encrypted(s.pool, s.vault, s.user_id)
         .await
         .context("DB error fetching AT Protocol credentials")?
         .ok_or_else(|| anyhow!("No AT Protocol credentials for user"))?;
@@ -76,168 +128,132 @@ pub async fn pds_xrpc_call(p: &PdsXrpcParams<'_>) -> Result<Vec<u8>> {
     let url = format!("{}/xrpc/{}", creds.pds_url, p.xrpc_endpoint);
 
     // Try the request, refreshing token once if it fails
-    match do_dpop_request(
-        &dpop_key,
-        &creds.access_token,
-        p.method,
-        &url,
-        p.body,
-        p.content_type,
-    )
+    match do_dpop_request(&DpopRequest {
+        transport: s.transport,
+        key: &dpop_key,
+        access_token: &creds.access_token,
+        method: p.method,
+        url: &url,
+        body: p.body,
+        content_type: p.content_type,
+    })
     .await
     {
         Ok(bytes) => Ok(bytes),
-        Err(e) => {
-            warn!(error = %e, "PDS XRPC call failed, attempting token refresh");
-            let new_token = refresh_access_token(
-                p.pool,
-                p.user_id,
-                &creds,
-                &dpop_key,
-                p.signing_key,
-                p.client_id,
-                p.redirect_uri,
-            )
-            .await?;
-            do_dpop_request(
-                &dpop_key,
-                &new_token,
-                p.method,
-                &url,
-                p.body,
-                p.content_type,
-            )
+        Err(PdsRequestError::Authentication) => {
+            warn!("PDS rejected access token; attempting token refresh");
+            let refreshed = refresh_access_token(s, &creds, &dpop_key).await?;
+            let refreshed_key = deserialize_dpop_key(&refreshed.dpop_private_key)?;
+            let refreshed_url = format!("{}/xrpc/{}", refreshed.pds_url, p.xrpc_endpoint);
+            do_dpop_request(&DpopRequest {
+                transport: s.transport,
+                key: &refreshed_key,
+                access_token: &refreshed.access_token,
+                method: p.method,
+                url: &refreshed_url,
+                body: p.body,
+                content_type: p.content_type,
+            })
             .await
             .context("PDS XRPC call failed after token refresh")
         }
+        Err(error) => Err(error.into()),
     }
 }
 
-/// Perform an HTTP request with DPoP authentication, handling nonce challenges.
-async fn do_dpop_request(
-    dpop_key: &KeyData,
-    access_token: &str,
-    method: &str,
-    url: &str,
-    body: Option<&[u8]>,
-    content_type: &str,
-) -> Result<Vec<u8>> {
-    let (dpop_token, _header, _claims) =
-        request_dpop(dpop_key, method, url, access_token).context("Failed to create DPoP proof")?;
-
-    let http_client = reqwest::Client::new();
-
-    let mut req = match method {
-        "GET" => http_client.get(url),
-        "POST" => http_client.post(url),
-        _ => return Err(anyhow!("Unsupported HTTP method: {}", method)),
-    };
-
-    req = req
-        .header("Authorization", format!("DPoP {}", access_token))
-        .header("DPoP", &dpop_token);
-
-    if let Some(body_bytes) = body {
-        req = req
-            .header("Content-Type", content_type)
-            .body(body_bytes.to_vec());
-    }
-
-    let resp = req.send().await.context("HTTP request to PDS failed")?;
-
-    // Handle DPoP nonce challenge: if server returns 401 with DPoP-Nonce, retry
-    if resp.status() == reqwest::StatusCode::UNAUTHORIZED
-        && let Some(nonce) = resp
-            .headers()
+async fn do_dpop_request(request: &DpopRequest<'_>) -> Result<Vec<u8>, PdsRequestError> {
+    let (proof, _, _) = request_dpop(
+        request.key,
+        request.method,
+        request.url,
+        request.access_token,
+    )
+    .map_err(|_| PdsRequestError::Local)?;
+    let response = send_dpop(request, &proof).await?;
+    if response.status == reqwest::StatusCode::UNAUTHORIZED
+        && let Some(nonce) = response
+            .headers
             .get("DPoP-Nonce")
-            .and_then(|v| v.to_str().ok())
+            .and_then(|value| value.to_str().ok())
     {
-        return do_dpop_request_with_nonce(
-            dpop_key,
-            access_token,
-            method,
-            url,
-            body,
-            content_type,
-            nonce,
-        )
-        .await;
+        return do_dpop_request_with_nonce(request, nonce).await;
     }
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body_text = resp.text().await.unwrap_or_default();
-        return Err(anyhow!(
-            "PDS XRPC {} returned {}: {}",
-            url,
-            status,
-            body_text
-        ));
+    if response.status == reqwest::StatusCode::UNAUTHORIZED {
+        return Err(PdsRequestError::Authentication);
     }
-
-    resp.bytes()
-        .await
-        .map(|b| b.to_vec())
-        .context("Failed to read PDS response body")
+    if !response.status.is_success() {
+        return Err(PdsRequestError::RemoteStatus {
+            status: response.status,
+            body: response.body,
+        });
+    }
+    Ok(response.body)
 }
 
-/// Retry a DPoP request with a nonce (after server challenge).
 async fn do_dpop_request_with_nonce(
-    dpop_key: &KeyData,
-    access_token: &str,
-    method: &str,
-    url: &str,
-    body: Option<&[u8]>,
-    content_type: &str,
+    request: &DpopRequest<'_>,
     nonce: &str,
-) -> Result<Vec<u8>> {
-    let (_dpop_token, header, mut claims) = request_dpop(dpop_key, method, url, access_token)
-        .context("Failed to create DPoP proof for nonce retry")?;
-
+) -> Result<Vec<u8>, PdsRequestError> {
+    let (_, header, mut claims) = request_dpop(
+        request.key,
+        request.method,
+        request.url,
+        request.access_token,
+    )
+    .map_err(|_| PdsRequestError::Local)?;
     claims
         .private
-        .insert("nonce".to_string(), nonce.to_string().into());
-    let dpop_token_with_nonce = jwt::mint(dpop_key, &header, &claims)
-        .map_err(|e| anyhow!("Failed to mint DPoP with nonce: {e}"))?;
+        .insert("nonce".into(), nonce.to_string().into());
+    let proof = jwt::mint(request.key, &header, &claims).map_err(|_| PdsRequestError::Local)?;
+    let response = send_dpop(request, &proof).await?;
+    if response.status == reqwest::StatusCode::UNAUTHORIZED {
+        return Err(PdsRequestError::Authentication);
+    }
+    if !response.status.is_success() {
+        return Err(PdsRequestError::RemoteStatus {
+            status: response.status,
+            body: response.body,
+        });
+    }
+    Ok(response.body)
+}
 
-    let http_client = reqwest::Client::new();
-
-    let mut req = match method {
-        "GET" => http_client.get(url),
-        "POST" => http_client.post(url),
-        _ => return Err(anyhow!("Unsupported HTTP method: {}", method)),
+async fn send_dpop(
+    dpop: &DpopRequest<'_>,
+    proof: &str,
+) -> Result<crate::egress::EgressResponse, PdsRequestError> {
+    let method = match dpop.method {
+        "GET" => reqwest::Method::GET,
+        "POST" => reqwest::Method::POST,
+        _ => return Err(PdsRequestError::Local),
     };
-
-    req = req
-        .header("Authorization", format!("DPoP {}", access_token))
-        .header("DPoP", &dpop_token_with_nonce);
-
-    if let Some(body_bytes) = body {
-        req = req
-            .header("Content-Type", content_type)
-            .body(body_bytes.to_vec());
+    let url = reqwest::Url::parse(dpop.url).map_err(|_| PdsRequestError::Local)?;
+    let authorization =
+        reqwest::header::HeaderValue::from_str(&format!("DPoP {}", dpop.access_token))
+            .map_err(|_| PdsRequestError::Local)?;
+    let proof =
+        reqwest::header::HeaderValue::from_str(proof).map_err(|_| PdsRequestError::Local)?;
+    let mut request = dpop
+        .transport
+        .request(method, url.clone(), crate::egress::RedirectPolicy::Reject)
+        .map_err(|_| PdsRequestError::Local)?
+        .header(reqwest::header::AUTHORIZATION, authorization)
+        .header(reqwest::header::HeaderName::from_static("dpop"), proof)
+        .credentials_for(&url)
+        .map_err(|_| PdsRequestError::Local)?;
+    if let Some(body) = dpop.body {
+        request = request
+            .header(
+                reqwest::header::CONTENT_TYPE,
+                reqwest::header::HeaderValue::from_str(dpop.content_type)
+                    .map_err(|_| PdsRequestError::Local)?,
+            )
+            .body(body.to_vec());
     }
-
-    let resp = req
-        .send()
+    dpop.transport
+        .send(request)
         .await
-        .context("HTTP request to PDS failed (nonce retry)")?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body_text = resp.text().await.unwrap_or_default();
-        return Err(anyhow!(
-            "PDS XRPC {} returned {} (nonce retry): {}",
-            url,
-            status,
-            body_text
-        ));
-    }
-
-    resp.bytes()
-        .await
-        .map(|b| b.to_vec())
-        .context("Failed to read PDS response body (nonce retry)")
+        .map_err(PdsRequestError::Uncertain)
 }
 
 /// Deserialize a DPoP private key from stored JWK JSON.
@@ -255,73 +271,66 @@ fn deserialize_dpop_key(dpop_private_key_json: &str) -> Result<KeyData> {
 /// `signing_key` is the server's persistent signing key for client assertions.
 /// `client_id` and `redirect_uri` are the OAuth client metadata values.
 pub async fn upload_blob_to_pds(
-    pool: &SqlitePool,
-    user_id: &str,
+    session: &PdsSession<'_>,
     file_bytes: Vec<u8>,
     content_type: &str,
-    signing_key: &KeyData,
-    client_id: &str,
-    redirect_uri: &str,
 ) -> Result<BlobRef> {
-    let creds = users::get_atproto_credentials(pool, user_id)
-        .await
-        .context("DB error fetching AT Protocol credentials")?
-        .ok_or_else(|| anyhow!("No AT Protocol credentials for user"))?;
+    let creds =
+        users::get_atproto_credentials_encrypted(session.pool, session.vault, session.user_id)
+            .await
+            .context("DB error fetching AT Protocol credentials")?
+            .ok_or_else(|| anyhow!("No AT Protocol credentials for user"))?;
 
-    let dpop_key = deserialize_dpop_key(&creds.dpop_private_key)?;
-    let pds_url = &creds.pds_url;
-    let upload_url = format!("{}/xrpc/com.atproto.repo.uploadBlob", pds_url);
+    let mut active = creds;
+    let mut dpop_key = deserialize_dpop_key(&active.dpop_private_key)?;
+    let mut upload_url = format!("{}/xrpc/com.atproto.repo.uploadBlob", active.pds_url);
 
     // Try upload, refreshing token once if expired
-    let (blob_resp, token_used) = match do_upload(
+    let blob_resp = match do_upload(
+        session.transport,
         &dpop_key,
-        &creds.access_token,
+        &active.access_token,
         &upload_url,
         &file_bytes,
         content_type,
     )
     .await
     {
-        Ok(resp) => (resp, creds.access_token.clone()),
-        Err(e) => {
-            warn!(error = %e, "PDS upload failed, attempting token refresh");
-            let new_token = refresh_access_token(
-                pool,
-                user_id,
-                &creds,
+        Ok(resp) => resp,
+        Err(PdsRequestError::Authentication) => {
+            warn!("PDS rejected blob upload access token; attempting token refresh");
+            active = refresh_access_token(session, &active, &dpop_key).await?;
+            dpop_key = deserialize_dpop_key(&active.dpop_private_key)?;
+            upload_url = format!("{}/xrpc/com.atproto.repo.uploadBlob", active.pds_url);
+            do_upload(
+                session.transport,
                 &dpop_key,
-                signing_key,
-                client_id,
-                redirect_uri,
-            )
-            .await?;
-            let resp = do_upload(
-                &dpop_key,
-                &new_token,
+                &active.access_token,
                 &upload_url,
                 &file_bytes,
                 content_type,
             )
             .await
-            .context("PDS upload failed after token refresh")?;
-            (resp, new_token)
+            .context("PDS upload failed after token refresh")?
         }
+        Err(error) => return Err(error.into()),
     };
 
-    let blob_ref = finalize_blob_ref(&blob_resp, pds_url, &creds.did);
+    let blob_ref = finalize_blob_ref(&blob_resp, &active.pds_url, &active.did);
 
     // Pin the blob by creating a record that references it in the user's repo.
     let pin_mime_type = blob_ref.mime_type.as_deref().unwrap_or(content_type);
     let file_size = file_bytes.len();
-    if let Err(e) = pin_blob_with_record(
-        &dpop_key,
-        &token_used,
-        pds_url,
-        &creds.did,
-        &blob_ref.cid,
-        pin_mime_type,
+    if let Err(e) = pin_blob_with_record(&PinBlobRequest {
+        transport: session.transport,
+        dpop_key: &dpop_key,
+        access_token: &active.access_token,
+        pds_url: &active.pds_url,
+        did: &active.did,
+        cid: &blob_ref.cid,
+        content_type: pin_mime_type,
         file_size,
-    )
+    })
     .await
     {
         warn!(error = %e, "Failed to pin blob with createRecord (blob may not be servable)");
@@ -332,22 +341,24 @@ pub async fn upload_blob_to_pds(
 
 /// Perform the actual blob upload with DPoP auth.
 async fn do_upload(
+    transport: &crate::egress::ControlledHttpClient,
     dpop_key: &KeyData,
     access_token: &str,
     upload_url: &str,
     file_bytes: &[u8],
     content_type: &str,
-) -> Result<UploadBlobResponse> {
-    let bytes = do_dpop_request(
-        dpop_key,
+) -> Result<UploadBlobResponse, PdsRequestError> {
+    let bytes = do_dpop_request(&DpopRequest {
+        transport,
+        key: dpop_key,
         access_token,
-        "POST",
-        upload_url,
-        Some(file_bytes),
+        method: "POST",
+        url: upload_url,
+        body: Some(file_bytes),
         content_type,
-    )
+    })
     .await?;
-    serde_json::from_slice(&bytes).context("Failed to parse PDS upload response")
+    crate::egress::parse_provider_json(&bytes).map_err(|_| PdsRequestError::Local)
 }
 
 fn finalize_blob_ref(resp: &UploadBlobResponse, pds_url: &str, did: &str) -> BlobRef {
@@ -411,31 +422,34 @@ struct BlobLink {
     link: String,
 }
 
+struct PinBlobRequest<'a> {
+    transport: &'a crate::egress::ControlledHttpClient,
+    dpop_key: &'a KeyData,
+    access_token: &'a str,
+    pds_url: &'a str,
+    did: &'a str,
+    cid: &'a str,
+    content_type: &'a str,
+    file_size: usize,
+}
+
 /// Create a record in the user's PDS repo that references the uploaded blob.
 /// This pins the blob so it can be served via com.atproto.sync.getBlob.
-async fn pin_blob_with_record(
-    dpop_key: &KeyData,
-    access_token: &str,
-    pds_url: &str,
-    did: &str,
-    cid: &str,
-    content_type: &str,
-    file_size: usize,
-) -> Result<()> {
-    let create_url = format!("{}/xrpc/com.atproto.repo.createRecord", pds_url);
+async fn pin_blob_with_record(request: &PinBlobRequest<'_>) -> Result<()> {
+    let create_url = format!("{}/xrpc/com.atproto.repo.createRecord", request.pds_url);
 
     let body = CreateRecordRequest {
-        repo: did.to_string(),
+        repo: request.did.to_string(),
         collection: "chat.concord.attachment".to_string(),
         record: AttachmentRecord {
             record_type: "chat.concord.attachment".to_string(),
             blob: BlobObject {
                 blob_type: "blob".to_string(),
                 ref_link: BlobLink {
-                    link: cid.to_string(),
+                    link: request.cid.to_string(),
                 },
-                mime_type: content_type.to_string(),
-                size: file_size,
+                mime_type: request.content_type.to_string(),
+                size: request.file_size,
             },
             created_at: chrono::Utc::now().to_rfc3339(),
         },
@@ -444,14 +458,15 @@ async fn pin_blob_with_record(
     let body_json =
         serde_json::to_string(&body).context("Failed to serialize createRecord body")?;
 
-    do_dpop_request(
-        dpop_key,
-        access_token,
-        "POST",
-        &create_url,
-        Some(body_json.as_bytes()),
-        "application/json",
-    )
+    do_dpop_request(&DpopRequest {
+        transport: request.transport,
+        key: request.dpop_key,
+        access_token: request.access_token,
+        method: "POST",
+        url: &create_url,
+        body: Some(body_json.as_bytes()),
+        content_type: "application/json",
+    })
     .await?;
 
     Ok(())
@@ -460,18 +475,15 @@ async fn pin_blob_with_record(
 /// Create any record in a user's PDS repo using the generic XRPC caller.
 /// This is the high-level helper for creating records with automatic token refresh.
 pub async fn create_record<T: Serialize>(
-    pool: &SqlitePool,
-    user_id: &str,
+    session: &PdsSession<'_>,
     collection: &str,
     record: &T,
-    signing_key: &KeyData,
-    client_id: &str,
-    redirect_uri: &str,
 ) -> Result<CreateRecordResponse> {
-    let creds = users::get_atproto_credentials(pool, user_id)
-        .await
-        .context("DB error fetching AT Protocol credentials")?
-        .ok_or_else(|| anyhow!("No AT Protocol credentials for user"))?;
+    let creds =
+        users::get_atproto_credentials_encrypted(session.pool, session.vault, session.user_id)
+            .await
+            .context("DB error fetching AT Protocol credentials")?
+            .ok_or_else(|| anyhow!("No AT Protocol credentials for user"))?;
 
     let body = serde_json::json!({
         "repo": creds.did,
@@ -482,19 +494,52 @@ pub async fn create_record<T: Serialize>(
         serde_json::to_string(&body).context("Failed to serialize createRecord body")?;
 
     let resp_bytes = pds_xrpc_call(&PdsXrpcParams {
-        pool,
-        user_id,
+        session,
         method: "POST",
         xrpc_endpoint: "com.atproto.repo.createRecord",
         body: Some(body_json.as_bytes()),
         content_type: "application/json",
-        signing_key,
-        client_id,
-        redirect_uri,
     })
     .await?;
 
-    serde_json::from_slice(&resp_bytes).context("Failed to parse createRecord response")
+    crate::egress::parse_provider_json(&resp_bytes).map_err(Into::into)
+}
+
+/// Create or replace a record at a deterministic repository key. Repeating a
+/// request after an uncertain response addresses the same AT record identity.
+pub async fn put_record<T: Serialize>(
+    session: &PdsSession<'_>,
+    collection: &str,
+    record_key: &str,
+    record: &T,
+) -> Result<CreateRecordResponse> {
+    if record_key.is_empty()
+        || !record_key
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_' | b'~'))
+    {
+        return Err(anyhow!("Invalid AT Protocol record key"));
+    }
+    let creds =
+        users::get_atproto_credentials_encrypted(session.pool, session.vault, session.user_id)
+            .await?
+            .ok_or_else(|| anyhow!("No AT Protocol credentials for user"))?;
+    let body = serde_json::json!({
+        "repo": creds.did,
+        "collection": collection,
+        "rkey": record_key,
+        "record": record,
+    });
+    let body_json = serde_json::to_string(&body)?;
+    let bytes = pds_xrpc_call(&PdsXrpcParams {
+        session,
+        method: "POST",
+        xrpc_endpoint: "com.atproto.repo.putRecord",
+        body: Some(body_json.as_bytes()),
+        content_type: "application/json",
+    })
+    .await?;
+    crate::egress::parse_provider_json(&bytes).map_err(Into::into)
 }
 
 /// Response from com.atproto.repo.createRecord
@@ -530,127 +575,6 @@ fn build_client_assertion(signing_key: &KeyData, client_id: &str, issuer: &str) 
 }
 
 /// Refresh the AT Protocol access token using the stored refresh token.
-async fn refresh_access_token(
-    pool: &SqlitePool,
-    user_id: &str,
-    creds: &users::AtprotoCredentials,
-    dpop_key: &KeyData,
-    signing_key: &KeyData,
-    client_id: &str,
-    redirect_uri: &str,
-) -> Result<String> {
-    if creds.refresh_token.is_empty() {
-        return Err(anyhow!("No refresh token available"));
-    }
-
-    let http_client = reqwest::Client::new();
-
-    // Discover the authorization server from the PDS
-    let (_resource, auth_server) =
-        atproto_oauth::resources::pds_resources(&http_client, &creds.pds_url)
-            .await
-            .context("Failed to discover PDS auth server for token refresh")?;
-
-    let token_endpoint = &auth_server.token_endpoint;
-
-    // Build client assertion (private_key_jwt) signed with the server's signing key
-    let client_assertion = build_client_assertion(signing_key, client_id, &auth_server.issuer)?;
-
-    let (dpop_token, _header, _claims) = auth_dpop(dpop_key, "POST", token_endpoint)
-        .context("Failed to create DPoP proof for refresh")?;
-
-    let params = [
-        ("client_id", client_id),
-        ("redirect_uri", redirect_uri),
-        ("grant_type", "refresh_token"),
-        ("refresh_token", creds.refresh_token.as_str()),
-        (
-            "client_assertion_type",
-            "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
-        ),
-        ("client_assertion", client_assertion.as_str()),
-    ];
-
-    let resp = http_client
-        .post(token_endpoint)
-        .header("DPoP", &dpop_token)
-        .form(&params)
-        .send()
-        .await
-        .context("Token refresh request failed")?;
-
-    // Handle DPoP nonce challenge on token endpoint
-    if (resp.status() == reqwest::StatusCode::BAD_REQUEST
-        || resp.status() == reqwest::StatusCode::UNAUTHORIZED)
-        && let Some(nonce) = resp
-            .headers()
-            .get("DPoP-Nonce")
-            .and_then(|v| v.to_str().ok())
-    {
-        let nonce_params = RefreshNonceParams {
-            http_client: &http_client,
-            dpop_key,
-            token_endpoint,
-            form_params: &params,
-            nonce,
-        };
-        return refresh_with_nonce(&nonce_params, pool, user_id, creds).await;
-    }
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err(anyhow!("Token refresh returned {}: {}", status, body));
-    }
-
-    parse_and_store_refresh(resp, pool, user_id, creds).await
-}
-
-struct RefreshNonceParams<'a> {
-    http_client: &'a reqwest::Client,
-    dpop_key: &'a KeyData,
-    token_endpoint: &'a str,
-    form_params: &'a [(&'a str, &'a str)],
-    nonce: &'a str,
-}
-
-async fn refresh_with_nonce(
-    p: &RefreshNonceParams<'_>,
-    pool: &SqlitePool,
-    user_id: &str,
-    creds: &users::AtprotoCredentials,
-) -> Result<String> {
-    let (_dpop_token, header, mut claims) = auth_dpop(p.dpop_key, "POST", p.token_endpoint)
-        .context("Failed to create DPoP proof for refresh nonce retry")?;
-
-    claims
-        .private
-        .insert("nonce".to_string(), p.nonce.to_string().into());
-    let dpop_token_with_nonce = jwt::mint(p.dpop_key, &header, &claims)
-        .map_err(|e| anyhow!("Failed to mint DPoP with nonce: {e}"))?;
-
-    let resp = p
-        .http_client
-        .post(p.token_endpoint)
-        .header("DPoP", &dpop_token_with_nonce)
-        .form(p.form_params)
-        .send()
-        .await
-        .context("Token refresh request failed (nonce retry)")?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err(anyhow!(
-            "Token refresh returned {} (nonce retry): {}",
-            status,
-            body
-        ));
-    }
-
-    parse_and_store_refresh(resp, pool, user_id, creds).await
-}
-
 #[derive(Deserialize)]
 struct RefreshResponse {
     access_token: String,
@@ -658,39 +582,306 @@ struct RefreshResponse {
     expires_in: u32,
 }
 
-async fn parse_and_store_refresh(
-    resp: reqwest::Response,
-    pool: &SqlitePool,
-    user_id: &str,
+async fn refresh_access_token(
+    session: &PdsSession<'_>,
     creds: &users::AtprotoCredentials,
-) -> Result<String> {
-    let refresh_resp: RefreshResponse = resp
-        .json()
-        .await
-        .context("Failed to parse token refresh response")?;
-
-    let expires_at = (chrono::Utc::now()
-        + chrono::Duration::seconds(refresh_resp.expires_in as i64))
-    .to_rfc3339();
-
-    if let Err(e) = users::store_atproto_credentials(
-        pool,
-        user_id,
-        &refresh_resp.access_token,
-        refresh_resp
-            .refresh_token
-            .as_deref()
-            .unwrap_or(&creds.refresh_token),
-        &creds.dpop_private_key,
-        &creds.pds_url,
-        &expires_at,
-    )
-    .await
+    dpop_key: &KeyData,
+) -> Result<users::AtprotoCredentials> {
+    let account_lock = account_refresh_lock(session.user_id)?;
+    let _guard = account_lock.lock().await;
+    let current =
+        users::get_atproto_credentials_encrypted(session.pool, session.vault, session.user_id)
+            .await?
+            .ok_or_else(|| anyhow!("No AT Protocol credentials for user"))?;
+    if current.credential_version != creds.credential_version {
+        return Ok(current);
+    }
+    let creds = &current;
+    if creds.refresh_token.is_empty() {
+        return Err(anyhow!("No refresh token available"));
+    }
+    if creds.authorization_issuer.is_empty() || creds.token_endpoint.is_empty() {
+        return Err(anyhow!(
+            "Stored authorization grant requires reauthentication"
+        ));
+    }
+    let issuer = reqwest::Url::parse(&creds.authorization_issuer)
+        .map_err(|_| anyhow!("Invalid stored authorization issuer"))?;
+    let token_url = reqwest::Url::parse(&creds.token_endpoint)
+        .map_err(|_| anyhow!("Invalid token endpoint"))?;
+    if token_url.origin() != issuer.origin() {
+        return Err(anyhow!("Token endpoint origin mismatch"));
+    }
+    let assertion = build_client_assertion(
+        session.signing_key,
+        session.client_id,
+        &creds.authorization_issuer,
+    )?;
+    let (proof, _, _) = auth_dpop(dpop_key, "POST", token_url.as_str())
+        .context("Failed to create refresh DPoP proof")?;
+    let form = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("client_id", session.client_id)
+        .append_pair("redirect_uri", session.redirect_uri)
+        .append_pair("grant_type", "refresh_token")
+        .append_pair("refresh_token", &creds.refresh_token)
+        .append_pair(
+            "client_assertion_type",
+            "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+        )
+        .append_pair("client_assertion", &assertion)
+        .finish();
+    let mut response =
+        send_token_request(session.transport, &token_url, &proof, form.as_bytes()).await?;
+    if matches!(
+        response.status,
+        reqwest::StatusCode::BAD_REQUEST | reqwest::StatusCode::UNAUTHORIZED
+    ) && let Some(nonce) = response
+        .headers
+        .get("DPoP-Nonce")
+        .and_then(|value| value.to_str().ok())
     {
-        warn!(error = %e, "Failed to update refreshed tokens");
+        let (_, header, mut claims) = auth_dpop(dpop_key, "POST", token_url.as_str())
+            .context("Failed to create nonce refresh proof")?;
+        claims
+            .private
+            .insert("nonce".into(), nonce.to_string().into());
+        let nonce_proof = jwt::mint(dpop_key, &header, &claims)
+            .map_err(|_| anyhow!("Failed to mint nonce refresh proof"))?;
+        response = send_token_request(session.transport, &token_url, &nonce_proof, form.as_bytes())
+            .await?;
+    }
+    if !response.status.is_success() {
+        return Err(anyhow!("Token refresh returned status {}", response.status));
+    }
+    let refresh: RefreshResponse = crate::egress::parse_provider_json(&response.body)?;
+    let updated = users::AtprotoCredentials {
+        did: creds.did.clone(),
+        access_token: refresh.access_token.clone(),
+        refresh_token: refresh
+            .refresh_token
+            .unwrap_or_else(|| creds.refresh_token.clone()),
+        dpop_private_key: creds.dpop_private_key.clone(),
+        pds_url: creds.pds_url.clone(),
+        authorization_issuer: creds.authorization_issuer.clone(),
+        token_endpoint: creds.token_endpoint.clone(),
+        token_expires_at: (chrono::Utc::now()
+            + chrono::Duration::seconds(refresh.expires_in as i64))
+        .to_rfc3339(),
+        credential_version: creds.credential_version,
+    };
+    let stored = users::store_atproto_credentials_if_version(
+        session.pool,
+        session.vault,
+        session.user_id,
+        creds.credential_version,
+        &updated,
+    )
+    .await?;
+    let current =
+        users::get_atproto_credentials_encrypted(session.pool, session.vault, session.user_id)
+            .await?
+            .ok_or_else(|| anyhow!("AT Protocol credential disappeared after refresh"))?;
+    if stored {
+        info!(user_id=%session.user_id,"AT Protocol tokens refreshed");
     } else {
-        info!(user_id = %user_id, "AT Protocol tokens refreshed");
+        info!(user_id=%session.user_id,"AT Protocol reauthentication superseded token refresh");
+    }
+    Ok(current)
+}
+
+async fn send_token_request(
+    transport: &crate::egress::ControlledHttpClient,
+    url: &reqwest::Url,
+    proof: &str,
+    body: &[u8],
+) -> Result<crate::egress::EgressResponse> {
+    let request = transport
+        .request(
+            reqwest::Method::POST,
+            url.clone(),
+            crate::egress::RedirectPolicy::Reject,
+        )?
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            reqwest::header::HeaderValue::from_static("application/x-www-form-urlencoded"),
+        )
+        .header(
+            reqwest::header::HeaderName::from_static("dpop"),
+            reqwest::header::HeaderValue::from_str(proof)
+                .map_err(|_| anyhow!("Invalid DPoP proof"))?,
+        )
+        .body(body.to_vec())
+        .credentials_for(url)?;
+    transport.send(request).await.map_err(Into::into)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use atproto_identity::key::{KeyType, generate_key};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn accepted_mutation_with_lost_response_is_uncertain_and_not_authentication() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let accepted = std::sync::Arc::new(AtomicUsize::new(0));
+        let observed = accepted.clone();
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = [0_u8; 4096];
+            let read = socket.read(&mut request).await.unwrap();
+            assert!(String::from_utf8_lossy(&request[..read]).starts_with("POST "));
+            observed.fetch_add(1, Ordering::SeqCst);
+            // The remote accepted the mutation and then lost the response.
+        });
+        let transport = crate::egress::ControlledHttpClient::fixture(address, 1024);
+        let key = generate_key(KeyType::P256Private).unwrap();
+        let result = do_dpop_request(&DpopRequest {
+            transport: &transport,
+            key: &key,
+            access_token: "access-token",
+            method: "POST",
+            url: "http://fixture.test/xrpc/com.atproto.repo.createRecord",
+            body: Some(br#"{"repo":"did:example:alice"}"#),
+            content_type: "application/json",
+        })
+        .await;
+        assert!(matches!(result, Err(PdsRequestError::Uncertain(_))));
+        assert_eq!(accepted.load(Ordering::SeqCst), 1);
     }
 
-    Ok(refresh_resp.access_token)
+    #[tokio::test]
+    async fn refresh_coordinator_serializes_the_same_account() {
+        let first = account_refresh_lock("did:example:alice").unwrap();
+        let second = account_refresh_lock("did:example:alice").unwrap();
+        assert!(std::sync::Arc::ptr_eq(&first, &second));
+        let held = first.lock().await;
+        let waiting = tokio::spawn(async move {
+            let _guard = second.lock().await;
+        });
+        tokio::task::yield_now().await;
+        assert!(!waiting.is_finished());
+        drop(held);
+        waiting.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn refresh_uses_bound_origin_and_yields_to_concurrent_reauthentication() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let (request_seen_tx, request_seen_rx) = tokio::sync::oneshot::channel();
+        let (respond_tx, respond_rx) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut bytes = Vec::new();
+            loop {
+                let mut buffer = [0_u8; 4096];
+                let read = socket.read(&mut buffer).await.unwrap();
+                bytes.extend_from_slice(&buffer[..read]);
+                if bytes.windows(4).any(|part| part == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            let request = String::from_utf8(bytes).unwrap();
+            assert!(request.starts_with("POST /bound-token HTTP/1.1"));
+            request_seen_tx.send(()).unwrap();
+            respond_rx.await.unwrap();
+            let body = r#"{"access_token":"stale-refresh-access","refresh_token":"stale-refresh-token","expires_in":3600}"#;
+            socket
+                .write_all(
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+                        body.len()
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+        });
+
+        let pool = crate::db::pool::create_pool("sqlite::memory:")
+            .await
+            .unwrap();
+        crate::db::pool::run_migrations(&pool).await.unwrap();
+        users::create_with_oauth(
+            &pool,
+            &users::CreateOAuthUser {
+                user_id: "alice",
+                username: "alice",
+                email: None,
+                avatar_url: None,
+                oauth_id: "oauth-alice",
+                provider: "atproto",
+                provider_id: "did:example:alice",
+            },
+        )
+        .await
+        .unwrap();
+        let key_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(key_file.path(), hex::encode([37_u8; 32])).unwrap();
+        let vault = crate::secrets::SecretVault::load(key_file.path()).unwrap();
+        let old_dpop = generate_key(KeyType::P256Private).unwrap();
+        let old_dpop_json = serde_json::to_string(&jwk::generate(&old_dpop).unwrap()).unwrap();
+        let old = users::AtprotoCredentials {
+            did: "did:example:alice".into(),
+            access_token: "old-access".into(),
+            refresh_token: "old-refresh".into(),
+            dpop_private_key: old_dpop_json,
+            pds_url: "https://old-pds.example".into(),
+            authorization_issuer: "http://fixture.test".into(),
+            token_endpoint: "http://fixture.test/bound-token".into(),
+            token_expires_at: "2026-01-01T00:00:00Z".into(),
+            credential_version: 0,
+        };
+        users::store_atproto_credentials_encrypted(&pool, &vault, "alice", &old)
+            .await
+            .unwrap();
+        let old = users::get_atproto_credentials_encrypted(&pool, &vault, "alice")
+            .await
+            .unwrap()
+            .unwrap();
+        let transport = crate::egress::ControlledHttpClient::fixture(address, 4096);
+        let signing_key = generate_key(KeyType::P256Private).unwrap();
+        let session = PdsSession {
+            transport: &transport,
+            pool: &pool,
+            vault: &vault,
+            user_id: "alice",
+            signing_key: &signing_key,
+            client_id: "https://concord.example/oauth/client-metadata.json",
+            redirect_uri: "https://concord.example/oauth/atproto/callback",
+        };
+        let refreshed = refresh_access_token(&session, &old, &old_dpop);
+        let replace = async {
+            request_seen_rx.await.unwrap();
+            let new_dpop = generate_key(KeyType::P256Private).unwrap();
+            let replacement = users::AtprotoCredentials {
+                did: "did:example:alice".into(),
+                access_token: "reauth-access".into(),
+                refresh_token: "reauth-refresh".into(),
+                dpop_private_key: serde_json::to_string(&jwk::generate(&new_dpop).unwrap())
+                    .unwrap(),
+                pds_url: "https://new-pds.example".into(),
+                authorization_issuer: "https://new-issuer.example".into(),
+                token_endpoint: "https://new-issuer.example/token".into(),
+                token_expires_at: "2027-01-01T00:00:00Z".into(),
+                credential_version: 0,
+            };
+            users::store_atproto_credentials_encrypted(&pool, &vault, "alice", &replacement)
+                .await
+                .unwrap();
+            respond_tx.send(()).unwrap();
+        };
+        let (result, ()) = tokio::join!(refreshed, replace);
+        let result = result.unwrap();
+        assert_eq!(result.access_token, "reauth-access");
+        assert_eq!(result.refresh_token, "reauth-refresh");
+        assert_eq!(result.pds_url, "https://new-pds.example");
+        assert_eq!(result.authorization_issuer, "https://new-issuer.example");
+        assert_eq!(result.token_endpoint, "https://new-issuer.example/token");
+        assert_ne!(result.dpop_private_key, old.dpop_private_key);
+        server.await.unwrap();
+    }
 }

@@ -1,18 +1,21 @@
 import { useEffect } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
-import type { BookmarkInfo } from '../../api/types';
+import type { BookmarkInfo, ChannelInfo } from '../../api/types';
 
 const EMPTY_BOOKMARKS: BookmarkInfo[] = [];
+const EMPTY_CHANNELS: ChannelInfo[] = [];
 
 export function BookmarksPanel() {
   const setShowBookmarks = useUiStore((s) => s.setShowBookmarks);
   const activeServer = useUiStore((s) => s.activeServer);
+  const channels = useChatStore((s) => activeServer ? s.channels[activeServer] ?? EMPTY_CHANNELS : EMPTY_CHANNELS);
   const setActiveChannel = useUiStore((s) => s.setActiveChannel);
   const joinChannel = useChatStore((s) => s.joinChannel);
   const bookmarks = useChatStore((s) => s.bookmarks ?? EMPTY_BOOKMARKS);
   const listBookmarks = useChatStore((s) => s.listBookmarks);
   const removeBookmark = useChatStore((s) => s.removeBookmark);
+  const setJumpToMessageId = useUiStore((s) => s.setJumpToMessageId);
 
   useEffect(() => {
     listBookmarks();
@@ -21,14 +24,13 @@ export function BookmarksPanel() {
   const handleJumpToMessage = (bookmark: BookmarkInfo) => {
     // Navigate to the channel containing the bookmarked message
     if (activeServer && bookmark.channel_id) {
-      // We only have channel_id, not name; for now try to switch
-      // The channel_id may need to be resolved to a name in a full implementation
-      setActiveChannel(bookmark.channel_id);
-      if (activeServer) {
-        joinChannel(activeServer, bookmark.channel_id);
-      }
+      const channel = channels.find((candidate) => candidate.id === bookmark.channel_id);
+      if (!channel) return;
+      setActiveChannel(channel.name);
+      joinChannel(activeServer, channel.name);
     }
-    // Future: scroll to specific message ID
+    setJumpToMessageId(bookmark.message_id);
+    setShowBookmarks(false);
   };
 
   return (
@@ -38,6 +40,7 @@ export function BookmarksPanel() {
         <button
           onClick={() => setShowBookmarks(false)}
           className="text-text-muted hover:text-text-primary"
+          aria-label="Close bookmarks"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

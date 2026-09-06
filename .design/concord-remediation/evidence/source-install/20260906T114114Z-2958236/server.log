@@ -1,0 +1,22 @@
+2026-09-06T11:42:29.318822Z  INFO concord_server::db::pool: database connected with WAL, synchronous=FULL, foreign_keys=ON database_url="sqlite:/home/doll/.cache/concord-remediation-qualification/tmp.3HriodNtRZ/var/concord.db?mode=rwc"
+2026-09-06T11:42:29.414838Z  INFO concord_server::db::pool: database migrations verified version=32
+2026-09-06T11:42:29.427463Z  INFO concord_server::engine::chat_engine: loaded servers from database count=0
+2026-09-06T11:42:29.427497Z  INFO concord_server::engine::chat_engine: loaded channels from database count=0
+2026-09-06T11:42:29.427626Z  INFO concord_server: IRC TLS configured with cert=/home/doll/.cache/concord-remediation-qualification/tmp.3HriodNtRZ/etc/tls/cert.pem, key=/home/doll/.cache/concord-remediation-qualification/tmp.3HriodNtRZ/etc/tls/key.pem
+2026-09-06T11:42:29.428223Z  INFO concord_server::web::atproto: no persisted AT Protocol signing key found, generating new one
+2026-09-06T11:42:29.430069Z  INFO concord_server: Concord server starting — Web: 127.0.0.1:36513, IRC: 127.0.0.1:52871
+2026-09-06T11:42:29.430194Z  INFO concord_server::irc::listener: IRC listener started on 127.0.0.1:52871 (TLS enabled)
+2026-09-06T11:42:29.538419Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:57018
+2026-09-06T11:42:29.539504Z  INFO concord_server::irc::connection: IRC client disconnected (unregistered) peer=127.0.0.1:57018
+2026-09-06T11:42:29.540405Z  INFO concord_server: shutdown signal received
+2026-09-06T11:42:29.540666Z  INFO concord_server::irc::listener: IRC listener shutting down
+2026-09-06T11:42:29.540689Z  INFO concord_server: Concord server stopped
+2026-09-06T11:42:29.702302Z  INFO concord_server::db::pool: database connected with WAL, synchronous=FULL, foreign_keys=ON database_url="sqlite:/home/doll/.cache/concord-remediation-qualification/tmp.3HriodNtRZ/var/concord.db?mode=rwc"
+2026-09-06T11:42:29.814231Z  INFO concord_server::engine::chat_engine: loaded servers from database count=0
+2026-09-06T11:42:29.814265Z  INFO concord_server::engine::chat_engine: loaded channels from database count=0
+2026-09-06T11:42:29.814381Z  INFO concord_server: IRC TLS configured with cert=/home/doll/.cache/concord-remediation-qualification/tmp.3HriodNtRZ/etc/tls/cert.pem, key=/home/doll/.cache/concord-remediation-qualification/tmp.3HriodNtRZ/etc/tls/key.pem
+2026-09-06T11:42:29.815218Z  INFO concord_server: Concord server starting — Web: 127.0.0.1:36513, IRC: 127.0.0.1:52871
+2026-09-06T11:42:29.815250Z  INFO concord_server::irc::listener: IRC listener started on 127.0.0.1:52871 (TLS enabled)
+2026-09-06T11:42:30.029297Z  INFO concord_server: shutdown signal received
+2026-09-06T11:42:30.029371Z  INFO concord_server::irc::listener: IRC listener shutting down
+2026-09-06T11:42:30.029483Z  INFO concord_server: Concord server stopped

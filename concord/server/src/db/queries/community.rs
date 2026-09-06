@@ -60,7 +60,10 @@ pub async fn accept_rules(
     server_id: &str,
     user_id: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE server_members SET rules_accepted = 1 WHERE server_id = ? AND user_id = ?")
+    sqlx::query(
+        "UPDATE server_members SET rules_accepted=1, accepted_rules_version=(SELECT rules_version FROM servers WHERE id=?) WHERE server_id=? AND user_id=?",
+    )
+        .bind(server_id)
         .bind(server_id)
         .bind(user_id)
         .execute(pool)
@@ -75,7 +78,7 @@ pub async fn has_accepted_rules(
     user_id: &str,
 ) -> Result<bool, sqlx::Error> {
     let val: i32 = sqlx::query_scalar(
-        "SELECT rules_accepted FROM server_members WHERE server_id = ? AND user_id = ?",
+        "SELECT EXISTS(SELECT 1 FROM server_members sm JOIN servers s ON s.id=sm.server_id WHERE sm.server_id=? AND sm.user_id=? AND sm.accepted_rules_version=s.rules_version)",
     )
     .bind(server_id)
     .bind(user_id)
@@ -164,8 +167,8 @@ pub async fn create_template(
     config: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO server_templates (id, name, description, server_id, created_by, config) \
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO server_templates (id, name, description, server_id, created_by, config, format_version) \
+         VALUES (?, ?, ?, ?, ?, ?, 1)",
     )
     .bind(id)
     .bind(name)

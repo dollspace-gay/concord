@@ -1,0 +1,12 @@
+Automated IRC real-client qualification passed
+Irssi: irssi 1.4.5 (20231003 1405) sha256=cfada9fd15d433f4fa595bf43772bc2461176fb75d6b7997a9e8aa785428c939
+WeeChat: 4.10.0 sha256=b16c49623662acd12068ce323ece00a45596cbbdc468bbe11899390d7b3885e2
+Concord server sha256=34a9214a43e98b8771b57ebac7c43673a99f5f4e95f10147b278e045138be1aa
+Rust toolchain: rustc 1.96.0 (ac68faa20 2026-05-25)
+Observed: verified fixture CA, TLS registration 001, JOIN, LIST 322/323, channel sends, persisted DM, HISTORY, token-correlated PING/PONG, disconnect/reconnect, post-reconnect history request
+Manual interactive-client observation remains a separate release record.
+>> :concord 001 u-d72fc956b683264273716f30b05431 :Welcome to Concord, u-d72fc956b683264273716f30b05431!
+>> :concord 322 u-d72fc956b683264273716f30b05431 #browser-fixture/general 2 :
+>> :concord 323 u-d72fc956b683264273716f30b05431 :End of /LIST
+>> PING :concord-1788694671579
+<< PONG :concord-1788694671579

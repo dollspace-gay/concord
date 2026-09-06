@@ -1,0 +1,22 @@
+{
+  "classification": "bounded-local-smoke",
+  "client_errors": [],
+  "duration_seconds": 8.009921810938977,
+  "full_acceptance_claimed": false,
+  "generator_hostname": "dollspace-laptop",
+  "generator_platform": "Linux-7.1.10-200.fc44.x86_64-x86_64-with-glibc2.43",
+  "marker_prefix": "load-6167eba9-7215-4681-87f6-60d2e1697370-",
+  "mean_observed_latency_ms": 11.794807767728344,
+  "messages_persisted": 8,
+  "messages_sent": 8,
+  "messages_uniquely_observed": 8,
+  "minimum_recipient_fanout": 3,
+  "p95_observed_latency_ms": 11.67376502417028,
+  "p99_observed_latency_ms": 11.67376502417028,
+  "python": "3.14.7",
+  "required_recipient_fanout": 2,
+  "senders": 1,
+  "server_host": "127.0.0.1",
+  "sessions": 3,
+  "started_unix_seconds": 1788686218.9137552
+}

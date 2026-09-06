@@ -1,0 +1,6 @@
+REST private-channel search: status=200 OK, leaked_secret=true
+Revoked token REST /api/me: 401 Unauthorized
+Revoked token WebSocket upgrade: 101 Switching Protocols
+Nonmember WebSocket search: leaked_secret=true
+Web + IRC same identity: original_session_survives=false
+Injected INSERT failure: acknowledged=true, persisted_rows=0

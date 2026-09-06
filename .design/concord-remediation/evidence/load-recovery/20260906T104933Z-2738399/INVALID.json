@@ -1,0 +1,4 @@
+{
+  "acceptance_eligible": false,
+  "reason": "Invalid: every sample omitted server_telemetry after an HTTP 403 from /metrics; the superseded smoke analyzer incorrectly allowed all telemetry to be absent."
+}

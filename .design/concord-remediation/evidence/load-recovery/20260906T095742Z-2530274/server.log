@@ -1,0 +1,119 @@
+2026-09-06T09:57:53.613635Z  INFO concord_server::db::pool: database connected with WAL, synchronous=FULL, foreign_keys=ON database_url="sqlite:/tmp/tmp.QLgtXu41rE/concord.db?mode=rwc"
+2026-09-06T09:57:53.834178Z  INFO concord_server::engine::chat_engine: bootstrapping default roles for existing server server_id=browser-server
+2026-09-06T09:57:53.835037Z  INFO concord_server::engine::chat_engine: loaded servers from database count=1
+2026-09-06T09:57:53.838887Z  INFO concord_server::engine::chat_engine: loaded channels from database count=1
+2026-09-06T09:57:53.839187Z  INFO concord_server::web::atproto: no persisted AT Protocol signing key found, generating new one
+2026-09-06T09:57:53.846957Z  INFO concord_server: Concord server starting — Web: 127.0.0.1:58559, IRC: 127.0.0.1:38807
+2026-09-06T09:57:53.847117Z  INFO concord_server::irc::listener: IRC listener started on 127.0.0.1:38807 (plaintext)
+2026-09-06T09:57:53.980984Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:59938
+2026-09-06T09:57:54.197882Z  INFO concord_server::engine::chat_engine: session connected session_id=e5ce6db9-bc2b-4b2b-9690-f45d0041493a nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T09:57:54.200087Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:59946
+2026-09-06T09:57:54.206534Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T09:57:54.408556Z  INFO concord_server::engine::chat_engine: session connected session_id=c15bd0d9-b4e5-4ddf-96fd-61b09c5b07df nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T09:57:54.410690Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:59950
+2026-09-06T09:57:54.414080Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T09:57:54.614526Z  INFO concord_server::engine::chat_engine: session connected session_id=339a9e58-eb4b-487a-98ca-973bcfa4cbc7 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T09:57:54.617502Z  INFO concord_server::engine::chat_engine: session connected session_id=04f89c76-1f82-4847-be59-98d55c6c4ff2 nickname=alice protocol=WebSocket
+2026-09-06T09:57:54.619103Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T09:57:54.662841Z  INFO concord_server::engine::chat_engine: session connected session_id=29ed55bb-32ce-468c-9413-5401e62f800c nickname=bob protocol=WebSocket
+2026-09-06T09:57:54.662933Z  INFO concord_server::engine::chat_engine: joined channel nickname=alice server_id=browser-server channel_name=#general
+2026-09-06T09:57:54.706490Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:59962
+2026-09-06T09:57:54.708097Z  INFO concord_server::engine::chat_engine: joined channel nickname=bob server_id=browser-server channel_name=#general
+2026-09-06T09:57:54.921544Z  INFO concord_server::engine::chat_engine: session connected session_id=f82f981c-a83a-4118-8d46-d2eaf9852218 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T09:57:54.926622Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T09:57:57.930055Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T09:57:57.930119Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T09:57:57.930146Z  INFO concord_server::engine::chat_engine: session disconnected session_id=04f89c76-1f82-4847-be59-98d55c6c4ff2 nickname=alice
+2026-09-06T09:57:57.930155Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=04f89c76-1f82-4847-be59-98d55c6c4ff2 nickname=alice
+2026-09-06T09:57:57.930603Z  INFO concord_server::engine::chat_engine: session disconnected session_id=29ed55bb-32ce-468c-9413-5401e62f800c nickname=bob
+2026-09-06T09:57:57.930625Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=29ed55bb-32ce-468c-9413-5401e62f800c nickname=bob
+2026-09-06T09:57:58.924759Z  INFO concord_server::engine::chat_engine: session connected session_id=bb302f7a-5305-4841-8dda-5f25aaafc057 nickname=alice protocol=WebSocket
+2026-09-06T09:57:58.925193Z  INFO concord_server::engine::chat_engine: session connected session_id=5ec7e3f5-2271-4f56-bffb-42723af118e7 nickname=bob protocol=WebSocket
+2026-09-06T09:57:58.969527Z  INFO concord_server::engine::chat_engine: joined channel nickname=bob server_id=browser-server channel_name=#general
+2026-09-06T09:57:58.969941Z  INFO concord_server::engine::chat_engine: joined channel nickname=alice server_id=browser-server channel_name=#general
+2026-09-06T09:58:03.180675Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T09:58:03.182342Z  INFO concord_server::engine::chat_engine: session disconnected session_id=5ec7e3f5-2271-4f56-bffb-42723af118e7 nickname=bob
+2026-09-06T09:58:03.182360Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=5ec7e3f5-2271-4f56-bffb-42723af118e7 nickname=bob
+2026-09-06T09:58:03.182537Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T09:58:03.182617Z  INFO concord_server::engine::chat_engine: session disconnected session_id=bb302f7a-5305-4841-8dda-5f25aaafc057 nickname=alice
+2026-09-06T09:58:03.182626Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=bb302f7a-5305-4841-8dda-5f25aaafc057 nickname=alice
+2026-09-06T09:58:03.184655Z  INFO concord_server::engine::chat_engine: session disconnected session_id=339a9e58-eb4b-487a-98ca-973bcfa4cbc7 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T09:58:03.184685Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:59950 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T09:58:03.184850Z  INFO concord_server::engine::chat_engine: session disconnected session_id=e5ce6db9-bc2b-4b2b-9690-f45d0041493a nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T09:58:03.184874Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:59938 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T09:58:03.185709Z  INFO concord_server::engine::chat_engine: session disconnected session_id=f82f981c-a83a-4118-8d46-d2eaf9852218 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T09:58:03.185726Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:59962 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T09:58:03.186309Z  INFO concord_server::engine::chat_engine: session disconnected session_id=c15bd0d9-b4e5-4ddf-96fd-61b09c5b07df nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T09:58:03.186326Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:59946 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T09:58:03.187415Z  INFO concord_server::engine::chat_engine: session connected session_id=d89f4ff1-b718-4f26-b50b-268c1ad3d8b3 nickname=alice protocol=WebSocket
+2026-09-06T09:58:03.191549Z  WARN concord_server::web::ws_handler: invalid client message category=Data line=1 column=40
+2026-09-06T09:58:03.194792Z  WARN concord_server::web::ws_handler: WebSocket read error error=Space limit exceeded: Message too long: 66005 > 65536
+2026-09-06T09:58:03.195172Z  INFO concord_server::engine::chat_engine: session disconnected session_id=d89f4ff1-b718-4f26-b50b-268c1ad3d8b3 nickname=alice
+2026-09-06T09:58:03.195186Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=d89f4ff1-b718-4f26-b50b-268c1ad3d8b3 nickname=alice
+2026-09-06T09:58:03.197140Z  INFO concord_server::engine::chat_engine: session connected session_id=d071cacf-8300-4dc0-b764-e4856da352a8 nickname=alice protocol=WebSocket
+2026-09-06T09:58:04.476619Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T09:58:04.478275Z  INFO concord_server::engine::chat_engine: session disconnected session_id=d071cacf-8300-4dc0-b764-e4856da352a8 nickname=alice
+2026-09-06T09:58:04.478302Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=d071cacf-8300-4dc0-b764-e4856da352a8 nickname=alice
+2026-09-06T09:58:04.478943Z  INFO concord_server::engine::chat_engine: session connected session_id=66dc22d5-2146-4a57-b289-0bdc49225a25 nickname=bob protocol=WebSocket
+2026-09-06T09:58:04.484678Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.485463Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.486304Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.486656Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.487322Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.488467Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.488569Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.489499Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.490416Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.491333Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.491671Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.492483Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.492500Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.493722Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.493885Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.495339Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.495663Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.496771Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.497077Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.497788Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.498203Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.499169Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.499843Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.500622Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.501431Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.501716Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.502865Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.502923Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.504127Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.505264Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.505624Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.507152Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.508747Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.509041Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.510016Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.510827Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.510866Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.511753Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.512252Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.512898Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.513192Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.513765Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.514252Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.514786Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.515193Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.516094Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.516119Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.516910Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.517709Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.517869Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.519195Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.519207Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.520721Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.520992Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.522350Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.522644Z ERROR concord_server::web::rest_api: Failed to fetch history error=resource unavailable
+2026-09-06T09:58:04.523082Z  WARN concord_server::web::ws_handler: WebSocket read error error=WebSocket protocol error: Connection reset without closing handshake
+2026-09-06T09:58:04.523558Z  INFO concord_server::engine::chat_engine: session disconnected session_id=66dc22d5-2146-4a57-b289-0bdc49225a25 nickname=bob
+2026-09-06T09:58:04.523576Z  INFO concord_server::web::ws_handler: WebSocket connection closed session_id=66dc22d5-2146-4a57-b289-0bdc49225a25 nickname=bob
+2026-09-06T09:58:04.556516Z  INFO concord_server: shutdown signal received
+2026-09-06T09:58:04.556698Z  INFO concord_server::irc::listener: IRC listener shutting down
+2026-09-06T09:58:04.556847Z  INFO concord_server: Concord server stopped

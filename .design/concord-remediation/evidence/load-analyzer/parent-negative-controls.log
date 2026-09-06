@@ -1,0 +1,8 @@
+synthetic complete fixture accepted
+mean_fanout_mismatch REJECTED: mean fanout is inconsistent with exact delivery totals
+rate_duration_mismatch REJECTED: accepted message rate is inconsistent with sent count and duration
+one_reconnect REJECTED: full reconnect declared target must equal 200
+one_sample REJECTED: full telemetry requires at least 5 warmup samples
+oversized_host REJECTED: full evidence requires the declared 4-vCPU, 8-GiB target (7.5-9 GiB OS-reporting tolerance)
+brief_occupancy REJECTED: full steady telemetry fell below the declared reconnect occupancy floor
+parent independent controls PASS 6/6; synthetic fixtures are not measured qualification evidence

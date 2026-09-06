@@ -1,39 +1,38 @@
-# Stage 1: Build the Rust server
-FROM rust:1.84-bookworm AS server-builder
-WORKDIR /build
-COPY server/ server/
-WORKDIR /build/server
-RUN cargo build --release
-
-# Stage 2: Build the React frontend
-FROM node:22-bookworm-slim AS web-builder
-WORKDIR /build
-COPY web/ web/
+FROM node:22.23.1-bookworm-slim AS web-builder
 WORKDIR /build/web
-RUN npm ci && npm run build
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
 
-# Stage 3: Runtime image
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libsqlite3-0 \
-    && rm -rf /var/lib/apt/lists/*
+FROM rust:1.96.0-bookworm AS server-builder
+WORKDIR /build
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY server/Cargo.toml server/Cargo.toml
+COPY server/build.rs server/build.rs
+COPY server/src server/src
+COPY server/migrations server/migrations
+RUN cargo build --workspace --release --locked --bin concord-server --bin concord_operator
+
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates libsqlite3-0 tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 concord \
+    && useradd --uid 10001 --gid concord --no-create-home --shell /usr/sbin/nologin concord \
+    && install -d -o concord -g concord -m 0700 /var/lib/concord /var/lib/concord/media /var/lib/concord/secrets \
+    && install -d -o concord -g concord -m 0755 /app /etc/concord
 
 WORKDIR /app
+COPY --from=server-builder --chown=concord:concord /build/target/release/concord-server /app/concord-server
+COPY --from=server-builder --chown=concord:concord /build/target/release/concord_operator /app/concord-operator
+COPY --from=web-builder --chown=concord:concord /build/web/dist /app/static
+COPY --chown=root:root concord.example.toml /etc/concord/concord.example.toml
 
-# Copy built artifacts
-COPY --from=server-builder /build/server/target/release/concord-server /app/concord-server
-COPY --from=web-builder /build/web/dist/ /app/static/
-
-# Copy example config
-COPY concord.example.toml /app/concord.example.toml
-
-# Data directory for SQLite
-RUN mkdir -p /app/data
-VOLUME /app/data
-
-ENV DATABASE_URL="sqlite:/app/data/concord.db?mode=rwc"
-ENV RUST_LOG="info"
-
+ENV CONCORD_CONFIG=/etc/concord/concord.toml
+ENV RUST_LOG=info
+USER concord:concord
+VOLUME ["/var/lib/concord"]
 EXPOSE 8080 6667
-
-CMD ["/app/concord-server"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/concord-server"]
+CMD ["serve"]

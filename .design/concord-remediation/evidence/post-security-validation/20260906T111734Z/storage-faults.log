@@ -1,0 +1,23 @@
+immutable_storage_probe production_sqlx_vfs_sha256=9f93f44a04b60695a258e20cfbf2caa0dc9035ff859546e9b9687043edf31999
+sync-fault-pass 37d26956-6c4d-4176-9ac8-adc1c3df2bc6 1 2026-09-06 11:36:04.927 journal_mode=wal synchronous=full injected=SQLITE_IOERR_FSYNC sqlite_extended_code=1034 observed=1 outcome=absent reopened_state=0/0/0/0/0
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1017 filtered out; finished in 0.21s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1017 filtered out; finished in 0.20s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1017 filtered out; finished in 0.21s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1017 filtered out; finished in 0.40s
+
+storage-faults: PASS (production SQLx WAL/FULL xSync I/O failure through MessagingService, no success/wakeup, reopen integrity with atomic complete-or-absent command state and canonical retry; canonical precommit/postcommit SIGKILL; link/event/receipt/lock faults)

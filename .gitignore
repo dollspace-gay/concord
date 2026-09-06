@@ -37,3 +37,7 @@ nul
 CHANGELOG.md
 smoke_test.py
 __pycache__/smoke_test.cpython-312.pyc
+
+# Local Playwright run artifacts (tests and curated evidence remain tracked).
+/concord/web/test-results/
+/concord/web/playwright-report/

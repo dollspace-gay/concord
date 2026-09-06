@@ -5,16 +5,17 @@ services:
       - "8080:8080"   # Web UI + API
       - "6667:6667"   # IRC
     volumes:
-      - concord-data:/app/data
-      - ./concord.toml:/app/concord.toml:ro
+      - concord-data:/var/lib/concord
+      - ./concord.toml:/etc/concord/concord.toml:ro
+      - ./secrets:/etc/concord/secrets:ro
+      - ./tls:/etc/concord/tls:ro
     environment:
-      - DATABASE_URL=sqlite:/app/data/concord.db?mode=rwc
+      - DATABASE_URL=sqlite:/var/lib/concord/concord.db?mode=rwc
+      - DATA_DIR=/var/lib/concord
+      - MEDIA_DIR=/var/lib/concord/media
       - RUST_LOG=info
-      # Uncomment and fill in for OAuth:
-      # - JWT_SECRET=your-secret-here
-      # - PUBLIC_URL=https://your-domain.com
-      # - GITHUB_CLIENT_ID=
-      # - GITHUB_CLIENT_SECRET=
+      # PUBLIC_URL must be set in concord.toml or as an environment variable.
+      # JWT_SECRET_FILE may point at a read-only file under /etc/concord/secrets.
       # - GOOGLE_CLIENT_ID=
       # - GOOGLE_CLIENT_SECRET=
     restart: unless-stopped

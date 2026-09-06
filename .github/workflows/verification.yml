@@ -1,0 +1,112 @@
+name: verification
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: concord
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: concord
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: cargo test --workspace --locked
+
+  frontend-and-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: concord/web/package-lock.json
+      - run: npm ci
+        working-directory: concord/web
+      - run: npx playwright install --with-deps chromium
+        working-directory: concord/web
+      - run: npm run contracts:check
+        working-directory: concord/web
+      - run: npm run test:contract-fixtures
+        working-directory: concord/web
+      - run: npm run build
+        working-directory: concord/web
+      - run: npm run lint
+        working-directory: concord/web
+      - run: npm audit --audit-level=high
+        working-directory: concord/web
+      - run: npm test
+        working-directory: concord/web
+        env:
+          CONCORD_PLAYWRIGHT_OUTPUT_DIR: test-results/browser-ci
+      - name: Upload browser harness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-harness-evidence
+          path: concord/web/test-results/browser-ci
+          if-no-files-found: ignore
+
+  authenticated-browser-socket:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: concord/web/package-lock.json
+      - run: npm ci
+        working-directory: concord/web
+      - name: Install browser and real IRC clients
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install --yes irssi jq weechat-headless
+        working-directory: concord/web
+      - run: mkdir -p concord/web/test-results/browser-socket
+      - run: ./scripts/run-required-suite.sh browser-socket
+        env:
+          CONCORD_PLAYWRIGHT_OUTPUT_DIR: test-results/browser-socket
+          CONCORD_AUTH_BROWSER_EVIDENCE: ${{ github.workspace }}/concord/web/test-results/browser-socket/authenticated
+          CONCORD_IRC_QUALIFICATION_REPORT: ${{ github.workspace }}/concord/web/test-results/browser-socket/irc-client-qualification.log
+      - name: Upload authenticated browser and socket evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-browser-socket-evidence
+          path: concord/web/test-results/browser-socket
+          if-no-files-found: ignore
+
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/run-required-suite.sh container-smoke
+        env:
+          CONTAINER_ENGINE: docker
+          CONTAINER_SMOKE_LOG: ${{ github.workspace }}/concord-container-smoke.log
+      - name: Upload container smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-smoke-evidence
+          path: concord-container-smoke.log
+          if-no-files-found: ignore

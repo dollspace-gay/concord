@@ -1,4 +1,5 @@
-import type { ClientCommand, ServerEvent } from './types';
+import type { ChatEvent as ServerEvent, ClientMessage as ClientCommand } from './generated/contract';
+import { isClientMessage, isServerEvent } from './generated/validator';
 
 type EventHandler = (event: ServerEvent) => void;
 type StatusHandler = (connected: boolean) => void;
@@ -34,10 +35,14 @@ export class WebSocketManager {
 
     ws.onmessage = (e) => {
       try {
-        const event: ServerEvent = JSON.parse(e.data);
+        const event: unknown = JSON.parse(e.data);
+        if (!isServerEvent(event)) {
+          console.warn('Invalid WebSocket message received');
+          return;
+        }
         this.onEvent(event);
       } catch {
-        console.warn('Invalid WebSocket message:', e.data);
+        console.warn('Invalid WebSocket message received');
       }
     };
 
@@ -53,10 +58,15 @@ export class WebSocketManager {
     };
   }
 
-  send(command: ClientCommand) {
+  send(command: ClientCommand): boolean {
+    if (!isClientMessage(command)) {
+      throw new Error('Invalid WebSocket command');
+    }
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(command));
+      return true;
     }
+    return false;
   }
 
   disconnect() {

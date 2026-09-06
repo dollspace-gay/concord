@@ -1,0 +1,1 @@
+Uncommitted remediation working-tree snapshot; not attributed to HEAD alone. Pre-security validation.

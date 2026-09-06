@@ -1,0 +1,2 @@
+backup_restored=e400bb1c-be99-42b8-bbb9-618c211c7ff8 activation_required=true external_jobs_paused=true
+{"duration_seconds":0.29716485,"kind":"concord_operator_operation","operation":"restore","outcome":"success"}

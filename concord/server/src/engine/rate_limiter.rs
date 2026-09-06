@@ -2,6 +2,9 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+const MAX_BUCKETS: usize = 16_384;
+const STALE_BUCKET_AGE: Duration = Duration::from_secs(60 * 60);
+
 /// Simple token-bucket rate limiter keyed by string (nickname, IP, etc.).
 pub struct RateLimiter {
     buckets: Mutex<HashMap<String, Bucket>>,
@@ -30,6 +33,14 @@ impl RateLimiter {
     pub fn check(&self, key: &str) -> bool {
         let mut buckets = self.buckets.lock().unwrap();
         let now = Instant::now();
+
+        if !buckets.contains_key(key) && buckets.len() >= MAX_BUCKETS {
+            let cutoff = now - STALE_BUCKET_AGE;
+            buckets.retain(|_, bucket| bucket.last_refill > cutoff);
+            if buckets.len() >= MAX_BUCKETS {
+                return false;
+            }
+        }
 
         let bucket = buckets.entry(key.to_string()).or_insert(Bucket {
             tokens: self.max_tokens as f64,
@@ -89,6 +100,26 @@ mod tests {
         // After cleanup with 0 duration, entry should be removed
         let buckets = limiter.buckets.lock().unwrap();
         assert!(buckets.is_empty());
+    }
+
+    #[test]
+    fn adversarial_unique_keys_cannot_grow_bucket_storage_without_bound() {
+        let limiter = RateLimiter::new(1, 1.0);
+        for index in 0..(MAX_BUCKETS + 1000) {
+            let _ = limiter.check(&format!("source-{index}"));
+        }
+        assert_eq!(limiter.buckets.lock().unwrap().len(), MAX_BUCKETS);
+    }
+
+    #[test]
+    fn capacity_pressure_does_not_reset_an_active_bucket_budget() {
+        let limiter = RateLimiter::new(1, 60.0);
+        assert!(limiter.check("active"));
+        for index in 0..(MAX_BUCKETS - 1) {
+            assert!(limiter.check(&format!("source-{index}")));
+        }
+        assert!(!limiter.check("new-source"));
+        assert!(!limiter.check("active"));
     }
 
     // ────────────────────────────────────────────────────────────────

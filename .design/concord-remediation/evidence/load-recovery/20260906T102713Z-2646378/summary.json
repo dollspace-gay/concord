@@ -1,0 +1,176 @@
+{
+  "acceptance_status": "bounded-local-smoke",
+  "classification": "bounded-local-smoke",
+  "client_errors": [],
+  "exact_fanout": {
+    "acked": 8,
+    "duplicates": 0,
+    "expected_deliveries": 40,
+    "minimum_fanout": 5,
+    "missing": 0,
+    "observed_deliveries": 40,
+    "passed": true,
+    "raw_replay_overlap_deduplicated": 48,
+    "required_minimum_fanout": 5,
+    "sent": 8,
+    "verified": 8
+  },
+  "full_acceptance_claimed": false,
+  "history_search": {
+    "authorization_failures": 0,
+    "history_p95_ms": 7.165485993027687,
+    "history_requests": 24,
+    "passed": true,
+    "search_p95_ms": 3.6467990139499307,
+    "search_requests": 24,
+    "stable_pagination_checks": 24
+  },
+  "host": {
+    "cpu_count": 24,
+    "filesystem": "temporary-local-fixture",
+    "generator_hostname": "dollspace-laptop",
+    "generator_platform": "Linux-7.1.10-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "memory_bytes": 33033777152,
+    "separate_load_generator": false,
+    "server_hostname": "dollspace-laptop",
+    "server_platform": "Linux-7.1.10-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "storage": "temporary-local-fixture"
+  },
+  "inputs": {
+    "config_sha256": "48051abb22c593f37bc8c2b2bd1a914daff8549ee89c67f87a5cfc858ea77847",
+    "dataset_sha256": "472b3124e7131f4fb3a1d52bf266c85bebb9c3678f303ea4c37482a3b238420b",
+    "generator_sha256": "7782095b07764dd3f16903c6df0be84b3356a42b6a07e8fba0df1bb52e3c1215",
+    "query_mix_sha256": "49a0d5157f6582ba4db6fa1fd7af8c74b406c7d5f44b9d303440c47486893df2",
+    "release_flags": "debug browser-fixtures bounded-smoke",
+    "seed_sha256": "152f975a51df9e4f42f4c62c57d179253c1125613f4f8764a3439e10a32849e0",
+    "server_sha256": "bc3d09f33558fc323953eafe116a890c6f7a82896cdd2264145dd75229db9568",
+    "source_revision": "cff0df246b91461f959d8dbe9154ba50bba2331c",
+    "toolchain": "3.14.7"
+  },
+  "latency": {
+    "commit_ack_p95_ms": 12.674735044129193,
+    "commit_ack_p99_ms": 12.674735044129193,
+    "recipient_p95_ms": 10.385044966824353,
+    "recipient_p99_ms": 10.385044966824353
+  },
+  "marker_prefix": "load-c3c79404-ece6-496a-9fe9-2a10c73cfb50-",
+  "media_provider": {
+    "concurrent_uploads": 4,
+    "core_chat_acks_during_failure": 1,
+    "file_bytes_each": 1048576,
+    "passed": true,
+    "provider": {
+      "chat_ack_latency_ms": 45.92168307863176,
+      "chat_acknowledged": true,
+      "disarmed_before_later_chat": true,
+      "retained_cursor_present": true,
+      "status": {
+        "delivery_attempts": 1,
+        "delivery_error": "webhook_transport_unavailable",
+        "delivery_state": "pending",
+        "found": true,
+        "job_attempts": 1,
+        "job_error": "webhook_transport_unavailable",
+        "job_state": "pending",
+        "last_status": null
+      },
+      "terminal_required": false
+    },
+    "provider_failure": true,
+    "provider_failures_terminal": false,
+    "upload": {
+      "all_four_overlapped": true,
+      "attachments_cleaned_up": 4,
+      "chat_ack_latency_ms": 47.65391303226352,
+      "chat_acknowledged_while_four_admitted": true,
+      "concurrent_uploads": 4,
+      "file_bytes_each": 1048576,
+      "maximum_duration_seconds": 0.07182670896872878,
+      "retained_cursor_present": true
+    },
+    "uploads_completed": 4,
+    "uploads_started": 4
+  },
+  "no_duplicate_accepted_messages": true,
+  "python": "3.14.7",
+  "reconnect": {
+    "convergence_seconds": 2.045565097942017,
+    "declared_target": 2,
+    "duplicates": 0,
+    "gaps": 0,
+    "passed": true,
+    "recovered": 2
+  },
+  "resource": {
+    "scope": "bounded"
+  },
+  "restart_restore": {
+    "accepted_messages_verified": true,
+    "duplicate_publications": 0,
+    "passed": true,
+    "restart": true,
+    "restart_recovered": true,
+    "restart_result": {
+      "logical_message_count": 1,
+      "no_duplicate_accepted_messages": true,
+      "ready_after_restart": true,
+      "restart": true,
+      "restart_seconds": 0.5982581119751558,
+      "retained_cursor_resumed": true,
+      "retry_replayed": true
+    },
+    "restore": true,
+    "restore_recovered": true,
+    "restore_result": {
+      "accepted_messages_verified": true,
+      "action": "restore",
+      "declared_restore_point": "backup_restored=16704ee6-607b-4853-8e8c-0157075dfed8",
+      "duplicate_publications": 0,
+      "external_jobs_paused": true,
+      "foreign_key_violations": 0,
+      "integrity": "ok",
+      "missing_media": 0,
+      "ready": true,
+      "restored_main_messages": 8
+    }
+  },
+  "slow_abusive": {
+    "abusive": {
+      "connection_recovered_after_rate_limit": true,
+      "fragmented_command_latency_ms": 3.0825979774817824,
+      "invalid_command_code": "INVALID_INPUT",
+      "oversized_command_code": "CONNECTION_CLOSED",
+      "rate_limit_code": "RATE_LIMITED"
+    },
+    "closed_or_resynced": 1,
+    "healthy_p95_ms": 10.385044966824353,
+    "healthy_p99_ms": 10.385044966824353,
+    "passed": true,
+    "permanently_blocked_workers": 0,
+    "permission_race": {
+      "concurrent_probe_count": 80,
+      "concurrent_statuses": [
+        404
+      ],
+      "post_revocation_status": 404
+    },
+    "slow_clients": 1
+  },
+  "started_unix_seconds": 1788690464.9598014,
+  "unverified_acceptance_areas": [
+    "dedicated 4-vCPU 8-GiB separate-host one-hour scale"
+  ],
+  "workload": {
+    "accepted_message_rate_per_second": 0.999468522617673,
+    "database_profile": "FULL/WAL",
+    "duration_seconds": 8.004254080005921,
+    "irc_sessions": 3,
+    "mean_fanout": 5.0,
+    "messages_sent": 8,
+    "seeded_messages": 3,
+    "senders": 1,
+    "servers": 1,
+    "sessions": 5,
+    "web_sessions": 2
+  }
+}

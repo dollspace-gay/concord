@@ -1,0 +1,17 @@
+workspace-default PASS
+clippy FAIL exit=101
+clippy-final PASS
+fmt PASS
+authenticated-browser FAIL exit=1
+irc-clients FAIL exit=1
+storage-faults PASS
+contracts PASS
+irc-clients-final PASS
+web-build-final PASS
+web-lint-complete PASS
+browser-harness-final PASS 51
+authenticated-browser-final FAIL 19/20 retained
+authenticated-browser-complete PASS 20
+source-install-final PASS
+container-smoke-final PASS
+final-source-manifest PASS

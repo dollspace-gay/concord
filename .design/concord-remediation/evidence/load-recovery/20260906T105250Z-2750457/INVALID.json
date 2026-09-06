@@ -1,0 +1,4 @@
+{
+  "acceptance_eligible": false,
+  "reason": "Invalid: authenticated metrics and server telemetry were collected, but the final sample retained one pending controlled-failure provider job."
+}

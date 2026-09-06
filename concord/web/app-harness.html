@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8"><title>Concord app harness</title></head>
+  <body><div id="root"></div>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import App from '/src/App.tsx';
+      import { useAuthStore } from '/src/stores/authStore.ts';
+      import { useUiStore } from '/src/stores/uiStore.ts';
+      window.authStore = useAuthStore;
+      window.uiStore = useUiStore;
+      createRoot(document.getElementById('root')).render(React.createElement(App));
+    </script>
+  </body>
+</html>

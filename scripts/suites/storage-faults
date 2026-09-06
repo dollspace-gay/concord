@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+manifest="${repository_root}/concord/Cargo.toml"
+run_tests="${repository_root}/scripts/run-cargo-tests-nonempty.sh"
+built_target="${repository_root}/concord/target/debug/storage_fault_probe"
+workspace="$(mktemp -d)"
+probe_pid=""
+cleanup() {
+  if [[ -n "${probe_pid}" ]] && kill -0 "${probe_pid}" 2>/dev/null; then
+    kill -KILL "${probe_pid}" 2>/dev/null || true
+    wait "${probe_pid}" 2>/dev/null || true
+  fi
+  rm -rf "${workspace}"
+}
+trap cleanup EXIT
+database="${workspace}/faults.db"
+mkdir -p "${workspace}/bin"
+probe="${workspace}/bin/storage_fault_probe"
+precommit_log="${workspace}/precommit.log"
+precommit_marker="${workspace}/precommit.marker"
+postcommit_marker="${workspace}/postcommit.marker"
+
+cd "${repository_root}/concord"
+
+cargo build --quiet --locked --manifest-path "${manifest}" \
+  --features storage-fault-injection --bin storage_fault_probe
+install -m 755 "${built_target}" "${probe}"
+probe_sha256="$(sha256sum "${probe}" | cut -d ' ' -f 1)"
+printf 'immutable_storage_probe production_sqlx_vfs_sha256=%s\n' "${probe_sha256}"
+"${probe}" init "${database}"
+
+"${probe}" canonical-crash "${database}" before "${precommit_marker}" >"${precommit_log}" 2>&1 &
+probe_pid=$!
+for _ in $(seq 1 100); do
+  if [[ -f "${precommit_marker}" ]]; then
+    break
+  fi
+  if ! kill -0 "${probe_pid}" 2>/dev/null; then
+    cat "${precommit_log}" >&2
+    exit 1
+  fi
+  sleep 0.02
+done
+test -f "${precommit_marker}"
+kill -KILL "${probe_pid}"
+wait "${probe_pid}" 2>/dev/null || true
+probe_pid=""
+test "$("${probe}" state "${database}")" = "0 0 0 0 0"
+
+"${probe}" canonical-crash "${database}" after "${postcommit_marker}" >"${workspace}/postcommit.log" 2>&1 &
+probe_pid=$!
+for _ in $(seq 1 100); do
+  [[ -f "${postcommit_marker}" ]] && break
+  kill -0 "${probe_pid}" 2>/dev/null || { cat "${workspace}/postcommit.log" >&2; exit 1; }
+  sleep 0.02
+done
+test -f "${postcommit_marker}"
+kill -KILL "${probe_pid}"
+wait "${probe_pid}" 2>/dev/null || true
+probe_pid=""
+test "$("${probe}" state "${database}")" = "1 1 1 1 1"
+
+retry="$("${probe}" send "${database}" crash-client crash-window)"
+test "${retry#replayed }" != "${retry}"
+test "$("${probe}" state "${database}")" = "1 1 1 1 1"
+test "$("${probe}" send "${database}" crash-client different)" = "conflict"
+
+sync_database="${workspace}/sync-fault.db"
+"${probe}" init "${sync_database}"
+sync_result="$("${probe}" sync-fault "${sync_database}" sync-client sync-content)"
+test "${sync_result#sync-fault-pass }" != "${sync_result}"
+printf '%s\n' "${sync_result}"
+test "$("${probe}" state "${sync_database}")" = "1 1 1 1 1"
+test "$("${probe}" send "${sync_database}" sync-client sync-content)" = \
+  "replayed $(printf '%s' "${sync_result}" | cut -d ' ' -f 2) $(printf '%s' "${sync_result}" | cut -d ' ' -f 3)"
+test "$(sha256sum "${probe}" | cut -d ' ' -f 1)" = "${probe_sha256}"
+
+"${run_tests}" --quiet --locked -p concord-server \
+  engine::messaging::tests::forced_event_failure_rolls_back_message_sequence_and_receipt --lib
+"${run_tests}" --quiet --locked -p concord-server \
+  engine::messaging::tests::forced_receipt_failure_rolls_back_message_event_and_outbox --lib
+"${run_tests}" --quiet --locked -p concord-server \
+  engine::messaging::tests::forced_attachment_link_failure_rolls_back_message_and_claim --lib
+"${run_tests}" --quiet --locked -p concord-server \
+  engine::messaging::tests::locked_database_timeout_cancels_cleanly_and_later_send_succeeds --lib
+
+printf '%s\n' "storage-faults: PASS (production SQLx WAL/FULL xSync I/O failure through MessagingService, no success/wakeup, reopen integrity with atomic complete-or-absent command state and canonical retry; canonical precommit/postcommit SIGKILL; link/event/receipt/lock faults)"

@@ -1,0 +1,139 @@
+ M concord/Cargo.lock
+ M concord/server/Cargo.toml
+ M concord/server/src/auth/config.rs
+ M concord/server/src/auth/mod.rs
+ M concord/server/src/auth/token.rs
+ M concord/server/src/config.rs
+ M concord/server/src/db/models.rs
+ M concord/server/src/db/pool.rs
+ M concord/server/src/db/queries/atproto.rs
+ M concord/server/src/db/queries/audit_log.rs
+ M concord/server/src/db/queries/bots.rs
+ M concord/server/src/db/queries/channels.rs
+ M concord/server/src/db/queries/community.rs
+ M concord/server/src/db/queries/emoji.rs
+ M concord/server/src/db/queries/events.rs
+ M concord/server/src/db/queries/forum_tags.rs
+ M concord/server/src/db/queries/mod.rs
+ M concord/server/src/db/queries/notifications.rs
+ M concord/server/src/db/queries/oauth2.rs
+ M concord/server/src/db/queries/presence.rs
+ M concord/server/src/db/queries/slash_commands.rs
+ M concord/server/src/db/queries/threads.rs
+ M concord/server/src/db/queries/users.rs
+ M concord/server/src/engine/channel.rs
+ M concord/server/src/engine/chat_engine.rs
+ M concord/server/src/engine/embeds.rs
+ M concord/server/src/engine/events.rs
+ M concord/server/src/engine/mod.rs
+ M concord/server/src/engine/rate_limiter.rs
+ M concord/server/src/engine/user_session.rs
+ M concord/server/src/engine/validation.rs
+ M concord/server/src/integration_tests.rs
+ M concord/server/src/irc/commands.rs
+ M concord/server/src/irc/connection.rs
+ M concord/server/src/irc/listener.rs
+ M concord/server/src/irc/mod.rs
+ M concord/server/src/lib.rs
+ M concord/server/src/main.rs
+ M concord/server/src/web/app_state.rs
+ M concord/server/src/web/atproto.rs
+ M concord/server/src/web/atproto_records.rs
+ M concord/server/src/web/auth_middleware.rs
+ M concord/server/src/web/mod.rs
+ M concord/server/src/web/oauth.rs
+ M concord/server/src/web/pds_client.rs
+ M concord/server/src/web/rate_limit.rs
+ M concord/server/src/web/rest_api.rs
+ M concord/server/src/web/router.rs
+ M concord/server/src/web/ws_handler.rs
+ M concord/web/package-lock.json
+ M concord/web/package.json
+ M concord/web/src/App.tsx
+ M concord/web/src/api/client.ts
+ M concord/web/src/api/types.ts
+ M concord/web/src/api/websocket.ts
+ M concord/web/src/components/auth/LoginPage.tsx
+ M concord/web/src/components/auth/SettingsPage.tsx
+ M concord/web/src/components/bookmarks/BookmarksPanel.tsx
+ M concord/web/src/components/channels/ChannelList.tsx
+ M concord/web/src/components/chat/ChannelHeader.tsx
+ M concord/web/src/components/chat/FormattedMessage.tsx
+ M concord/web/src/components/chat/GifPicker.tsx
+ M concord/web/src/components/chat/MessageInput.tsx
+ M concord/web/src/components/chat/MessageList.tsx
+ M concord/web/src/components/chat/VoiceRecorder.tsx
+ M concord/web/src/components/chat/WaveformPlayer.tsx
+ M concord/web/src/components/community/CommunityPanel.tsx
+ M concord/web/src/components/integrations/IntegrationsPanel.tsx
+ M concord/web/src/components/layout/AppLayout.tsx
+ M concord/web/src/components/members/MemberList.tsx
+ D concord/web/src/components/members/UserProfilePopup.tsx
+ M concord/web/src/components/moderation/ModerationPanel.tsx
+ M concord/web/src/components/navigation/QuickSwitcher.tsx
+ M concord/web/src/components/pins/PinnedMessagesPanel.tsx
+ M concord/web/src/components/profiles/UserProfileModal.tsx
+ M concord/web/src/components/search/SearchPanel.tsx
+ M concord/web/src/components/servers/CreateServerModal.tsx
+ M concord/web/src/components/servers/ServerList.tsx
+ M concord/web/src/components/servers/ServerSettings.tsx
+ M concord/web/src/components/threads/ThreadList.tsx
+ M concord/web/src/components/threads/ThreadPanel.tsx
+ M concord/web/src/stores/authStore.ts
+ M concord/web/src/stores/chatStore.ts
+ M concord/web/src/stores/uiStore.ts
+ M concord/web/vite.config.ts
+?? concord/rust-toolchain.toml
+?? concord/server/build.rs
+?? concord/server/migrations/017_migration_foundation.sql
+?? concord/server/migrations/018_session_authority.sql
+?? concord/server/migrations/019_authorization_threads.sql
+?? concord/server/migrations/020_conversations_messages.sql
+?? concord/server/migrations/021_receipts_events.sql
+?? concord/server/migrations/022_identity_direct_presence.sql
+?? concord/server/migrations/023_private_media.sql
+?? concord/server/migrations/024_feature_integrity.sql
+?? concord/server/migrations/025_operation_generations.sql
+?? concord/server/migrations/026_integration_contracts.sql
+?? concord/server/migrations/027_moderation_notification_integrity.sql
+?? concord/server/migrations/028_server_member_nicknames.sql
+?? concord/server/migrations/029_oauth2_lifecycle.sql
+?? concord/server/migrations/030_role_projection_versions.sql
+?? concord/server/migrations/031_message_chronology_index.sql
+?? concord/server/migrations/032_operator_audit.sql
+?? concord/server/src/auth/authority.rs
+?? concord/server/src/bin/
+?? concord/server/src/contract.rs
+?? concord/server/src/db/queries/aliases.rs
+?? concord/server/src/db/storage_fault_vfs.c
+?? concord/server/src/egress.rs
+?? concord/server/src/engine/account.rs
+?? concord/server/src/engine/authorization.rs
+?? concord/server/src/engine/community_service.rs
+?? concord/server/src/engine/forum.rs
+?? concord/server/src/engine/ids.rs
+?? concord/server/src/engine/integrations.rs
+?? concord/server/src/engine/media_service.rs
+?? concord/server/src/engine/messaging.rs
+?? concord/server/src/engine/moderation.rs
+?? concord/server/src/engine/organization.rs
+?? concord/server/src/engine/profile_sync.rs
+?? concord/server/src/engine/replay.rs
+?? concord/server/src/engine/write_admission.rs
+?? concord/server/src/irc/framing.rs
+?? concord/server/src/jobs.rs
+?? concord/server/src/media.rs
+?? concord/server/src/operations.rs
+?? concord/server/src/runtime_metrics.rs
+?? concord/server/src/secrets.rs
+?? concord/server/src/web/observability.rs
+?? concord/server/src/web/webhook_dispatcher.rs
+?? concord/web/public/
+?? concord/web/src/api/generated/
+?? concord/web/src/components/Dialog.tsx
+?? concord/web/src/components/ExternalImage.tsx
+?? concord/web/src/stores/composerStore.ts
+?? concord/web/src/stores/connectionStore.ts
+?? concord/web/src/stores/entityStore.ts
+?? concord/web/src/stores/pendingStore.ts
+?? concord/web/src/utils/

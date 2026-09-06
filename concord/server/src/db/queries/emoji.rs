@@ -61,15 +61,21 @@ pub async fn insert_emoji(
 pub async fn list_emoji_for_user_servers(
     pool: &SqlitePool,
     user_id: &str,
+    target_server_id: &str,
 ) -> Result<Vec<EmojiRow>, sqlx::Error> {
     sqlx::query_as::<_, EmojiRow>(
         "SELECT e.id, e.server_id, e.name, e.image_url, e.uploader_id, e.created_at \
          FROM custom_emoji e \
          JOIN servers s ON e.server_id = s.id \
          JOIN server_members sm ON s.id = sm.server_id \
+         JOIN servers target ON target.id = ? \
+         JOIN server_members target_member ON target_member.server_id = target.id \
+             AND target_member.user_id = sm.user_id \
          WHERE sm.user_id = ? AND s.shareable_emoji = 1 \
+             AND (e.server_id = target.id OR target.allow_external_emoji = 1) \
          ORDER BY s.name, e.name",
     )
+    .bind(target_server_id)
     .bind(user_id)
     .fetch_all(pool)
     .await
@@ -209,5 +215,58 @@ mod tests {
 
         let emojis = list_emoji(&pool, "s1").await.unwrap();
         assert!(emojis.is_empty());
+    }
+
+    #[tokio::test]
+    async fn cross_server_emoji_requires_source_sharing_and_target_external_policy() {
+        let pool = setup_db().await;
+        setup_server(&pool).await;
+        sqlx::query(
+            "INSERT INTO servers(id,name,owner_id,shareable_emoji,allow_external_emoji) VALUES \
+             ('source','Source','u1',1,1),('target','Target','u1',1,0)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO server_members(server_id,user_id,role) VALUES \
+             ('source','u1','owner'),('target','u1','owner')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        insert_emoji(&pool, "external", "source", "wave", "/wave.png", "u1")
+            .await
+            .unwrap();
+
+        assert!(
+            list_emoji_for_user_servers(&pool, "u1", "target")
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        sqlx::query("UPDATE servers SET allow_external_emoji=1 WHERE id='target'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            list_emoji_for_user_servers(&pool, "u1", "target")
+                .await
+                .unwrap()
+                .iter()
+                .map(|emoji| emoji.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["external"]
+        );
+        sqlx::query("UPDATE servers SET shareable_emoji=0 WHERE id='source'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(
+            list_emoji_for_user_servers(&pool, "u1", "target")
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 }

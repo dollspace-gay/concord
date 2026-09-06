@@ -1,4 +1,4 @@
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::db::models::{AuditLogRow, CreateAuditLogParams};
 
@@ -6,18 +6,32 @@ pub async fn create_entry(
     pool: &SqlitePool,
     params: &CreateAuditLogParams<'_>,
 ) -> Result<(), sqlx::Error> {
+    let mut connection = pool.acquire().await?;
+    create_entry_in(&mut connection, params).await
+}
+
+pub async fn create_entry_in(
+    connection: &mut SqliteConnection,
+    params: &CreateAuditLogParams<'_>,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO audit_log (id, server_id, actor_id, action_type, target_type, target_id, reason, changes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO audit_log( \
+            id,server_id,actor_id,actor_username_snapshot,actor_avatar_snapshot, \
+            action_type,target_type,target_id,reason,changes \
+         ) SELECT ?,?,?,COALESCE(u.username,?),u.avatar_url,?,?,?,?,? \
+           FROM (SELECT 1) LEFT JOIN users u ON u.id=?",
     )
     .bind(params.id)
     .bind(params.server_id)
+    .bind(params.actor_id)
     .bind(params.actor_id)
     .bind(params.action_type)
     .bind(params.target_type)
     .bind(params.target_id)
     .bind(params.reason)
     .bind(params.changes)
-    .execute(pool)
+    .bind(params.actor_id)
+    .execute(connection)
     .await?;
     Ok(())
 }

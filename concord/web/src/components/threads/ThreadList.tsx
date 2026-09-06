@@ -2,9 +2,10 @@ import { useEffect } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
 import { channelKey } from '../../api/types';
-import type { ThreadInfo } from '../../api/types';
+import type { ForumTagInfo, ThreadInfo } from '../../api/types';
 
 const EMPTY_THREADS: ThreadInfo[] = [];
+const EMPTY_TAGS: ForumTagInfo[] = [];
 
 export function ThreadList() {
   const activeServer = useUiStore((s) => s.activeServer);
@@ -12,20 +13,23 @@ export function ThreadList() {
   const setActiveThreadId = useUiStore((s) => s.setActiveThreadId);
   const key = activeServer && activeChannel ? channelKey(activeServer, activeChannel) : null;
   const threads = useChatStore((s) => (key ? s.threads[key] ?? EMPTY_THREADS : EMPTY_THREADS));
+  const tags = useChatStore((s) => (key ? s.forumTags[key] ?? EMPTY_TAGS : EMPTY_TAGS));
   const listThreads = useChatStore((s) => s.listThreads);
+  const listForumTags = useChatStore((s) => s.listForumTags);
 
   useEffect(() => {
     if (activeServer && activeChannel) {
       listThreads(activeServer, activeChannel);
+      listForumTags(activeServer, activeChannel);
     }
-  }, [activeServer, activeChannel, listThreads]);
+  }, [activeServer, activeChannel, listThreads, listForumTags]);
 
   if (threads.length === 0) {
     return null;
   }
 
   return (
-    <div className="border-t border-border px-3 py-2">
+    <section aria-label="Threads" className="border-t border-border px-3 py-2">
       <div className="mb-1 text-xs font-semibold uppercase text-text-muted">Threads</div>
       {threads.map((thread) => (
         <button
@@ -51,9 +55,21 @@ export function ThreadList() {
             <span className="text-xs text-text-muted">
               {thread.message_count} message{thread.message_count !== 1 ? 's' : ''}
             </span>
+            {(thread.tag_ids?.length ?? 0) > 0 && (
+              <div className="mt-0.5 flex flex-wrap gap-1">
+                {thread.tag_ids?.map((tagId) => {
+                  const tag = tags.find((candidate) => candidate.id === tagId);
+                  return tag ? (
+                    <span key={tag.id} className="rounded-full bg-bg-tertiary px-1.5 text-[10px] text-text-muted">
+                      {tag.emoji ? `${tag.emoji} ` : ''}{tag.name}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            )}
           </div>
         </button>
       ))}
-    </div>
+    </section>
   );
 }

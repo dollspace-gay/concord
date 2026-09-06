@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running unittests src/lib.rs (target/debug/deps/concord_server-dc82ffb804d83609)
+
+running 4 tests
+test contract::tests::schema_contains_both_wire_directions_and_discriminators ... ok
+test contract::tests::schema_accepts_actual_serde_values_and_rejects_wrong_payload_types ... ok
+test contract::tests::message_event_contract_preserves_historical_opaque_identifiers ... ok
+test contract::tests::every_wire_variant_fixture_round_trips_through_production_serde ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1014 filtered out; finished in 5.19s
+
+contract payload coverage: 124 client + 105 server variants, minimal + edge shapes

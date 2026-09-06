@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
 /// Parameters for creating a new OAuth-linked user.
@@ -61,6 +62,19 @@ pub async fn create_with_oauth(
     )
     .bind(params.user_id)
     .bind(params.username)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query("INSERT INTO user_aliases(alias,user_id,alias_kind) VALUES(?,?,'canonical_id')")
+        .bind(params.user_id)
+        .bind(params.user_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(
+        "INSERT OR IGNORE INTO user_aliases(alias,user_id,alias_kind) VALUES(?,?,'nickname')",
+    )
+    .bind(params.username)
+    .bind(params.user_id)
     .execute(&mut *tx)
     .await?;
 
@@ -198,13 +212,90 @@ pub async fn get_user_by_nickname(
 }
 
 /// AT Protocol credentials stored alongside an OAuth account.
+#[derive(Serialize, Deserialize)]
 pub struct AtprotoCredentials {
     pub did: String,
     pub access_token: String,
     pub refresh_token: String,
     pub dpop_private_key: String,
     pub pds_url: String,
+    #[serde(default)]
+    pub authorization_issuer: String,
+    #[serde(default)]
+    pub token_endpoint: String,
     pub token_expires_at: String,
+    #[serde(default)]
+    pub credential_version: i64,
+}
+
+pub async fn store_atproto_credentials_encrypted(
+    pool: &SqlitePool,
+    vault: &crate::secrets::SecretVault,
+    user_id: &str,
+    credentials: &AtprotoCredentials,
+) -> Result<(), anyhow::Error> {
+    let context = format!("atproto:{user_id}");
+    let plaintext = serde_json::to_vec(credentials)?;
+    let ciphertext = vault.encrypt(&context, &plaintext)?;
+    let changed=sqlx::query(
+        "UPDATE oauth_accounts SET credential_key_id=?,credential_ciphertext=?,credential_version=credential_version+1,credential_state='active',access_token=NULL,refresh_token=NULL,dpop_private_key=NULL WHERE user_id=? AND provider='atproto'",
+    ).bind(vault.key_id()).bind(ciphertext).bind(user_id).execute(pool).await?;
+    if changed.rows_affected() != 1 {
+        anyhow::bail!("AT Protocol account is unavailable");
+    }
+    Ok(())
+}
+
+pub async fn get_atproto_credentials_encrypted(
+    pool: &SqlitePool,
+    vault: &crate::secrets::SecretVault,
+    user_id: &str,
+) -> Result<Option<AtprotoCredentials>, anyhow::Error> {
+    let row:Option<(String,String,i64)>=sqlx::query_as(
+        "SELECT credential_key_id,credential_ciphertext,credential_version FROM oauth_accounts WHERE user_id=? AND provider='atproto' AND credential_state='active'",
+    ).bind(user_id).fetch_optional(pool).await?;
+    let Some((key_id, ciphertext, version)) = row else {
+        return Ok(None);
+    };
+    let plaintext = vault.decrypt(&format!("atproto:{user_id}"), &ciphertext, &key_id)?;
+    let mut credentials: AtprotoCredentials = serde_json::from_slice(&plaintext)?;
+    credentials.credential_version = version;
+    Ok(Some(credentials))
+}
+
+pub async fn store_atproto_credentials_if_version(
+    pool: &SqlitePool,
+    vault: &crate::secrets::SecretVault,
+    user_id: &str,
+    expected_version: i64,
+    credentials: &AtprotoCredentials,
+) -> Result<bool, anyhow::Error> {
+    let context = format!("atproto:{user_id}");
+    let ciphertext = vault.encrypt(&context, &serde_json::to_vec(credentials)?)?;
+    let result=sqlx::query("UPDATE oauth_accounts SET credential_key_id=?,credential_ciphertext=?,credential_version=credential_version+1,credential_state='active',access_token=NULL,refresh_token=NULL,dpop_private_key=NULL WHERE user_id=? AND provider='atproto' AND credential_version=?")
+        .bind(vault.key_id()).bind(ciphertext).bind(user_id).bind(expected_version).execute(pool).await?;
+    Ok(result.rows_affected() == 1)
+}
+
+pub async fn rotate_atproto_credential_key(
+    pool: &SqlitePool,
+    old: &crate::secrets::SecretVault,
+    new: &crate::secrets::SecretVault,
+) -> Result<u64, anyhow::Error> {
+    let mut transaction = pool.begin_with("BEGIN IMMEDIATE").await?;
+    let rows:Vec<(String,String,String)>=sqlx::query_as(
+        "SELECT user_id,credential_key_id,credential_ciphertext FROM oauth_accounts WHERE provider='atproto' AND credential_state='active'",
+    ).fetch_all(&mut *transaction).await?;
+    for (user_id, key_id, ciphertext) in &rows {
+        let context = format!("atproto:{user_id}");
+        let plaintext = old.decrypt(&context, ciphertext, key_id)?;
+        let replacement = new.encrypt(&context, &plaintext)?;
+        sqlx::query("UPDATE oauth_accounts SET credential_key_id=?,credential_ciphertext=?,credential_version=credential_version+1 WHERE user_id=? AND credential_key_id=?")
+            .bind(new.key_id()).bind(replacement).bind(user_id).bind(key_id)
+            .execute(&mut *transaction).await?;
+    }
+    transaction.commit().await?;
+    Ok(rows.len() as u64)
 }
 
 /// Store AT Protocol credentials (tokens, DPoP key, PDS URL) on an oauth_account.
@@ -255,7 +346,10 @@ pub async fn get_atproto_credentials(
                 refresh_token,
                 dpop_private_key,
                 pds_url,
+                authorization_issuer: String::new(),
+                token_endpoint: String::new(),
                 token_expires_at,
+                credential_version: 0,
             }
         },
     ))
@@ -498,6 +592,68 @@ mod tests {
         assert_eq!(c.did, "did:plc:123");
         assert_eq!(c.access_token, "access-tok");
         assert_eq!(c.pds_url, "https://pds.example.com");
+    }
+
+    #[tokio::test]
+    async fn encrypted_atproto_credentials_round_trip_and_fail_closed() {
+        let pool = setup_db().await;
+        create_with_oauth(
+            &pool,
+            &CreateOAuthUser {
+                user_id: "encrypted-user",
+                username: "alice",
+                email: None,
+                avatar_url: None,
+                oauth_id: "oauth-encrypted",
+                provider: "atproto",
+                provider_id: "did:plc:encrypted",
+            },
+        )
+        .await
+        .unwrap();
+        let first = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(first.path(), hex::encode([11_u8; 32])).unwrap();
+        let vault = crate::secrets::SecretVault::load(first.path()).unwrap();
+        let expected = AtprotoCredentials {
+            did: "did:plc:encrypted".into(),
+            access_token: "access-secret".into(),
+            refresh_token: "refresh-secret".into(),
+            dpop_private_key: "private-jwk".into(),
+            pds_url: "https://pds.example.com".into(),
+            authorization_issuer: "https://issuer.example.com".into(),
+            token_endpoint: "https://issuer.example.com/token".into(),
+            token_expires_at: "2026-12-31T00:00:00Z".into(),
+            credential_version: 0,
+        };
+        store_atproto_credentials_encrypted(&pool, &vault, "encrypted-user", &expected)
+            .await
+            .unwrap();
+        let stored:(Option<String>,Option<String>,Option<String>,String)=sqlx::query_as(
+            "SELECT access_token,refresh_token,dpop_private_key,credential_state FROM oauth_accounts WHERE user_id='encrypted-user'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!(stored, (None, None, None, "active".into()));
+        let actual = get_atproto_credentials_encrypted(&pool, &vault, "encrypted-user")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(actual.access_token, expected.access_token);
+        assert_eq!(actual.refresh_token, expected.refresh_token);
+
+        let second = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(second.path(), hex::encode([12_u8; 32])).unwrap();
+        let wrong = crate::secrets::SecretVault::load(second.path()).unwrap();
+        assert!(
+            get_atproto_credentials_encrypted(&pool, &wrong, "encrypted-user")
+                .await
+                .is_err()
+        );
+        sqlx::query("UPDATE oauth_accounts SET credential_ciphertext='corrupt' WHERE user_id='encrypted-user'")
+            .execute(&pool).await.unwrap();
+        assert!(
+            get_atproto_credentials_encrypted(&pool, &vault, "encrypted-user")
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]

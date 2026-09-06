@@ -1,0 +1,14 @@
+    Checking concord-server v0.1.0 (/home/doll/concord/concord/server)
+error: manually reimplementing `div_ceil`
+   --> server/src/bin/load_qualification_seed.rs:357:31
+    |
+357 |             "expected_total": (message_count + 49_999) / 50_000,
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `message_count.div_ceil(50_000)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#manual_div_ceil
+    = note: `-D clippy::manual-div-ceil` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_div_ceil)]`
+
+error: could not compile `concord-server` (bin "load_qualification_seed" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `concord-server` (bin "load_qualification_seed") due to 1 previous error

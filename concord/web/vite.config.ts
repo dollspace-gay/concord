@@ -10,9 +10,10 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': process.env.CONCORD_BACKEND_URL ?? 'http://localhost:8080',
+      '/oauth': process.env.CONCORD_BACKEND_URL ?? 'http://localhost:8080',
       '/ws': {
-        target: 'ws://localhost:8080',
+        target: (process.env.CONCORD_BACKEND_URL ?? 'http://localhost:8080').replace(/^http/, 'ws'),
         ws: true,
       },
     },

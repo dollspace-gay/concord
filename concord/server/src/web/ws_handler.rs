@@ -2,14 +2,16 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use axum::extract::ws::{Message, WebSocket};
-use axum::extract::{State, WebSocketUpgrade};
+use axum::extract::{Extension, State, WebSocketUpgrade};
+use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use axum_extra::extract::CookieJar;
 use futures_util::{SinkExt, StreamExt};
-use serde::Deserialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
-use crate::auth::token::validate_session_token;
+use crate::auth::authority::{Actor, AuthService};
 use crate::db::queries::users;
 use crate::engine::chat_engine::{ChatEngine, DEFAULT_SERVER_ID};
 use crate::engine::events::ChatEvent;
@@ -18,19 +20,63 @@ use crate::engine::user_session::Protocol;
 
 use super::app_state::AppState;
 
+fn default_oauth_client_type() -> String {
+    "confidential".to_owned()
+}
+
 /// Client-to-server WebSocket message types.
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum ClientMessage {
+pub(crate) enum ClientMessage {
+    /// Explicit correlation envelope for non-durable lifecycle commands.
+    LifecycleCommand {
+        request_id: String,
+        command: Box<ClientMessage>,
+    },
+    Sync {
+        request_id: String,
+        protocol_version: u32,
+        subscriptions: Vec<String>,
+        #[serde(default)]
+        cursor: Option<String>,
+        #[serde(default)]
+        limit: Option<usize>,
+    },
     SendMessage {
+        operation_generation: String,
+        #[serde(default)]
+        request_id: Option<String>,
+        #[serde(default)]
+        client_message_id: Option<String>,
+        #[serde(default)]
+        conversation_id: Option<String>,
         #[serde(default = "default_server_id")]
         server_id: String,
         channel: String,
         content: String,
+        #[serde(default)]
+        content_format: crate::engine::messaging::ContentFormat,
+        reply_to: Option<String>,
+        attachment_ids: Option<Vec<String>>,
+        #[serde(default)]
+        mentions: Vec<crate::engine::messaging::MessageMention>,
+        nonce: Option<String>,
+    },
+    SendDirectMessage {
+        operation_generation: String,
+        #[serde(default)]
+        request_id: Option<String>,
+        #[serde(default)]
+        client_message_id: Option<String>,
+        recipient: String,
+        content: String,
+        #[serde(default)]
+        content_format: crate::engine::messaging::ContentFormat,
         reply_to: Option<String>,
         attachment_ids: Option<Vec<String>>,
         nonce: Option<String>,
     },
+    ListDirectConversations,
     JoinChannel {
         #[serde(default = "default_server_id")]
         server_id: String,
@@ -80,6 +126,7 @@ enum ClientMessage {
         name: String,
         category_id: Option<String>,
         is_private: Option<bool>,
+        channel_type: Option<String>,
     },
     DeleteChannel {
         server_id: String,
@@ -99,17 +146,41 @@ enum ClientMessage {
         role: String,
     },
     EditMessage {
+        operation_generation: String,
+        #[serde(default)]
+        request_id: Option<String>,
+        #[serde(default)]
+        client_message_id: Option<String>,
         message_id: String,
         content: String,
+        #[serde(default)]
+        content_format: crate::engine::messaging::ContentFormat,
+        #[serde(default)]
+        mentions: Vec<crate::engine::messaging::MessageMention>,
     },
     DeleteMessage {
+        operation_generation: String,
+        #[serde(default)]
+        request_id: Option<String>,
+        #[serde(default)]
+        client_message_id: Option<String>,
         message_id: String,
     },
     AddReaction {
+        operation_generation: String,
+        #[serde(default)]
+        request_id: Option<String>,
+        #[serde(default)]
+        client_message_id: Option<String>,
         message_id: String,
         emoji: String,
     },
     RemoveReaction {
+        operation_generation: String,
+        #[serde(default)]
+        request_id: Option<String>,
+        #[serde(default)]
+        client_message_id: Option<String>,
         message_id: String,
         emoji: String,
     },
@@ -119,6 +190,13 @@ enum ClientMessage {
         channel: String,
     },
     MarkRead {
+        operation_generation: String,
+        #[serde(default)]
+        request_id: Option<String>,
+        #[serde(default)]
+        client_message_id: Option<String>,
+        #[serde(default)]
+        conversation_id: Option<String>,
         #[serde(default = "default_server_id")]
         server_id: String,
         channel: String,
@@ -159,6 +237,24 @@ enum ClientMessage {
         user_id: String,
         role_id: String,
     },
+    ListChannelPermissionOverrides {
+        server_id: String,
+        channel_id: String,
+    },
+    SetChannelPermissionOverride {
+        server_id: String,
+        channel_id: String,
+        target_type: String,
+        target_id: String,
+        allow_bits: i64,
+        deny_bits: i64,
+    },
+    DeleteChannelPermissionOverride {
+        server_id: String,
+        channel_id: String,
+        target_type: String,
+        target_id: String,
+    },
     // ── Categories ──
     ListCategories {
         server_id: String,
@@ -197,11 +293,15 @@ enum ClientMessage {
     },
     // ── Phase 4: Search ──
     SearchMessages {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        request_id: Option<String>,
         server_id: String,
         query: String,
         channel: Option<String>,
         limit: Option<i64>,
         offset: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        continuation: Option<String>,
     },
     // ── Phase 4: Notifications ──
     UpdateNotificationSettings {
@@ -248,9 +348,48 @@ enum ClientMessage {
         server_id: String,
         thread_id: String,
     },
+    UnarchiveThread {
+        server_id: String,
+        thread_id: String,
+    },
     ListThreads {
         server_id: String,
         channel: String,
+    },
+    CreateForumTag {
+        server_id: String,
+        channel: String,
+        name: String,
+        emoji: Option<String>,
+        #[serde(default)]
+        moderated: bool,
+    },
+    UpdateForumTag {
+        server_id: String,
+        channel: String,
+        tag_id: String,
+        name: String,
+        emoji: Option<String>,
+        moderated: bool,
+        position: i32,
+    },
+    DeleteForumTag {
+        server_id: String,
+        channel: String,
+        tag_id: String,
+    },
+    ListForumTags {
+        server_id: String,
+        channel: String,
+    },
+    SetThreadTags {
+        server_id: String,
+        thread_id: String,
+        tag_ids: Vec<String>,
+    },
+    GetThreadTags {
+        server_id: String,
+        thread_id: String,
     },
     // ── Phase 5: Bookmarks ──
     AddBookmark {
@@ -415,6 +554,9 @@ enum ClientMessage {
     ListChannelFollows {
         channel_id: String,
     },
+    PublishAnnouncement {
+        message_id: String,
+    },
     CreateTemplate {
         server_id: String,
         name: String,
@@ -426,6 +568,10 @@ enum ClientMessage {
     DeleteTemplate {
         server_id: String,
         template_id: String,
+    },
+    InstantiateTemplate {
+        template_id: String,
+        server_name: String,
     },
     // ── Phase 8: Integrations & Bots ──
     CreateWebhook {
@@ -451,6 +597,7 @@ enum ClientMessage {
         username: String,
         avatar_url: Option<String>,
     },
+    ListOwnedBots,
     CreateBotToken {
         bot_user_id: String,
         name: String,
@@ -483,10 +630,18 @@ enum ClientMessage {
         command_id: String,
     },
     InvokeSlashCommand {
+        request_id: String,
         server_id: String,
         channel: String,
         command_name: String,
         args_json: Option<String>,
+    },
+    InvokeMessageComponent {
+        request_id: String,
+        message_id: String,
+        custom_id: String,
+        #[serde(default)]
+        values: Vec<String>,
     },
     RespondToInteraction {
         interaction_id: String,
@@ -499,6 +654,8 @@ enum ClientMessage {
         name: String,
         description: Option<String>,
         redirect_uris: Vec<String>,
+        #[serde(default = "default_oauth_client_type")]
+        client_type: String,
     },
     ListOAuth2Apps,
     DeleteOAuth2App {
@@ -523,38 +680,99 @@ fn default_server_id() -> String {
 
 pub async fn ws_upgrade(
     State(state): State<Arc<AppState>>,
+    Extension(rate_limiters): Extension<Arc<super::rate_limit::ApiRateLimiters>>,
     jar: CookieJar,
+    headers: HeaderMap,
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
-    // Try cookie-based auth first
-    let (nickname, user_id, avatar_url) = if let Some(cookie) = jar.get("concord_session") {
-        if let Ok(claims) = validate_session_token(cookie.value(), &state.auth_config.jwt_secret) {
-            match users::get_user(&state.db, &claims.sub).await {
-                Ok(Some((id, username, _email, avatar))) => (username, Some(id), avatar),
-                _ => {
-                    return (axum::http::StatusCode::UNAUTHORIZED, "User not found")
-                        .into_response();
-                }
+    let expected_origin = state.auth_config.public_url.trim_end_matches('/');
+    if headers
+        .get(axum::http::header::ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        != Some(expected_origin)
+    {
+        return (
+            axum::http::StatusCode::FORBIDDEN,
+            "Invalid WebSocket origin",
+        )
+            .into_response();
+    }
+    // Browser sessions use the same-site cookie. Bot clients use the canonical
+    // bearer credential rather than trying to impersonate a browser session.
+    let bearer = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "));
+    if jar.get("concord_session").is_some() && bearer.is_some() {
+        return (
+            axum::http::StatusCode::UNAUTHORIZED,
+            "Provide exactly one WebSocket credential",
+        )
+            .into_response();
+    }
+    let (nickname, actor, avatar_url) = if let Some(cookie) = jar.get("concord_session") {
+        let actor = match state.auth.authenticate_web_session(cookie.value()).await {
+            Ok(actor) => actor,
+            Err(error) => {
+                return super::auth_middleware::auth_error_response(error, "Invalid session token");
             }
-        } else {
-            return (
-                axum::http::StatusCode::UNAUTHORIZED,
-                "Invalid session token",
-            )
-                .into_response();
+        };
+        match users::get_user(&state.db, actor.user_id().as_str()).await {
+            Ok(Some((_id, username, _email, avatar))) => (username, actor, avatar),
+            Ok(None) => {
+                return (axum::http::StatusCode::UNAUTHORIZED, "User not found").into_response();
+            }
+            Err(_) => {
+                return (
+                    axum::http::StatusCode::SERVICE_UNAVAILABLE,
+                    "Authentication service unavailable",
+                )
+                    .into_response();
+            }
+        }
+    } else if let Some(token) = bearer {
+        let actor = match state.auth.authenticate_bot(token).await {
+            Ok(actor) => actor,
+            Err(error) => {
+                return super::auth_middleware::auth_error_response(error, "Invalid bot token");
+            }
+        };
+        match users::get_user(&state.db, actor.user_id().as_str()).await {
+            Ok(Some((_id, username, _email, avatar))) => (username, actor, avatar),
+            Ok(None) => {
+                return (axum::http::StatusCode::UNAUTHORIZED, "Bot user not found")
+                    .into_response();
+            }
+            Err(_) => {
+                return (
+                    axum::http::StatusCode::SERVICE_UNAVAILABLE,
+                    "Authentication service unavailable",
+                )
+                    .into_response();
+            }
         }
     } else {
         return (
             axum::http::StatusCode::UNAUTHORIZED,
-            "Not authenticated. Provide a valid session cookie.",
+            "Not authenticated. Provide a valid session cookie or bot bearer token.",
         )
             .into_response();
     };
 
+    if !rate_limiters.admit_authenticated_ws(actor.credential_id().as_str()) {
+        return (
+            axum::http::StatusCode::TOO_MANY_REQUESTS,
+            "Too many authenticated reconnects. Please try again later.",
+        )
+            .into_response();
+    }
+
     let engine = state.engine.clone();
+    let auth = state.auth.clone();
+    let shutdown = state.shutdown.clone();
     ws.max_message_size(64 * 1024) // 64 KB max WS message
         .on_upgrade(move |socket| {
-            handle_ws_connection(socket, engine, user_id, nickname, avatar_url)
+            handle_ws_connection(socket, engine, auth, actor, nickname, avatar_url, shutdown)
         })
         .into_response()
 }
@@ -562,73 +780,214 @@ pub async fn ws_upgrade(
 async fn handle_ws_connection(
     socket: WebSocket,
     engine: Arc<ChatEngine>,
-    user_id: Option<String>,
+    auth: AuthService,
+    actor: Actor,
     nickname: String,
     avatar_url: Option<String>,
+    shutdown: tokio_util::sync::CancellationToken,
 ) {
-    let (session_id, mut event_rx) =
-        match engine.connect(user_id, nickname.clone(), Protocol::WebSocket, avatar_url) {
-            Ok(pair) => pair,
-            Err(e) => {
-                warn!(%nickname, error = %e, "WebSocket connection rejected");
-                return;
-            }
-        };
+    let credential_lease = match auth.register_live(&actor).await {
+        Ok(lease) => lease,
+        Err(_) => return,
+    };
+    let (session_id, mut event_rx) = match engine.connect(
+        Some(actor.user_id().as_str().to_owned()),
+        nickname.clone(),
+        Protocol::WebSocket,
+        avatar_url,
+    ) {
+        Ok(pair) => pair,
+        Err(e) => {
+            warn!(%nickname, error = %e, "WebSocket connection rejected");
+            return;
+        }
+    };
+    if engine
+        .bind_authenticated_actor(session_id, actor.clone())
+        .is_err()
+    {
+        engine.disconnect(session_id);
+        return;
+    }
+    if engine.send_own_presence(session_id).await.is_err() {
+        engine.disconnect(session_id);
+        return;
+    }
+    let Some(session) = engine.get_session(session_id) else {
+        return;
+    };
+    let overflow_cancel = session.overflow_cancellation_token();
 
     let (mut ws_sender, mut ws_receiver) = socket.split();
+    let (heartbeat_tx, mut heartbeat_rx) = tokio::sync::mpsc::channel::<()>(1);
 
+    let writer_auth = auth.clone();
+    let writer_actor = actor.clone();
+    let writer_cancel = credential_lease.cancellation_token();
+    let writer_shutdown = shutdown.clone();
+    let writer_engine = engine.clone();
+    let writer_session = session.clone();
+    let writer_overflow = overflow_cancel.clone();
+    let writer_done = tokio_util::sync::CancellationToken::new();
+    let writer_finished = writer_done.clone();
     let write_handle = tokio::spawn(async move {
-        while let Some(event) = event_rx.recv().await {
-            match serde_json::to_string(&event) {
-                Ok(json) => {
-                    if ws_sender.send(Message::Text(json.into())).await.is_err() {
-                        break;
+        enum WriterAction {
+            Event(Box<ChatEvent>),
+            Ping,
+            PongReceived,
+        }
+
+        let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(30));
+        heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        heartbeat.tick().await;
+        let mut awaiting_pong = false;
+        loop {
+            let action = tokio::select! {
+                _ = writer_cancel.cancelled() => break,
+                _ = writer_shutdown.cancelled() => break,
+                _ = writer_overflow.cancelled() => break,
+                _ = crate::auth::authority::wait_for_expiry(writer_actor.expires_at()) => break,
+                _ = heartbeat.tick() => WriterAction::Ping,
+                pong = heartbeat_rx.recv() => match pong {
+                    Some(()) => WriterAction::PongReceived,
+                    None => break,
+                },
+                event = event_rx.recv() => match event {
+                    Some(event) => WriterAction::Event(Box::new(event)),
+                    None => break,
+                },
+            };
+            if matches!(action, WriterAction::PongReceived) {
+                awaiting_pong = false;
+                continue;
+            }
+            if matches!(action, WriterAction::Ping) && awaiting_pong {
+                break;
+            }
+            if writer_auth.validate_actor(&writer_actor).await.is_err() {
+                break;
+            }
+            let message = match action {
+                WriterAction::Event(event) => {
+                    if let Some(guard) = writer_session.take_delivery_guard() {
+                        let authorized = writer_engine
+                            .delivery_guard_is_current(&writer_actor, &guard)
+                            .await;
+                        if !authorized {
+                            warn!(
+                                guard = guard.kind(),
+                                "WebSocket delivery guard denied queued event"
+                            );
+                            if matches!(
+                                guard,
+                                crate::engine::user_session::DeliveryGuard::ServerPermissions(_)
+                            ) {
+                                continue;
+                            }
+                            break;
+                        }
+                    }
+                    match serde_json::to_string(&event) {
+                        Ok(json) => Message::Text(json.into()),
+                        Err(e) => {
+                            error!(error = %e, "failed to serialize event");
+                            continue;
+                        }
                     }
                 }
-                Err(e) => {
-                    error!(error = %e, "failed to serialize event");
+                WriterAction::Ping => {
+                    awaiting_pong = true;
+                    Message::Ping(Vec::new().into())
                 }
+                WriterAction::PongReceived => unreachable!(),
+            };
+            let sent = tokio::select! {
+                _ = writer_cancel.cancelled() => false,
+                _ = writer_shutdown.cancelled() => false,
+                _ = writer_overflow.cancelled() => false,
+                result = tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    ws_sender.send(message),
+                ) => matches!(result, Ok(Ok(()))),
+            };
+            if !sent {
+                break;
             }
         }
+        writer_finished.cancel();
     });
 
     let engine_ref = engine.clone();
-    let mut ws_command_count: u32 = 0;
-    let mut ws_command_window_start = Instant::now();
+    let mut ws_mutation_count: u32 = 0;
+    let mut ws_mutation_window_start = Instant::now();
+    let mut ws_read_count: u32 = 0;
+    let mut ws_read_window_start = Instant::now();
     const WS_COMMANDS_PER_SECOND: u32 = 30;
+    const WS_READS_PER_SECOND: u32 = 120;
 
     loop {
-        let msg = match tokio::time::timeout(std::time::Duration::from_secs(90), ws_receiver.next())
-            .await
-        {
-            Ok(Some(Ok(msg))) => msg,
-            Ok(Some(Err(e))) => {
+        let msg = match tokio::select! {
+            _ = credential_lease.cancelled() => break,
+            _ = shutdown.cancelled() => break,
+            _ = crate::auth::authority::wait_for_expiry(actor.expires_at()) => break,
+            _ = writer_done.cancelled() => break,
+            _ = overflow_cancel.cancelled() => break,
+            result = ws_receiver.next() => result,
+        } {
+            Some(Ok(msg)) => msg,
+            Some(Err(e)) => {
                 warn!(error = %e, "WebSocket read error");
                 break;
             }
-            Ok(None) => break, // Stream closed
-            Err(_) => {
-                info!(%session_id, %nickname, "WebSocket idle timeout, disconnecting");
-                break;
-            }
+            None => break, // Stream closed
         };
 
         match msg {
             Message::Text(text) => {
-                ws_command_count += 1;
-                if ws_command_window_start.elapsed() >= std::time::Duration::from_secs(1) {
-                    ws_command_count = 1;
-                    ws_command_window_start = Instant::now();
-                } else if ws_command_count > WS_COMMANDS_PER_SECOND {
+                if auth.validate_actor(&actor).await.is_err() {
+                    break;
+                }
+                let is_read = websocket_command_is_read(&text);
+                let admitted = if is_read {
+                    fixed_window_admit(
+                        &mut ws_read_count,
+                        &mut ws_read_window_start,
+                        WS_READS_PER_SECOND,
+                    )
+                } else {
+                    fixed_window_admit(
+                        &mut ws_mutation_count,
+                        &mut ws_mutation_window_start,
+                        WS_COMMANDS_PER_SECOND,
+                    )
+                };
+                if !admitted {
                     if let Some(session) = engine_ref.get_session(session_id) {
-                        let _ = session.send(ChatEvent::Error {
-                            code: "RATE_LIMITED".to_string(),
-                            message: "Rate limited: too many commands per second".to_string(),
-                        });
+                        let message = if is_read {
+                            "Rate limited: too many read commands; retry shortly"
+                        } else {
+                            "Rate limited: too many mutation commands; retry shortly"
+                        };
+                        if let Some(request_id) = websocket_command_correlation(&text) {
+                            let _ = session.send(ChatEvent::CommandError {
+                                request_id,
+                                code: "RATE_LIMITED".into(),
+                                message: message.into(),
+                                retryable: true,
+                            });
+                        } else {
+                            let _ = session.send(ChatEvent::Error {
+                                code: "RATE_LIMITED".into(),
+                                message: message.into(),
+                            });
+                        }
                     }
                     continue;
                 }
                 handle_client_message(&engine_ref, session_id, &text).await;
+            }
+            Message::Pong(_) => {
+                let _ = heartbeat_tx.try_send(());
             }
             Message::Close(_) => break,
             _ => {}
@@ -640,38 +999,270 @@ async fn handle_ws_connection(
     info!(%session_id, %nickname, "WebSocket connection closed");
 }
 
+fn fixed_window_admit(count: &mut u32, window_start: &mut Instant, limit: u32) -> bool {
+    if window_start.elapsed() >= std::time::Duration::from_secs(1) {
+        *count = 0;
+        *window_start = Instant::now();
+    }
+    *count = count.saturating_add(1);
+    let admitted = *count <= limit;
+    crate::runtime_metrics::record(
+        crate::runtime_metrics::Operation::CommandAdmission,
+        admitted,
+        std::time::Duration::ZERO,
+    );
+    admitted
+}
+
+fn websocket_command_correlation(text: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(text)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("request_id")
+                .or_else(|| value.get("nonce"))
+                .and_then(serde_json::Value::as_str)
+                .filter(|value| !value.is_empty() && value.len() <= 128)
+                .map(str::to_owned)
+        })
+}
+
+/// Read-only bootstrap and query commands have an independent admission budget
+/// so reconnect hydration cannot consume the budget needed for user mutations.
+fn websocket_command_is_read(text: &str) -> bool {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(text) else {
+        return false;
+    };
+    matches!(
+        value.get("type").and_then(serde_json::Value::as_str),
+        Some(
+            "sync"
+                | "fetch_history"
+                | "list_channels"
+                | "get_members"
+                | "list_servers"
+                | "list_direct_conversations"
+                | "get_unread_counts"
+                | "list_roles"
+                | "list_channel_permission_overrides"
+                | "list_categories"
+                | "get_presences"
+                | "search_messages"
+                | "get_notification_settings"
+                | "get_user_profile"
+                | "get_pinned_messages"
+                | "list_threads"
+                | "list_forum_tags"
+                | "get_thread_tags"
+                | "list_bookmarks"
+                | "list_bans"
+                | "get_audit_log"
+                | "list_automod_rules"
+                | "list_invites"
+                | "list_events"
+                | "list_rsvps"
+                | "get_community_settings"
+                | "discover_servers"
+                | "list_channel_follows"
+                | "list_templates"
+                | "list_webhooks"
+                | "list_owned_bots"
+                | "list_bot_tokens"
+                | "list_slash_commands"
+                | "list_o_auth2_apps"
+                | "get_server_limits"
+                | "get_bluesky_identity"
+                | "get_atproto_sync_setting"
+        )
+    )
+}
+
 async fn handle_client_message(
     engine: &ChatEngine,
-    session_id: crate::engine::events::SessionId,
+    session_id: crate::engine::events::ConnectionId,
     text: &str,
 ) {
+    let correlation_id = websocket_command_correlation(text);
     let msg: ClientMessage = match serde_json::from_str(text) {
         Ok(m) => m,
         Err(e) => {
-            warn!(error = %e, "invalid client message");
+            warn!(
+                category = ?e.classify(),
+                line = e.line(),
+                column = e.column(),
+                "invalid client message"
+            );
+            if let Some(request_id) = correlation_id
+                && let Some(session) = engine.get_session(session_id)
+            {
+                let _ = session.send(ChatEvent::CommandError {
+                    request_id,
+                    code: "INVALID_INPUT".into(),
+                    message: "invalid client message".into(),
+                    retryable: false,
+                });
+            }
             return;
         }
     };
 
+    let (msg, lifecycle_success_id) = match msg {
+        ClientMessage::LifecycleCommand {
+            request_id,
+            command,
+        } if lifecycle_command_allowed(&command) => (*command, Some(request_id)),
+        ClientMessage::LifecycleCommand { request_id, .. } => {
+            if let Some(session) = engine.get_session(session_id) {
+                let _ = session.send(ChatEvent::CommandError {
+                    request_id,
+                    code: "INVALID_INPUT".into(),
+                    message: "command is not a lifecycle mutation".into(),
+                    retryable: false,
+                });
+            }
+            return;
+        }
+        message => (message, None),
+    };
+
     let result = match msg {
+        ClientMessage::LifecycleCommand { .. } => unreachable!("lifecycle envelope was unwrapped"),
+        ClientMessage::Sync {
+            request_id,
+            protocol_version,
+            subscriptions,
+            cursor,
+            limit,
+        } => {
+            if protocol_version != 2 {
+                if let Some(session) = engine.get_session(session_id) {
+                    let _ = session.send(ChatEvent::ResyncRequired {
+                        request_id,
+                        reason: crate::engine::replay::ResyncReason::ProtocolChanged,
+                    });
+                }
+                Ok(())
+            } else {
+                match engine
+                    .synchronize(
+                        session_id,
+                        &subscriptions,
+                        cursor.as_deref(),
+                        limit.unwrap_or(100),
+                    )
+                    .await
+                {
+                    Ok(event) => {
+                        if let Some(session) = engine.get_session(session_id) {
+                            let event = match event {
+                                crate::engine::chat_engine::Synchronization::Snapshot(snapshot) => {
+                                    ChatEvent::SyncSnapshot {
+                                        request_id,
+                                        snapshot,
+                                    }
+                                }
+                                crate::engine::chat_engine::Synchronization::Replay(batch) => {
+                                    ChatEvent::ReplayBatch { request_id, batch }
+                                }
+                            };
+                            let _ = session.send_guarded(
+                                event,
+                                Some(crate::engine::user_session::DeliveryGuard::Conversations(
+                                    subscriptions,
+                                )),
+                            );
+                        }
+                        Ok(())
+                    }
+                    Err(crate::engine::replay::ReplayError::ResyncRequired(reason)) => {
+                        if let Some(session) = engine.get_session(session_id) {
+                            let _ = session.send(ChatEvent::ResyncRequired { request_id, reason });
+                        }
+                        Ok(())
+                    }
+                    Err(error) => Err(error.to_string()),
+                }
+            }
+        }
         ClientMessage::SendMessage {
+            operation_generation,
+            request_id,
+            client_message_id,
+            conversation_id,
             server_id,
             channel,
             content,
+            content_format,
+            reply_to,
+            attachment_ids,
+            mentions,
+            nonce,
+        } => {
+            let fallback = nonce
+                .clone()
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+            let request_id = request_id.as_deref().unwrap_or(&fallback);
+            let client_message_id = client_message_id.as_deref().unwrap_or(&fallback);
+            engine
+                .submit_channel_message(
+                    session_id,
+                    crate::engine::messaging::SendMessageCommand {
+                        request_id,
+                        client_message_id,
+                        operation_generation: Some(&operation_generation),
+                        conversation_id: conversation_id.as_deref(),
+                        server_id: &server_id,
+                        channel: &channel,
+                        content: &content,
+                        content_format,
+                        reply_to_id: reply_to.as_deref(),
+                        attachment_ids: attachment_ids.as_deref().unwrap_or(&[]),
+                        mentions: &mentions,
+                    },
+                    nonce.as_deref(),
+                )
+                .await
+                .map(|_| ())
+                .map_err(|error| format!("{}: {}", error.code(), error.safe_message()))
+        }
+        ClientMessage::SendDirectMessage {
+            operation_generation,
+            request_id,
+            client_message_id,
+            recipient,
+            content,
+            content_format,
             reply_to,
             attachment_ids,
             nonce,
-        } => engine.send_message(
-            session_id,
-            &server_id,
-            &channel,
-            &content,
-            reply_to.as_deref(),
-            attachment_ids.as_deref(),
-            nonce.as_deref(),
-        ),
+        } => {
+            let fallback = nonce
+                .clone()
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+            engine
+                .submit_direct_message(
+                    session_id,
+                    crate::engine::messaging::SendDirectMessageCommand {
+                        request_id: request_id.as_deref().unwrap_or(&fallback),
+                        client_message_id: client_message_id.as_deref().unwrap_or(&fallback),
+                        operation_generation: Some(&operation_generation),
+                        recipient: &recipient,
+                        content: &content,
+                        content_format,
+                        reply_to_id: reply_to.as_deref(),
+                        attachment_ids: attachment_ids.as_deref().unwrap_or(&[]),
+                    },
+                    nonce.as_deref(),
+                )
+                .await
+                .map(|_| ())
+                .map_err(|error| format!("{}: {}", error.code(), error.safe_message()))
+        }
+        ClientMessage::ListDirectConversations => {
+            engine.list_direct_conversations(session_id).await
+        }
         ClientMessage::JoinChannel { server_id, channel } => {
-            engine.join_channel(session_id, &server_id, &channel)
+            engine.join_channel(session_id, &server_id, &channel).await
         }
         ClientMessage::PartChannel {
             server_id,
@@ -682,75 +1273,75 @@ async fn handle_client_message(
             server_id,
             channel,
             topic,
-        } => engine.set_topic(session_id, &server_id, &channel, topic),
+        } => {
+            engine
+                .set_topic(session_id, &server_id, &channel, topic)
+                .await
+        }
         ClientMessage::FetchHistory {
             server_id,
             channel,
             before,
             limit,
         } => {
-            // Verify the user is a member of this server
-            let is_member = engine
-                .get_session(session_id)
-                .and_then(|s| {
-                    s.user_id
-                        .as_ref()
-                        .map(|uid| engine.user_is_server_member(&server_id, uid))
-                })
-                .unwrap_or(false);
-            if !is_member {
-                Err("You are not a member of this server".into())
-            } else {
-                let user_id = engine
-                    .get_session(session_id)
-                    .and_then(|s| s.user_id.clone());
+            if let Some(actor) = engine.get_authenticated_actor(session_id) {
                 let limit = limit.unwrap_or(50).clamp(1, 200);
                 match engine
-                    .fetch_history(
-                        &server_id,
-                        &channel,
-                        before.as_deref(),
-                        limit,
-                        user_id.as_deref(),
-                    )
+                    .fetch_history(&server_id, &channel, before.as_deref(), limit, &actor)
                     .await
                 {
-                    Ok((messages, has_more)) => {
+                    Ok((messages, has_more, stamp)) => {
+                        if !engine.authorization_stamp_is_current(&actor, &stamp).await {
+                            return;
+                        }
                         if let Some(session) = engine.get_session(session_id) {
-                            let _ = session.send(ChatEvent::History {
-                                server_id,
-                                channel,
-                                messages,
-                                has_more,
-                            });
+                            let _ = session.send_guarded(
+                                ChatEvent::History {
+                                    server_id,
+                                    channel,
+                                    messages,
+                                    has_more,
+                                },
+                                Some(crate::engine::user_session::DeliveryGuard::Stamps(vec![
+                                    stamp,
+                                ])),
+                            );
                         }
                         Ok(())
                     }
                     Err(e) => Err(e),
                 }
+            } else {
+                Err("resource unavailable".into())
             }
         }
         ClientMessage::ListChannels { server_id } => {
-            // Verify the user is a member of this server
-            let is_member = engine
-                .get_session(session_id)
-                .and_then(|s| {
-                    s.user_id
-                        .as_ref()
-                        .map(|uid| engine.user_is_server_member(&server_id, uid))
-                })
-                .unwrap_or(false);
-            if !is_member {
-                Err("You are not a member of this server".into())
-            } else {
-                let channels = engine.list_channels(&server_id);
-                if let Some(session) = engine.get_session(session_id) {
-                    let _ = session.send(ChatEvent::ChannelList {
-                        server_id,
-                        channels,
-                    });
+            if let Some(actor) = engine.get_authenticated_actor(session_id) {
+                match engine
+                    .list_visible_channels_for_actor(&server_id, &actor)
+                    .await
+                {
+                    Ok((channels, stamp)) => {
+                        if !engine.authorization_stamp_is_current(&actor, &stamp).await {
+                            return;
+                        }
+                        if let Some(session) = engine.get_session(session_id) {
+                            let _ = session.send_guarded(
+                                ChatEvent::ChannelList {
+                                    server_id,
+                                    channels,
+                                },
+                                Some(crate::engine::user_session::DeliveryGuard::Stamps(vec![
+                                    stamp,
+                                ])),
+                            );
+                        }
+                        Ok(())
+                    }
+                    Err(error) => Err(error),
                 }
-                Ok(())
+            } else {
+                Err("resource unavailable".into())
             }
         }
         ClientMessage::GetMembers { server_id, channel } => {
@@ -766,14 +1357,28 @@ async fn handle_client_message(
             if !is_member {
                 Err("You are not a member of this server".into())
             } else {
-                match engine.get_members(&server_id, &channel) {
-                    Ok(member_infos) => {
+                let Some(actor) = engine.get_authenticated_actor(session_id) else {
+                    return;
+                };
+                match engine
+                    .get_visible_members(&actor, &server_id, &channel)
+                    .await
+                {
+                    Ok((member_infos, stamp)) => {
+                        if !engine.authorization_stamp_is_current(&actor, &stamp).await {
+                            return;
+                        }
                         if let Some(session) = engine.get_session(session_id) {
-                            let _ = session.send(ChatEvent::Names {
-                                server_id,
-                                channel,
-                                members: member_infos,
-                            });
+                            let _ = session.send_guarded(
+                                ChatEvent::Names {
+                                    server_id,
+                                    channel,
+                                    members: member_infos,
+                                },
+                                Some(crate::engine::user_session::DeliveryGuard::Stamps(vec![
+                                    stamp,
+                                ])),
+                            );
                         }
                         Ok(())
                     }
@@ -793,75 +1398,54 @@ async fn handle_client_message(
             Ok(())
         }
         ClientMessage::CreateServer { name, icon_url } => {
-            let session = engine.get_session(session_id);
-            let user_id = session.as_ref().and_then(|s| s.user_id.clone());
-            let Some(uid) = user_id else {
-                return send_error(
-                    engine,
-                    session_id,
-                    "AUTH_REQUIRED",
-                    "Must be authenticated to create a server",
-                );
-            };
-            match engine.create_server(name, uid, icon_url).await {
-                Ok(_server_id) => {
-                    if let Some(session) = engine.get_session(session_id)
-                        && let Some(ref uid) = session.user_id
-                    {
-                        let servers = engine.list_servers_for_user(uid).await;
-                        let _ = session.send(ChatEvent::ServerList { servers });
+            match engine.get_authenticated_actor(session_id) {
+                Some(actor) => match engine.create_server_for_actor(&actor, name, icon_url).await {
+                    Ok(_server_id) => {
+                        if let Some(session) = engine.get_session(session_id)
+                            && let Some(ref uid) = session.user_id
+                        {
+                            let servers = engine.list_servers_for_user(uid).await;
+                            let _ = session.send(ChatEvent::ServerList { servers });
+                        }
+                        Ok(())
                     }
-                    Ok(())
-                }
-                Err(e) => Err(e),
+                    Err(e) => Err(e.to_string()),
+                },
+                None => Err("UNAUTHENTICATED: authentication required".into()),
             }
         }
         ClientMessage::JoinServer { server_id } => {
-            let session = engine.get_session(session_id);
-            let user_id = session.as_ref().and_then(|s| s.user_id.clone());
-            let Some(uid) = user_id else {
-                return send_error(
-                    engine,
-                    session_id,
-                    "AUTH_REQUIRED",
-                    "Must be authenticated to join a server",
-                );
-            };
-            match engine.join_server(&uid, &server_id).await {
-                Ok(()) => {
-                    if let Some(session) = engine.get_session(session_id)
-                        && let Some(ref uid) = session.user_id
-                    {
-                        let servers = engine.list_servers_for_user(uid).await;
-                        let _ = session.send(ChatEvent::ServerList { servers });
+            match engine.get_authenticated_actor(session_id) {
+                Some(actor) => match engine.join_server_for_actor(&actor, &server_id).await {
+                    Ok(()) => {
+                        if let Some(session) = engine.get_session(session_id)
+                            && let Some(ref uid) = session.user_id
+                        {
+                            let servers = engine.list_servers_for_user(uid).await;
+                            let _ = session.send(ChatEvent::ServerList { servers });
+                        }
+                        Ok(())
                     }
-                    Ok(())
-                }
-                Err(e) => Err(e),
+                    Err(e) => Err(e),
+                },
+                None => Err("UNAUTHENTICATED: authentication required".into()),
             }
         }
         ClientMessage::LeaveServer { server_id } => {
-            let session = engine.get_session(session_id);
-            let user_id = session.as_ref().and_then(|s| s.user_id.clone());
-            let Some(uid) = user_id else {
-                return send_error(
-                    engine,
-                    session_id,
-                    "AUTH_REQUIRED",
-                    "Must be authenticated to leave a server",
-                );
-            };
-            match engine.leave_server(&uid, &server_id).await {
-                Ok(()) => {
-                    if let Some(session) = engine.get_session(session_id)
-                        && let Some(ref uid) = session.user_id
-                    {
-                        let servers = engine.list_servers_for_user(uid).await;
-                        let _ = session.send(ChatEvent::ServerList { servers });
+            match engine.get_authenticated_actor(session_id) {
+                Some(actor) => match engine.leave_server_for_actor(&actor, &server_id).await {
+                    Ok(()) => {
+                        if let Some(session) = engine.get_session(session_id)
+                            && let Some(ref uid) = session.user_id
+                        {
+                            let servers = engine.list_servers_for_user(uid).await;
+                            let _ = session.send(ChatEvent::ServerList { servers });
+                        }
+                        Ok(())
                     }
-                    Ok(())
-                }
-                Err(e) => Err(e),
+                    Err(e) => Err(e),
+                },
+                None => Err("UNAUTHENTICATED: authentication required".into()),
             }
         }
         ClientMessage::CreateChannel {
@@ -869,86 +1453,55 @@ async fn handle_client_message(
             name,
             category_id,
             is_private,
+            channel_type,
         } => {
             match engine
-                .require_permission(session_id, &server_id, None, Permissions::MANAGE_CHANNELS)
+                .create_channel_in_server(
+                    session_id,
+                    &server_id,
+                    &name,
+                    category_id.as_deref(),
+                    is_private.unwrap_or(false),
+                    channel_type.as_deref().unwrap_or("text"),
+                )
                 .await
             {
-                Ok(_) => match engine
-                    .create_channel_in_server(
-                        &server_id,
-                        &name,
-                        category_id.as_deref(),
-                        is_private.unwrap_or(false),
-                    )
-                    .await
-                {
-                    Ok(_) => {
-                        let channels = engine.list_channels(&server_id);
-                        if let Some(session) = engine.get_session(session_id) {
-                            let _ = session.send(ChatEvent::ChannelList {
-                                server_id,
-                                channels,
-                            });
-                        }
-                        Ok(())
-                    }
-                    Err(e) => Err(e),
-                },
+                Ok(_) => {
+                    engine
+                        .send_visible_channel_list(session_id, server_id)
+                        .await
+                }
                 Err(e) => Err(e),
             }
         }
         ClientMessage::DeleteChannel { server_id, channel } => {
             match engine
-                .require_permission(session_id, &server_id, None, Permissions::MANAGE_CHANNELS)
+                .delete_channel_in_server(session_id, &server_id, &channel)
                 .await
             {
-                Ok(_) => match engine.delete_channel_in_server(&server_id, &channel).await {
+                Ok(()) => {
+                    engine
+                        .send_visible_channel_list(session_id, server_id)
+                        .await
+                }
+                Err(e) => Err(e),
+            }
+        }
+        ClientMessage::DeleteServer { server_id } => {
+            match engine.get_authenticated_actor(session_id) {
+                Some(actor) => match engine.delete_owned_server(&server_id, &actor).await {
                     Ok(()) => {
-                        let channels = engine.list_channels(&server_id);
-                        if let Some(session) = engine.get_session(session_id) {
-                            let _ = session.send(ChatEvent::ChannelList {
-                                server_id,
-                                channels,
-                            });
+                        if let Some(session) = engine.get_session(session_id)
+                            && let Some(ref uid) = session.user_id
+                        {
+                            let servers = engine.list_servers_for_user(uid).await;
+                            let _ = session.send(ChatEvent::ServerList { servers });
                         }
                         Ok(())
                     }
                     Err(e) => Err(e),
                 },
-                Err(e) => Err(e),
-            }
-        }
-        ClientMessage::DeleteServer { server_id } => {
-            let session = engine.get_session(session_id);
-            let user_id = session.as_ref().and_then(|s| s.user_id.clone());
-            let Some(uid) = user_id else {
-                return send_error(
-                    engine,
-                    session_id,
-                    "AUTH_REQUIRED",
-                    "Must be authenticated to delete a server",
-                );
-            };
-            if !engine.is_server_owner(&server_id, &uid) {
-                return send_error(
-                    engine,
-                    session_id,
-                    "FORBIDDEN",
-                    "Only the server owner can delete it",
-                );
-            }
-            match engine.delete_server(&server_id).await {
-                Ok(()) => {
-                    if let Some(session) = engine.get_session(session_id)
-                        && let Some(ref uid) = session.user_id
-                    {
-                        let servers = engine.list_servers_for_user(uid).await;
-                        let _ = session.send(ChatEvent::ServerList { servers });
-                    }
-                    Ok(())
-                }
-                Err(e) => Err(e),
+                None => Err("UNAUTHENTICATED: authentication required".into()),
             }
         }
         ClientMessage::UpdateServer {
@@ -956,13 +1509,15 @@ async fn handle_client_message(
             name,
             icon_url,
         } => {
-            match engine
-                .require_permission(session_id, &server_id, None, Permissions::MANAGE_SERVER)
-                .await
-            {
-                Ok(_) => {
+            match engine.get_authenticated_actor(session_id) {
+                Some(actor) => {
                     match engine
-                        .update_server_settings(&server_id, name.as_deref(), icon_url.as_deref())
+                        .update_server_settings_for_actor(
+                            &actor,
+                            &server_id,
+                            name.as_deref(),
+                            icon_url.as_deref(),
+                        )
                         .await
                     {
                         Ok(()) => {
@@ -978,96 +1533,164 @@ async fn handle_client_message(
                         Err(e) => Err(e),
                     }
                 }
-                Err(e) => Err(e),
+                None => Err("UNAUTHENTICATED: authentication required".into()),
             }
         }
         ClientMessage::UpdateMemberRole {
             server_id,
             user_id,
             role,
-        } => {
-            // Require MANAGE_ROLES permission
-            match engine
-                .require_permission(session_id, &server_id, None, Permissions::MANAGE_ROLES)
-                .await
-            {
-                Ok(_) => {
-                    // Prevent assigning "owner" through this path
-                    if role == "owner" {
-                        Err("Cannot assign owner role — use ownership transfer".into())
-                    } else if engine.is_server_owner(&server_id, &user_id) {
-                        // Prevent modifying the server owner's role
-                        Err("Cannot change the server owner's role".into())
-                    } else {
-                        // Role hierarchy: caller must outrank the target role
-                        let mut hierarchy_ok = true;
-                        if let Some(session) = engine.get_session(session_id)
-                            && let Some(ref caller_uid) = session.user_id
-                            && !engine.is_server_owner(&server_id, caller_uid)
-                        {
-                            let caller_role = engine.get_server_role(&server_id, caller_uid).await;
-                            let target_role = match role.as_str() {
-                                "admin" => Some(crate::engine::permissions::ServerRole::Admin),
-                                "moderator" => {
-                                    Some(crate::engine::permissions::ServerRole::Moderator)
-                                }
-                                "member" => Some(crate::engine::permissions::ServerRole::Member),
-                                _ => None,
-                            };
-                            if let (Some(caller), Some(target)) = (caller_role, target_role)
-                                && target >= caller
-                            {
-                                hierarchy_ok = false;
-                            }
-                        }
-                        if !hierarchy_ok {
-                            Err("Cannot assign a role at or above your own level".into())
-                        } else if let Some(pool) = engine.db() {
-                            crate::db::queries::servers::update_member_role(
-                                pool, &server_id, &user_id, &role,
-                            )
-                            .await
-                            .map_err(|e| format!("Failed to update role: {e}"))
-                        } else {
-                            Err("No database configured".into())
-                        }
-                    }
-                }
-                Err(e) => Err(e),
+        } => match engine.get_authenticated_actor(session_id) {
+            Some(actor) => {
+                engine
+                    .update_member_role_for_actor(&actor, &server_id, &user_id, &role)
+                    .await
             }
-        }
+            None => Err("UNAUTHENTICATED: authentication required".into()),
+        },
         ClientMessage::EditMessage {
+            operation_generation,
+            request_id,
+            client_message_id,
             message_id,
             content,
-        } => engine.edit_message(session_id, &message_id, &content).await,
-        ClientMessage::DeleteMessage { message_id } => {
-            engine.delete_message(session_id, &message_id).await
-        }
-        ClientMessage::AddReaction { message_id, emoji } => {
-            engine.add_reaction(session_id, &message_id, &emoji).await
-        }
-        ClientMessage::RemoveReaction { message_id, emoji } => {
+            content_format,
+            mentions,
+        } => {
+            let fallback = uuid::Uuid::new_v4().to_string();
             engine
-                .remove_reaction(session_id, &message_id, &emoji)
+                .submit_edit_message(
+                    session_id,
+                    crate::engine::messaging::EditMessageCommand {
+                        request_id: request_id.as_deref().unwrap_or(&fallback),
+                        client_message_id: client_message_id.as_deref().unwrap_or(&fallback),
+                        operation_generation: Some(&operation_generation),
+                        message_id: &message_id,
+                        content: &content,
+                        content_format,
+                        mentions: &mentions,
+                    },
+                )
                 .await
+                .map(|_| ())
+                .map_err(|error| format!("{}: {}", error.code(), error.safe_message()))
+        }
+        ClientMessage::DeleteMessage {
+            operation_generation,
+            request_id,
+            client_message_id,
+            message_id,
+        } => {
+            let fallback = uuid::Uuid::new_v4().to_string();
+            engine
+                .submit_delete_message(
+                    session_id,
+                    crate::engine::messaging::EntityCommand {
+                        request_id: request_id.as_deref().unwrap_or(&fallback),
+                        client_message_id: client_message_id.as_deref().unwrap_or(&fallback),
+                        operation_generation: Some(&operation_generation),
+                        message_id: &message_id,
+                    },
+                )
+                .await
+                .map(|_| ())
+                .map_err(|error| format!("{}: {}", error.code(), error.safe_message()))
+        }
+        ClientMessage::AddReaction {
+            operation_generation,
+            request_id,
+            client_message_id,
+            message_id,
+            emoji,
+        } => {
+            let fallback = uuid::Uuid::new_v4().to_string();
+            engine
+                .submit_reaction(
+                    session_id,
+                    crate::engine::messaging::ReactionCommand {
+                        request_id: request_id.as_deref().unwrap_or(&fallback),
+                        client_message_id: client_message_id.as_deref().unwrap_or(&fallback),
+                        operation_generation: Some(&operation_generation),
+                        message_id: &message_id,
+                        emoji: &emoji,
+                    },
+                    true,
+                )
+                .await
+                .map(|_| ())
+                .map_err(|error| format!("{}: {}", error.code(), error.safe_message()))
+        }
+        ClientMessage::RemoveReaction {
+            operation_generation,
+            request_id,
+            client_message_id,
+            message_id,
+            emoji,
+        } => {
+            let fallback = uuid::Uuid::new_v4().to_string();
+            engine
+                .submit_reaction(
+                    session_id,
+                    crate::engine::messaging::ReactionCommand {
+                        request_id: request_id.as_deref().unwrap_or(&fallback),
+                        client_message_id: client_message_id.as_deref().unwrap_or(&fallback),
+                        operation_generation: Some(&operation_generation),
+                        message_id: &message_id,
+                        emoji: &emoji,
+                    },
+                    false,
+                )
+                .await
+                .map(|_| ())
+                .map_err(|error| format!("{}: {}", error.code(), error.safe_message()))
         }
         ClientMessage::Typing { server_id, channel } => {
             engine.send_typing(session_id, &server_id, &channel)
         }
         ClientMessage::MarkRead {
+            operation_generation,
+            request_id,
+            client_message_id,
+            conversation_id,
             server_id,
             channel,
             message_id,
         } => {
-            engine
-                .mark_read(session_id, &server_id, &channel, &message_id)
-                .await
+            let fallback = uuid::Uuid::new_v4().to_string();
+            let conversation_id = match conversation_id {
+                Some(id) => Ok(id),
+                None => {
+                    engine
+                        .conversation_id_for_channel(&server_id, &channel)
+                        .await
+                }
+            };
+            match conversation_id {
+                Ok(conversation_id) => engine
+                    .submit_mark_read(
+                        session_id,
+                        crate::engine::messaging::ReadCommand {
+                            request_id: request_id.as_deref().unwrap_or(&fallback),
+                            client_message_id: client_message_id.as_deref().unwrap_or(&fallback),
+                            operation_generation: Some(&operation_generation),
+                            conversation_id: &conversation_id,
+                            message_id: &message_id,
+                        },
+                    )
+                    .await
+                    .map(|_| ())
+                    .map_err(|error| format!("{}: {}", error.code(), error.safe_message())),
+                Err(error) => Err(error),
+            }
         }
         ClientMessage::GetUnreadCounts { server_id } => {
             match engine.get_unread_counts(session_id, &server_id).await {
-                Ok(counts) => {
+                Ok((counts, stamps)) => {
                     if let Some(session) = engine.get_session(session_id) {
-                        let _ = session.send(ChatEvent::UnreadCounts { server_id, counts });
+                        let _ = session.send_guarded(
+                            ChatEvent::UnreadCounts { server_id, counts },
+                            Some(crate::engine::user_session::DeliveryGuard::Stamps(stamps)),
+                        );
                     }
                     Ok(())
                 }
@@ -1075,15 +1698,22 @@ async fn handle_client_message(
             }
         }
         // ── Roles ──
-        ClientMessage::ListRoles { server_id } => match engine.list_roles(&server_id).await {
-            Ok(roles) => {
-                if let Some(session) = engine.get_session(session_id) {
-                    let _ = session.send(ChatEvent::RoleList { server_id, roles });
+        ClientMessage::ListRoles { server_id } => {
+            match engine.list_roles(session_id, &server_id).await {
+                Ok((version, roles, member_roles)) => {
+                    if let Some(session) = engine.get_session(session_id) {
+                        let _ = session.send(ChatEvent::RoleList {
+                            server_id,
+                            version,
+                            roles,
+                            member_roles: Some(member_roles),
+                        });
+                    }
+                    Ok(())
                 }
-                Ok(())
+                Err(e) => Err(e),
             }
-            Err(e) => Err(e),
-        },
+        }
         ClientMessage::CreateRole {
             server_id,
             name,
@@ -1115,14 +1745,13 @@ async fn handle_client_message(
                     .await
                 {
                     Ok(_) => match engine
-                        .create_role(&server_id, &name, color.as_deref(), perms)
+                        .create_role(session_id, &server_id, &name, color.as_deref(), perms)
                         .await
                     {
-                        Ok(role) => {
-                            if let Some(session) = engine.get_session(session_id) {
-                                let _ = session.send(ChatEvent::RoleUpdate { server_id, role });
-                            }
-                            Ok(())
+                        Ok(_) => {
+                            engine
+                                .broadcast_role_snapshot(session_id, &server_id, None)
+                                .await
                         }
                         Err(e) => Err(e),
                     },
@@ -1169,6 +1798,7 @@ async fn handle_client_message(
                             Err(e) => Err(e),
                             Ok(()) => match engine
                                 .update_role(
+                                    session_id,
                                     &server_id,
                                     &role_id,
                                     &name,
@@ -1177,12 +1807,10 @@ async fn handle_client_message(
                                 )
                                 .await
                             {
-                                Ok(role) => {
-                                    if let Some(session) = engine.get_session(session_id) {
-                                        let _ =
-                                            session.send(ChatEvent::RoleUpdate { server_id, role });
-                                    }
-                                    Ok(())
+                                Ok(_) => {
+                                    engine
+                                        .broadcast_role_snapshot(session_id, &server_id, None)
+                                        .await
                                 }
                                 Err(e) => Err(e),
                             },
@@ -1209,16 +1837,16 @@ async fn handle_client_message(
                         .await
                     {
                         Err(e) => Err(e),
-                        Ok(()) => match engine.delete_role(&server_id, &role_id).await {
-                            Ok(()) => {
-                                if let Some(session) = engine.get_session(session_id) {
-                                    let _ =
-                                        session.send(ChatEvent::RoleDelete { server_id, role_id });
+                        Ok(()) => {
+                            match engine.delete_role(session_id, &server_id, &role_id).await {
+                                Ok(()) => {
+                                    engine
+                                        .broadcast_role_snapshot(session_id, &server_id, None)
+                                        .await
                                 }
-                                Ok(())
+                                Err(e) => Err(e),
                             }
-                            Err(e) => Err(e),
-                        },
+                        }
                     }
                 }
                 Err(e) => Err(e),
@@ -1238,19 +1866,14 @@ async fn handle_client_message(
                 )
                 .await
             {
-                Ok(actor_uid) => match engine
-                    .assign_role(&server_id, &actor_uid, &user_id, &role_id)
+                Ok(_actor_uid) => match engine
+                    .assign_role(session_id, &server_id, &user_id, &role_id)
                     .await
                 {
-                    Ok(role_ids) => {
-                        if let Some(session) = engine.get_session(session_id) {
-                            let _ = session.send(ChatEvent::MemberRoleUpdate {
-                                server_id,
-                                user_id,
-                                role_ids,
-                            });
-                        }
-                        Ok(())
+                    Ok(_) => {
+                        engine
+                            .broadcast_role_snapshot(session_id, &server_id, Some(&user_id))
+                            .await
                     }
                     Err(e) => Err(e),
                 },
@@ -1271,25 +1894,109 @@ async fn handle_client_message(
                 )
                 .await
             {
-                Ok(actor_uid) => match engine
-                    .remove_role(&server_id, &actor_uid, &user_id, &role_id)
+                Ok(_actor_uid) => match engine
+                    .remove_role(session_id, &server_id, &user_id, &role_id)
                     .await
                 {
-                    Ok(role_ids) => {
-                        if let Some(session) = engine.get_session(session_id) {
-                            let _ = session.send(ChatEvent::MemberRoleUpdate {
-                                server_id,
-                                user_id,
-                                role_ids,
-                            });
-                        }
-                        Ok(())
+                    Ok(_) => {
+                        engine
+                            .broadcast_role_snapshot(session_id, &server_id, Some(&user_id))
+                            .await
                     }
                     Err(e) => Err(e),
                 },
                 Err(e) => Err(e),
             }
         }
+        ClientMessage::ListChannelPermissionOverrides {
+            server_id,
+            channel_id,
+        } => match engine
+            .list_channel_permission_overrides(session_id, &server_id, &channel_id)
+            .await
+        {
+            Ok(overrides) => {
+                if let Some(session) = engine.get_session(session_id) {
+                    let _ = session.send_guarded(
+                        ChatEvent::ChannelPermissionOverrideList {
+                            server_id: server_id.clone(),
+                            channel_id,
+                            overrides,
+                        },
+                        Some(
+                            crate::engine::user_session::DeliveryGuard::ServerPermissions(vec![(
+                                server_id,
+                                Permissions::MANAGE_CHANNELS,
+                            )]),
+                        ),
+                    );
+                }
+                Ok(())
+            }
+            Err(error) => Err(error),
+        },
+        ClientMessage::SetChannelPermissionOverride {
+            server_id,
+            channel_id,
+            target_type,
+            target_id,
+            allow_bits,
+            deny_bits,
+        } => {
+            match (
+                crate::engine::ids::ServerId::from_stored(server_id.clone()),
+                crate::engine::ids::ChannelId::from_stored(channel_id.clone()),
+            ) {
+                (Ok(server_resource_id), Ok(channel_resource_id)) => match engine
+                    .set_channel_permission_override(
+                        session_id,
+                        crate::engine::organization::ChannelOverrideUpdate {
+                            server_id: &server_resource_id,
+                            channel_id: &channel_resource_id,
+                            target_type: &target_type,
+                            target_id: &target_id,
+                            allow_bits,
+                            deny_bits,
+                        },
+                    )
+                    .await
+                {
+                    Ok(()) => {
+                        engine
+                            .broadcast_channel_permission_overrides(
+                                session_id,
+                                &server_id,
+                                &channel_id,
+                            )
+                            .await
+                    }
+                    Err(error) => Err(error),
+                },
+                _ => Err("INVALID_INPUT: invalid resource id".to_owned()),
+            }
+        }
+        ClientMessage::DeleteChannelPermissionOverride {
+            server_id,
+            channel_id,
+            target_type,
+            target_id,
+        } => match engine
+            .delete_channel_permission_override(
+                session_id,
+                &server_id,
+                &channel_id,
+                &target_type,
+                &target_id,
+            )
+            .await
+        {
+            Ok(()) => {
+                engine
+                    .broadcast_channel_permission_overrides(session_id, &server_id, &channel_id)
+                    .await
+            }
+            Err(error) => Err(error),
+        },
         // ── Categories ──
         ClientMessage::ListCategories { server_id } => {
             match engine.list_categories(&server_id).await {
@@ -1315,7 +2022,7 @@ async fn handle_client_message(
                 )
                 .await
             {
-                Ok(_) => match engine.create_category(&server_id, &name).await {
+                Ok(_) => match engine.create_category(session_id, &server_id, &name).await {
                     Ok(category) => {
                         if let Some(session) = engine.get_session(session_id) {
                             let _ = session.send(ChatEvent::CategoryUpdate {
@@ -1344,7 +2051,10 @@ async fn handle_client_message(
                 )
                 .await
             {
-                Ok(_) => match engine.update_category(&category_id, &name).await {
+                Ok(_) => match engine
+                    .update_category(session_id, &server_id, &category_id, &name)
+                    .await
+                {
                     Ok(category) => {
                         if let Some(session) = engine.get_session(session_id) {
                             let _ = session.send(ChatEvent::CategoryUpdate {
@@ -1372,7 +2082,10 @@ async fn handle_client_message(
                 )
                 .await
             {
-                Ok(_) => match engine.delete_category(&category_id).await {
+                Ok(_) => match engine
+                    .delete_category(session_id, &server_id, &category_id)
+                    .await
+                {
                     Ok(()) => {
                         if let Some(session) = engine.get_session(session_id) {
                             let _ = session.send(ChatEvent::CategoryDelete {
@@ -1401,7 +2114,10 @@ async fn handle_client_message(
                 )
                 .await
             {
-                Ok(_) => match engine.reorder_channels(&server_id, &channels).await {
+                Ok(_) => match engine
+                    .reorder_channels(session_id, &server_id, &channels)
+                    .await
+                {
                     Ok(()) => {
                         if let Some(session) = engine.get_session(session_id) {
                             let _ = session.send(ChatEvent::ChannelReorder {
@@ -1432,7 +2148,7 @@ async fn handle_client_message(
                 .await
         }
         ClientMessage::GetPresences { server_id } => {
-            match engine.get_server_presences(&server_id).await {
+            match engine.get_server_presences(session_id, &server_id).await {
                 Ok(presences) => {
                     if let Some(session) = engine.get_session(session_id) {
                         let _ = session.send(ChatEvent::PresenceList {
@@ -1456,31 +2172,60 @@ async fn handle_client_message(
         }
         // ── Phase 4: Search ──
         ClientMessage::SearchMessages {
+            request_id,
             server_id,
             query,
             channel,
             limit,
             offset,
+            continuation,
         } => {
             let limit = limit.unwrap_or(25).min(50);
             let offset = offset.unwrap_or(0);
+            let Some(actor) = engine.get_authenticated_actor(session_id) else {
+                return;
+            };
             match engine
-                .search_messages(&server_id, &query, channel.as_deref(), limit, offset)
+                .search_messages(
+                    &actor,
+                    crate::engine::chat_engine::SearchMessagesRequest {
+                        server_id: &server_id,
+                        query: &query,
+                        channel_name: channel.as_deref(),
+                        limit,
+                        offset,
+                        continuation: continuation.as_deref(),
+                    },
+                )
                 .await
             {
-                Ok((results, total_count)) => {
+                Ok(page) => {
+                    if !engine
+                        .authorization_stamp_is_current(&actor, &page.stamp)
+                        .await
+                    {
+                        return;
+                    }
                     if let Some(session) = engine.get_session(session_id) {
-                        let _ = session.send(ChatEvent::SearchResults {
-                            server_id,
-                            query,
-                            results,
-                            total_count,
-                            offset,
-                        });
+                        let _ = session.send_guarded(
+                            ChatEvent::SearchResults {
+                                request_id,
+                                server_id,
+                                query,
+                                results: page.results,
+                                total_count: page.total_count,
+                                offset: page.offset,
+                                next_continuation: page.next_continuation,
+                                restarted: page.restarted,
+                            },
+                            Some(crate::engine::user_session::DeliveryGuard::Stamps(vec![
+                                page.stamp,
+                            ])),
+                        );
                     }
                     Ok(())
                 }
-                Err(e) => Err(e),
+                Err(e) => Err(e.to_string()),
             }
         }
         // ── Phase 4: Notifications ──
@@ -1525,10 +2270,27 @@ async fn handle_client_message(
         }
         // ── Phase 4: Profiles ──
         ClientMessage::GetUserProfile { user_id } => {
-            match engine.get_user_profile(&user_id).await {
-                Ok(profile) => {
+            let Some(actor) = engine.get_authenticated_actor(session_id) else {
+                return;
+            };
+            match engine.get_user_profile(&actor, &user_id).await {
+                Ok((profile, stamp)) => {
+                    let current = match &stamp {
+                        Some(stamp) => engine.authorization_stamp_is_current(&actor, stamp).await,
+                        None => engine.actor_is_current(&actor).await,
+                    };
+                    if !current {
+                        return;
+                    }
                     if let Some(session) = engine.get_session(session_id) {
-                        let _ = session.send(ChatEvent::UserProfile { profile });
+                        let guard = match stamp {
+                            Some(stamp) => {
+                                crate::engine::user_session::DeliveryGuard::Stamps(vec![stamp])
+                            }
+                            None => crate::engine::user_session::DeliveryGuard::ActorCurrent,
+                        };
+                        let _ =
+                            session.send_guarded(ChatEvent::UserProfile { profile }, Some(guard));
                     }
                     Ok(())
                 }
@@ -1586,8 +2348,87 @@ async fn handle_client_message(
                 .archive_thread(session_id, &server_id, &thread_id)
                 .await
         }
+        ClientMessage::UnarchiveThread {
+            server_id,
+            thread_id,
+        } => {
+            engine
+                .unarchive_thread(session_id, &server_id, &thread_id)
+                .await
+        }
         ClientMessage::ListThreads { server_id, channel } => {
             engine.list_threads(session_id, &server_id, &channel).await
+        }
+        ClientMessage::CreateForumTag {
+            server_id,
+            channel,
+            name,
+            emoji,
+            moderated,
+        } => {
+            engine
+                .create_forum_tag(
+                    session_id,
+                    &server_id,
+                    &channel,
+                    &name,
+                    emoji.as_deref(),
+                    moderated,
+                )
+                .await
+        }
+        ClientMessage::UpdateForumTag {
+            server_id,
+            channel,
+            tag_id,
+            name,
+            emoji,
+            moderated,
+            position,
+        } => {
+            engine
+                .update_forum_tag(
+                    session_id,
+                    &server_id,
+                    &channel,
+                    &tag_id,
+                    &name,
+                    emoji.as_deref(),
+                    moderated,
+                    position,
+                )
+                .await
+        }
+        ClientMessage::DeleteForumTag {
+            server_id,
+            channel,
+            tag_id,
+        } => {
+            engine
+                .delete_forum_tag(session_id, &server_id, &channel, &tag_id)
+                .await
+        }
+        ClientMessage::ListForumTags { server_id, channel } => {
+            engine
+                .list_forum_tags(session_id, &server_id, &channel)
+                .await
+        }
+        ClientMessage::SetThreadTags {
+            server_id,
+            thread_id,
+            tag_ids,
+        } => {
+            engine
+                .set_thread_tags(session_id, &server_id, &thread_id, tag_ids)
+                .await
+        }
+        ClientMessage::GetThreadTags {
+            server_id,
+            thread_id,
+        } => {
+            engine
+                .get_thread_tags(session_id, &server_id, &thread_id)
+                .await
         }
         // ── Phase 5: Bookmarks ──
         ClientMessage::AddBookmark { message_id, note } => {
@@ -1698,12 +2539,10 @@ async fn handle_client_message(
             action_type,
             timeout_duration_seconds,
         } => {
-            let rule_id_placeholder = ""; // id generated inside engine
             engine
                 .create_automod_rule(
                     session_id,
-                    &crate::db::models::CreateAutomodRuleParams {
-                        id: rule_id_placeholder,
+                    &crate::engine::chat_engine::CreateAutomodRuleRequest {
                         server_id: &server_id,
                         name: &name,
                         rule_type: &rule_type,
@@ -1726,7 +2565,7 @@ async fn handle_client_message(
             engine
                 .update_automod_rule(
                     session_id,
-                    &crate::db::models::UpdateAutomodRuleParams {
+                    &crate::engine::chat_engine::UpdateAutomodRuleRequest {
                         rule_id: &rule_id,
                         server_id: &server_id,
                         name: &name,
@@ -1789,7 +2628,7 @@ async fn handle_client_message(
             engine
                 .create_event(
                     session_id,
-                    &crate::db::models::CreateServerEventParams {
+                    &crate::engine::chat_engine::CreateServerEventRequest {
                         id: &event_id,
                         server_id: &server_id,
                         name: &name,
@@ -1885,6 +2724,9 @@ async fn handle_client_message(
         ClientMessage::ListChannelFollows { channel_id } => {
             engine.list_channel_follows(session_id, &channel_id).await
         }
+        ClientMessage::PublishAnnouncement { message_id } => {
+            engine.publish_announcement(session_id, &message_id).await
+        }
         ClientMessage::CreateTemplate {
             server_id,
             name,
@@ -1903,6 +2745,14 @@ async fn handle_client_message(
         } => {
             engine
                 .delete_template(session_id, &server_id, &template_id)
+                .await
+        }
+        ClientMessage::InstantiateTemplate {
+            template_id,
+            server_name,
+        } => {
+            engine
+                .instantiate_template(session_id, &template_id, &server_name)
                 .await
         }
         // ── Phase 8: Integrations & Bots ──
@@ -1954,6 +2804,7 @@ async fn handle_client_message(
                 .create_bot(session_id, &username, avatar_url.as_deref())
                 .await
         }
+        ClientMessage::ListOwnedBots => engine.list_owned_bots(session_id).await,
         ClientMessage::CreateBotToken {
             bot_user_id,
             name,
@@ -2008,12 +2859,13 @@ async fn handle_client_message(
             engine.delete_slash_command(session_id, &command_id).await
         }
         ClientMessage::InvokeSlashCommand {
+            request_id,
             server_id,
             channel,
             command_name,
             args_json,
         } => {
-            engine
+            let result = engine
                 .invoke_slash_command(
                     session_id,
                     &server_id,
@@ -2021,7 +2873,29 @@ async fn handle_client_message(
                     &command_name,
                     args_json.as_deref(),
                 )
-                .await
+                .await;
+            if result.is_ok()
+                && let Some(session) = engine.get_session(session_id)
+            {
+                let _ = session.send(ChatEvent::InteractionInvoked { request_id });
+            }
+            result
+        }
+        ClientMessage::InvokeMessageComponent {
+            request_id,
+            message_id,
+            custom_id,
+            values,
+        } => {
+            let result = engine
+                .invoke_message_component(session_id, &message_id, &custom_id, &values)
+                .await;
+            if result.is_ok()
+                && let Some(session) = engine.get_session(session_id)
+            {
+                let _ = session.send(ChatEvent::InteractionInvoked { request_id });
+            }
+            result
         }
         ClientMessage::RespondToInteraction {
             interaction_id,
@@ -2045,9 +2919,16 @@ async fn handle_client_message(
             name,
             description,
             redirect_uris,
+            client_type,
         } => {
             engine
-                .create_oauth2_app(session_id, &name, description.as_deref(), &redirect_uris)
+                .create_oauth2_app(
+                    session_id,
+                    &name,
+                    description.as_deref(),
+                    &redirect_uris,
+                    &client_type,
+                )
                 .await
         }
         ClientMessage::ListOAuth2Apps => engine.list_oauth2_apps(session_id).await,
@@ -2059,95 +2940,22 @@ async fn handle_client_message(
         ClientMessage::SetServerAvatar {
             server_id,
             avatar_url,
-        } => {
-            match engine
-                .require_permission(
-                    session_id,
-                    &server_id,
-                    None,
-                    crate::engine::permissions::Permissions::MANAGE_SERVER,
-                )
-                .await
-            {
-                Err(e) => Err(e),
-                Ok(_) => {
-                    let user_id = engine
-                        .get_session_user_id(session_id)
-                        .ok_or_else(|| "Not authenticated".to_string());
-                    match user_id {
-                        Err(e) => Err(e),
-                        Ok(user_id) => {
-                            let pool = engine.get_db().ok_or("No database".to_string());
-                            match pool {
-                                Err(e) => Err(e),
-                                Ok(pool) => {
-                                    match crate::db::queries::servers::set_server_avatar(
-                                        &pool,
-                                        &server_id,
-                                        &user_id,
-                                        avatar_url.as_deref(),
-                                    )
-                                    .await
-                                    {
-                                        Ok(()) => {
-                                            let event = ChatEvent::ServerAvatarUpdate {
-                                                server_id: server_id.clone(),
-                                                user_id,
-                                                avatar_url,
-                                            };
-                                            engine.broadcast_to_server(&server_id, &event);
-                                            Ok(())
-                                        }
-                                        Err(e) => Err(format!("Failed to set server avatar: {e}")),
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        } => match engine.get_authenticated_actor(session_id) {
+            Some(actor) => {
+                engine
+                    .set_member_avatar_for_actor(&actor, &server_id, avatar_url.as_deref())
+                    .await
             }
-        }
+            None => Err("UNAUTHENTICATED: authentication required".into()),
+        },
 
         ClientMessage::SetVanityCode {
             server_id,
             vanity_code,
         } => {
-            match engine
-                .require_permission(
-                    session_id,
-                    &server_id,
-                    None,
-                    crate::engine::permissions::Permissions::MANAGE_SERVER,
-                )
+            engine
+                .set_vanity_code(session_id, &server_id, vanity_code.as_deref())
                 .await
-            {
-                Err(e) => Err(e),
-                Ok(_) => {
-                    let valid = if let Some(ref code) = vanity_code {
-                        crate::engine::validation::validate_vanity_code(code)
-                    } else {
-                        Ok(())
-                    };
-                    match valid {
-                        Err(e) => Err(e),
-                        Ok(()) => match engine.get_db() {
-                            None => Err("No database".to_string()),
-                            Some(pool) => {
-                                match crate::db::queries::servers::set_vanity_code(
-                                    &pool,
-                                    &server_id,
-                                    vanity_code.as_deref(),
-                                )
-                                .await
-                                {
-                                    Ok(()) => Ok(()),
-                                    Err(e) => Err(format!("Failed to set vanity code: {e}")),
-                                }
-                            }
-                        },
-                    }
-                }
-            }
         }
 
         ClientMessage::GetServerLimits => {
@@ -2161,14 +2969,62 @@ async fn handle_client_message(
         }
     };
 
-    if let Err(e) = result {
-        send_error(engine, session_id, "COMMAND_FAILED", &e);
+    match result {
+        Ok(()) => {
+            if let Some(request_id) = lifecycle_success_id
+                && let Some(session) = engine.get_session(session_id)
+            {
+                let _ = session.send(ChatEvent::LifecycleCommandSucceeded { request_id });
+            }
+        }
+        Err(error) => {
+            let (code, message) = split_safe_error(&error);
+            if let Some(request_id) = correlation_id {
+                if let Some(session) = engine.get_session(session_id) {
+                    let _ = session.send(ChatEvent::CommandError {
+                        request_id,
+                        code: code.to_owned(),
+                        message: message.to_owned(),
+                        retryable: code == "DEPENDENCY_UNAVAILABLE",
+                    });
+                }
+            } else {
+                send_error(engine, session_id, code, message);
+            }
+        }
     }
+}
+
+fn lifecycle_command_allowed(command: &ClientMessage) -> bool {
+    !matches!(
+        command,
+        ClientMessage::LifecycleCommand { .. }
+            | ClientMessage::Sync { .. }
+            | ClientMessage::SendMessage { .. }
+            | ClientMessage::SendDirectMessage { .. }
+            | ClientMessage::EditMessage { .. }
+            | ClientMessage::DeleteMessage { .. }
+            | ClientMessage::AddReaction { .. }
+            | ClientMessage::RemoveReaction { .. }
+            | ClientMessage::MarkRead { .. }
+            | ClientMessage::InvokeSlashCommand { .. }
+            | ClientMessage::InvokeMessageComponent { .. }
+    )
+}
+
+fn split_safe_error(error: &str) -> (&str, &str) {
+    error
+        .split_once(": ")
+        .filter(|(code, _)| {
+            code.chars()
+                .all(|character| character.is_ascii_uppercase() || character == '_')
+        })
+        .unwrap_or(("COMMAND_FAILED", error))
 }
 
 fn send_error(
     engine: &ChatEngine,
-    session_id: crate::engine::events::SessionId,
+    session_id: crate::engine::events::ConnectionId,
     code: &str,
     message: &str,
 ) {
@@ -2183,10 +3039,329 @@ fn send_error(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::sync::mpsc;
+
+    #[test]
+    fn bootstrap_reads_do_not_consume_mutation_admission() {
+        let before = crate::runtime_metrics::snapshot();
+        let admission_index = crate::runtime_metrics::Operation::CommandAdmission as usize;
+        let mut read_count = 0;
+        let mut read_window = Instant::now();
+        let mut mutation_count = 0;
+        let mut mutation_window = Instant::now();
+
+        for _ in 0..120 {
+            assert!(fixed_window_admit(&mut read_count, &mut read_window, 120));
+        }
+        assert!(!fixed_window_admit(&mut read_count, &mut read_window, 120));
+        assert!(fixed_window_admit(
+            &mut mutation_count,
+            &mut mutation_window,
+            30
+        ));
+        let after = crate::runtime_metrics::snapshot();
+        assert!(after.succeeded[admission_index] >= before.succeeded[admission_index] + 121);
+        assert!(after.failed[admission_index] > before.failed[admission_index]);
+    }
+
+    #[test]
+    fn websocket_admission_classifies_reads_and_preserves_correlation() {
+        assert!(websocket_command_is_read(
+            r#"{"type":"list_channels","server_id":"server"}"#
+        ));
+        assert!(websocket_command_is_read(
+            r#"{"type":"sync","request_id":"sync-1","protocol_version":2,"subscriptions":[]}"#
+        ));
+        assert!(websocket_command_is_read(r#"{"type":"list_owned_bots"}"#));
+        assert!(!websocket_command_is_read(
+            r#"{"type":"set_presence","status":"idle"}"#
+        ));
+        assert!(!websocket_command_is_read("not json"));
+        assert_eq!(
+            websocket_command_correlation(
+                r#"{"type":"sync","request_id":"sync-1","protocol_version":2,"subscriptions":[]}"#
+            )
+            .as_deref(),
+            Some("sync-1")
+        );
+    }
 
     /// Helper to deserialize a JSON string into a ClientMessage.
     fn parse_msg(json: &str) -> Result<ClientMessage, serde_json::Error> {
         serde_json::from_str(json)
+    }
+
+    async fn forum_wire_fixture(
+        owner: bool,
+    ) -> (
+        ChatEngine,
+        sqlx::SqlitePool,
+        crate::auth::authority::AuthService,
+        crate::auth::authority::CredentialId,
+        crate::engine::events::ConnectionId,
+        mpsc::Receiver<ChatEvent>,
+    ) {
+        let pool = crate::db::pool::create_pool("sqlite::memory:")
+            .await
+            .unwrap();
+        crate::db::pool::run_migrations(&pool).await.unwrap();
+        sqlx::query("INSERT INTO users(id,username) VALUES('owner','owner'),('member','member')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO servers(id,name,owner_id) VALUES('server','Server','owner')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO server_members(server_id,user_id,role) VALUES \
+             ('server','owner','owner'),('server','member','member')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO roles(id,server_id,name,permissions,is_default) \
+             VALUES('everyone','server','@everyone',?,1)",
+        )
+        .bind(crate::engine::permissions::DEFAULT_EVERYONE.bits() as i64)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO channels(id,server_id,name,channel_type) \
+             VALUES('forum','server','#forum','forum')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let user_id = if owner { "owner" } else { "member" };
+        let auth = crate::auth::authority::AuthService::new(pool.clone(), "test-secret".into(), 1);
+        let (_, actor) = auth.issue_web_session(user_id).await.unwrap();
+        let credential_id = actor.credential_id().clone();
+        let engine = ChatEngine::new(pool.clone(), auth.clone(), "replay-secret", 4000, 100);
+        engine.load_servers_from_db().await.unwrap();
+        engine.load_channels_from_db().await.unwrap();
+        let (session_id, receiver) = engine
+            .connect(
+                Some(user_id.into()),
+                user_id.into(),
+                Protocol::WebSocket,
+                None,
+            )
+            .unwrap();
+        engine.bind_authenticated_actor(session_id, actor).unwrap();
+        (engine, pool, auth, credential_id, session_id, receiver)
+    }
+
+    async fn receive_command_error(
+        receiver: &mut mpsc::Receiver<ChatEvent>,
+    ) -> (String, String, bool) {
+        loop {
+            match tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
+                .await
+                .expect("command response timed out")
+                .expect("command response channel closed")
+            {
+                ChatEvent::CommandError {
+                    code,
+                    message,
+                    retryable,
+                    ..
+                } => return (code, message, retryable),
+                _ => continue,
+            }
+        }
+    }
+
+    async fn receive_lifecycle_success(receiver: &mut mpsc::Receiver<ChatEvent>) -> String {
+        loop {
+            match tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
+                .await
+                .expect("command response timed out")
+                .expect("command response channel closed")
+            {
+                ChatEvent::LifecycleCommandSucceeded { request_id } => return request_id,
+                _ => continue,
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn lifecycle_mutation_reports_success_only_after_command_acceptance() {
+        let (engine, pool, _, _, session_id, mut receiver) = forum_wire_fixture(true).await;
+        handle_client_message(
+            &engine,
+            session_id,
+            r##"{"type":"lifecycle_command","request_id":"create-tag","command":{"type":"create_forum_tag","server_id":"server","channel":"#forum","name":"accepted","emoji":null,"moderated":false}}"##,
+        )
+        .await;
+
+        assert_eq!(receive_lifecycle_success(&mut receiver).await, "create-tag");
+        let persisted: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM forum_tags WHERE name='accepted'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(persisted, 1);
+    }
+
+    #[tokio::test]
+    async fn forum_commands_preserve_validation_denial_auth_and_dependency_fault_classes() {
+        let (engine, pool, auth, credential_id, session_id, mut receiver) =
+            forum_wire_fixture(true).await;
+        handle_client_message(
+            &engine,
+            session_id,
+            r##"{"type":"create_forum_tag","request_id":"invalid","server_id":"server","channel":"#forum","name":"","emoji":null,"moderated":false}"##,
+        )
+        .await;
+        assert_eq!(
+            receive_command_error(&mut receiver).await,
+            (
+                "INVALID_INPUT".into(),
+                "forum tag name must contain 1 to 100 bytes".into(),
+                false,
+            )
+        );
+
+        sqlx::query(
+            "CREATE TRIGGER reject_forum_tag BEFORE INSERT ON forum_tags \
+             BEGIN SELECT RAISE(ABORT,'forced'); END",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        handle_client_message(
+            &engine,
+            session_id,
+            r##"{"type":"create_forum_tag","request_id":"dependency","server_id":"server","channel":"#forum","name":"tag","emoji":null,"moderated":false}"##,
+        )
+        .await;
+        assert_eq!(
+            receive_command_error(&mut receiver).await,
+            (
+                "DEPENDENCY_UNAVAILABLE".into(),
+                "dependency unavailable".into(),
+                true,
+            )
+        );
+        sqlx::query("DROP TRIGGER reject_forum_tag")
+            .execute(&pool)
+            .await
+            .unwrap();
+        auth.revoke_credential(&credential_id).await.unwrap();
+        handle_client_message(
+            &engine,
+            session_id,
+            r##"{"type":"create_forum_tag","request_id":"auth","server_id":"server","channel":"#forum","name":"tag","emoji":null,"moderated":false}"##,
+        )
+        .await;
+        assert_eq!(
+            receive_command_error(&mut receiver).await,
+            (
+                "UNAUTHENTICATED".into(),
+                "authentication required".into(),
+                false,
+            )
+        );
+
+        let (engine, _, _, _, session_id, mut receiver) = forum_wire_fixture(false).await;
+        handle_client_message(
+            &engine,
+            session_id,
+            r##"{"type":"create_forum_tag","request_id":"denied","server_id":"server","channel":"#forum","name":"tag","emoji":null,"moderated":false}"##,
+        )
+        .await;
+        assert_eq!(
+            receive_command_error(&mut receiver).await,
+            (
+                "RESOURCE_UNAVAILABLE".into(),
+                "resource unavailable".into(),
+                false,
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn moderation_commands_preserve_validation_denial_auth_and_dependency_fault_classes() {
+        let (engine, pool, auth, credential_id, session_id, mut receiver) =
+            forum_wire_fixture(true).await;
+        handle_client_message(
+            &engine,
+            session_id,
+            r##"{"type":"ban_member","request_id":"invalid","server_id":"server","user_id":"member","delete_message_days":8}"##,
+        )
+        .await;
+        assert_eq!(
+            receive_command_error(&mut receiver).await,
+            (
+                "INVALID_INPUT".into(),
+                "delete_message_days must be between 0 and 7".into(),
+                false,
+            )
+        );
+
+        sqlx::query(
+            "CREATE TRIGGER reject_timeout_audit BEFORE INSERT ON audit_log \
+             WHEN NEW.action_type='member_timeout' BEGIN SELECT RAISE(ABORT,'forced'); END",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let timeout_until = (chrono::Utc::now() + chrono::Duration::minutes(5)).to_rfc3339();
+        let dependency = serde_json::json!({
+            "type": "timeout_member",
+            "request_id": "dependency",
+            "server_id": "server",
+            "user_id": "member",
+            "timeout_until": timeout_until,
+        })
+        .to_string();
+        handle_client_message(&engine, session_id, &dependency).await;
+        assert_eq!(
+            receive_command_error(&mut receiver).await,
+            (
+                "DEPENDENCY_UNAVAILABLE".into(),
+                "dependency unavailable".into(),
+                true,
+            )
+        );
+        sqlx::query("DROP TRIGGER reject_timeout_audit")
+            .execute(&pool)
+            .await
+            .unwrap();
+        auth.revoke_credential(&credential_id).await.unwrap();
+        handle_client_message(
+            &engine,
+            session_id,
+            r##"{"type":"kick_member","request_id":"auth","server_id":"server","user_id":"member"}"##,
+        )
+        .await;
+        assert_eq!(
+            receive_command_error(&mut receiver).await,
+            (
+                "UNAUTHENTICATED".into(),
+                "authentication required".into(),
+                false,
+            )
+        );
+
+        let (engine, _, _, _, session_id, mut receiver) = forum_wire_fixture(false).await;
+        handle_client_message(
+            &engine,
+            session_id,
+            r##"{"type":"ban_member","request_id":"denied","server_id":"server","user_id":"owner","delete_message_days":0}"##,
+        )
+        .await;
+        assert_eq!(
+            receive_command_error(&mut receiver).await,
+            (
+                "RESOURCE_UNAVAILABLE".into(),
+                "resource unavailable".into(),
+                false,
+            )
+        );
     }
 
     // ── Core messaging ──
@@ -2194,7 +3369,7 @@ mod tests {
     #[test]
     fn test_send_message_basic() {
         let msg: ClientMessage = parse_msg(
-            r##"{"type": "send_message", "channel": "#general", "content": "Hello world"}"##,
+            r##"{"type": "send_message", "operation_generation": "generation-0001", "channel": "#general", "content": "Hello world"}"##,
         )
         .unwrap();
         match msg {
@@ -2205,6 +3380,7 @@ mod tests {
                 reply_to,
                 attachment_ids,
                 nonce,
+                ..
             } => {
                 assert_eq!(server_id, DEFAULT_SERVER_ID);
                 assert_eq!(channel, "#general");
@@ -2218,10 +3394,19 @@ mod tests {
     }
 
     #[test]
+    fn protocol_v2_mutation_requires_operation_generation() {
+        assert!(parse_msg(
+            r##"{"type":"send_message","request_id":"request-1","channel":"#general","content":"hello"}"##
+        )
+        .is_err());
+    }
+
+    #[test]
     fn test_send_message_with_reply_and_attachments() {
         let msg: ClientMessage = parse_msg(
             r##"{
             "type": "send_message",
+            "operation_generation": "generation-0001",
             "server_id": "srv-1",
             "channel": "#dev",
             "content": "See attached",
@@ -2484,11 +3669,13 @@ mod tests {
                 name,
                 category_id,
                 is_private,
+                channel_type,
             } => {
                 assert_eq!(server_id, "srv-1");
                 assert_eq!(name, "new-channel");
                 assert!(category_id.is_none());
                 assert!(is_private.is_none());
+                assert!(channel_type.is_none());
             }
             _ => panic!("Expected CreateChannel"),
         }
@@ -2520,6 +3707,7 @@ mod tests {
         let msg: ClientMessage = parse_msg(
             r##"{
             "type": "edit_message",
+            "operation_generation": "generation-0001",
             "message_id": "msg-1",
             "content": "edited content"
         }"##,
@@ -2529,6 +3717,7 @@ mod tests {
             ClientMessage::EditMessage {
                 message_id,
                 content,
+                ..
             } => {
                 assert_eq!(message_id, "msg-1");
                 assert_eq!(content, "edited content");
@@ -2542,12 +3731,13 @@ mod tests {
         let msg: ClientMessage = parse_msg(
             r##"{
             "type": "delete_message",
+            "operation_generation": "generation-0001",
             "message_id": "msg-1"
         }"##,
         )
         .unwrap();
         assert!(
-            matches!(msg, ClientMessage::DeleteMessage { message_id } if message_id == "msg-1")
+            matches!(msg, ClientMessage::DeleteMessage { message_id, .. } if message_id == "msg-1")
         );
     }
 
@@ -2556,13 +3746,16 @@ mod tests {
         let msg: ClientMessage = parse_msg(
             r##"{
             "type": "add_reaction",
+            "operation_generation": "generation-0001",
             "message_id": "msg-1",
             "emoji": "\ud83d\udc4d"
         }"##,
         )
         .unwrap();
         match msg {
-            ClientMessage::AddReaction { message_id, emoji } => {
+            ClientMessage::AddReaction {
+                message_id, emoji, ..
+            } => {
                 assert_eq!(message_id, "msg-1");
                 assert_eq!(emoji, "\u{1f44d}");
             }
@@ -2575,6 +3768,7 @@ mod tests {
         let msg: ClientMessage = parse_msg(
             r##"{
             "type": "remove_reaction",
+            "operation_generation": "generation-0001",
             "message_id": "msg-1",
             "emoji": "\ud83d\udc4d"
         }"##,
@@ -2606,6 +3800,7 @@ mod tests {
         let msg: ClientMessage = parse_msg(
             r##"{
             "type": "mark_read",
+            "operation_generation": "generation-0001",
             "server_id": "srv-1",
             "channel": "#general",
             "message_id": "msg-42"
@@ -2617,6 +3812,7 @@ mod tests {
                 server_id,
                 channel,
                 message_id,
+                ..
             } => {
                 assert_eq!(server_id, "srv-1");
                 assert_eq!(channel, "#general");
@@ -3133,6 +4329,7 @@ mod tests {
         let msg: ClientMessage = parse_msg(
             r##"{
             "type": "invoke_slash_command",
+            "request_id": "request-1",
             "server_id": "srv-1",
             "channel": "#general",
             "command_name": "ping"
@@ -3149,6 +4346,34 @@ mod tests {
                 assert!(args_json.is_none());
             }
             _ => panic!("Expected InvokeSlashCommand"),
+        }
+    }
+
+    #[test]
+    fn test_invoke_message_component() {
+        let msg: ClientMessage = parse_msg(
+            r##"{
+            "type": "invoke_message_component",
+            "request_id": "request-2",
+            "message_id": "message-1",
+            "custom_id": "priority",
+            "values": ["high"]
+        }"##,
+        )
+        .unwrap();
+        match msg {
+            ClientMessage::InvokeMessageComponent {
+                request_id,
+                message_id,
+                custom_id,
+                values,
+            } => {
+                assert_eq!(request_id, "request-2");
+                assert_eq!(message_id, "message-1");
+                assert_eq!(custom_id, "priority");
+                assert_eq!(values, ["high"]);
+            }
+            _ => panic!("Expected InvokeMessageComponent"),
         }
     }
 
@@ -3194,10 +4419,12 @@ mod tests {
                 name,
                 description,
                 redirect_uris,
+                client_type,
             } => {
                 assert_eq!(name, "My App");
                 assert_eq!(description, Some("A cool app".into()));
                 assert_eq!(redirect_uris, vec!["https://example.com/callback"]);
+                assert_eq!(client_type, "confidential");
             }
             _ => panic!("Expected CreateOAuth2App"),
         }

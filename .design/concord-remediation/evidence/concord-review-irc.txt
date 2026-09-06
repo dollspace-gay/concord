@@ -1,0 +1,2 @@
+complete: returncode=0, read 12 bytes
+fragment: timed out after 2 seconds (process killed)

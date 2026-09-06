@@ -1,0 +1,1 @@
+Frozen current uncommitted source after SR01 fix: oauth.rs, router.rs and session_authority.rs. Exact input hashes in manifest; not attributed to Git HEAD alone. TMPDIR is disk-backed at /home/doll/.cache/concord-remediation-qualification. Final security verdict and parent correctness review recorded separately.

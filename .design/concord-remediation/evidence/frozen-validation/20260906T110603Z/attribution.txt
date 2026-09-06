@@ -1,0 +1,1 @@
+Frozen uncommitted remediation tree after all3Sol coding handbacks. Source manifest identifies working tree; not attributed to HEAD alone. Final validation concurrent with requested Daybreak security review; correctness review follows security. Large test fixtures use disk-backed TMPDIR=/home/doll/.cache/concord-remediation-qualification after prior tmpfs quota failure.

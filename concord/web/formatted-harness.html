@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8"><title>Formatted message harness</title></head>
+  <body>
+    <main id="formatted-message"></main>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { FormattedMessage } from '/src/components/chat/FormattedMessage.tsx';
+      const content = '**bold** *italic* ~~removed~~ `code`\n> quoted\n||secret|| see https://example.com/path <script>alert(1)<\/script>';
+      createRoot(document.getElementById('formatted-message')).render(React.createElement(FormattedMessage, { content }));
+    </script>
+  </body>
+</html>

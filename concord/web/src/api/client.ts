@@ -1,6 +1,16 @@
-import type { AttachmentInfo, AuthStatus, BlueskyIdentityInfo, BlueskyShareResult, ChannelInfo, CreateTokenResponse, HistoryResponse, IrcToken, PublicUserProfile, ServerInfo, UserProfile } from './types';
+import type { AttachmentInfo, AtprotoChannelPublicationPolicy, AtprotoPublicationStatus, AuthStatus, BlueskyIdentityInfo, BlueskyShareResult, ChannelInfo, CreateTokenResponse, HistoryResponse, IrcToken, PublicUserProfile, ServerInfo, UserProfile, UserProfileInfo } from './types';
 
 const BASE = '/api';
+
+export class HttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -14,7 +24,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    throw new Error(text || `HTTP ${res.status}`);
+    throw new HttpError(res.status, text || `HTTP ${res.status}`);
   }
 
   if (res.status === 204) return undefined as T;
@@ -56,9 +66,29 @@ export const getServerChannelHistory = (serverId: string, channelName: string, b
 export const listServerMembers = (serverId: string) =>
   request<{ user_id: string; role: string; joined_at: string }[]>(`/servers/${encodeURIComponent(serverId)}/members`);
 
+export interface ServerFolderData {
+  id: string;
+  name: string;
+  color?: string | null;
+  server_ids: string[];
+  collapsed?: boolean;
+}
+
+export const listServerFolders = () => request<ServerFolderData[]>('/server-folders');
+export const replaceServerFolders = (folders: ServerFolderData[]) =>
+  request<void>('/server-folders', { method: 'PUT', body: JSON.stringify(folders) });
+
 // User profiles
 export const getUserProfile = (nickname: string) =>
   request<PublicUserProfile>(`/users/${encodeURIComponent(nickname)}`);
+export const getFullUserProfile = (userId: string) =>
+  request<UserProfileInfo>(`/users/${encodeURIComponent(userId)}/profile`);
+export const updateProfile = (profile: Partial<Pick<UserProfileInfo, 'bio' | 'pronouns' | 'avatar_url' | 'banner_url'>>) =>
+  request<void>('/profile', { method: 'PATCH', body: JSON.stringify(profile) });
+export const updateServerMemberAvatar = (serverId: string, iconUrl: string) =>
+  request<void>(`/servers/${encodeURIComponent(serverId)}/member-media`, {
+    method: 'PATCH', body: JSON.stringify({ icon_url: iconUrl }),
+  });
 
 // IRC Tokens
 export const getTokens = () => request<IrcToken[]>('/tokens');
@@ -107,6 +137,20 @@ export const getBlueskyIdentity = (userId: string) =>
   request<BlueskyIdentityInfo>(`/users/${encodeURIComponent(userId)}/bluesky`);
 export const shareToBluesky = (messageId: string) =>
   request<BlueskyShareResult>(`/messages/${encodeURIComponent(messageId)}/share-bluesky`, { method: 'POST' });
+export const listAtprotoPublications = () =>
+  request<AtprotoPublicationStatus[]>('/atproto/publications');
+export const retryAtprotoPublication = (publicationId: string) =>
+  request<{ id: string; status: string; remote_uri: string | null; remote_cid: string | null }>(`/atproto/publications/${encodeURIComponent(publicationId)}/retry`, { method: 'POST' });
+export const getAtprotoChannelPublicationPolicy = (channelId: string) =>
+  request<AtprotoChannelPublicationPolicy>(`/channels/${encodeURIComponent(channelId)}/atproto-publication`);
+export const setAtprotoChannelEnabled = (channelId: string, enabled: boolean) =>
+  request<AtprotoChannelPublicationPolicy>(`/channels/${encodeURIComponent(channelId)}/atproto-publication`, {
+    method: 'PATCH', body: JSON.stringify({ enabled }),
+  });
+export const setAtprotoPublicationGrant = (channelId: string, enabled: boolean) =>
+  request<AtprotoChannelPublicationPolicy>('/settings/atproto-sync', {
+    method: 'PATCH', body: JSON.stringify({ channel_id: channelId, enabled }),
+  });
 export const getAtprotoSyncSetting = () =>
   request<{ atproto_sync_enabled: boolean }>('/settings/atproto-sync');
 export const updateAtprotoSyncSetting = (enabled: boolean) =>
@@ -137,8 +181,10 @@ export const deleteServerSticker = (serverId: string, stickerId: string) =>
   });
 
 // Cross-server emoji
-export const listAllUserEmoji = () =>
-  request<{ server_id: string; name: string; image_url: string }[]>('/users/me/emoji');
+export const listAllUserEmoji = (targetServerId: string) =>
+  request<{ server_id: string; name: string; image_url: string }[]>(
+    `/users/me/emoji?target_server_id=${encodeURIComponent(targetServerId)}`,
+  );
 
 // Emoji settings
 export const updateServerEmojiSettings = (serverId: string, allowExternal: boolean, shareable: boolean) =>
@@ -152,21 +198,48 @@ export const getServerLimits = () =>
   request<{ max_message_length: number; max_file_size_mb: number }>('/config/limits');
 
 // File uploads
-export async function uploadFile(file: File): Promise<AttachmentInfo> {
+export async function uploadFile(
+  file: File,
+  target?: { conversationId?: string; serverId?: string; channel?: string; purpose?: 'message' | 'emoji' | 'sticker' | 'server_avatar' | 'server_member_avatar' | 'user_avatar' | 'user_banner' },
+  options?: { signal?: AbortSignal; onProgress?: (loaded: number, total: number) => void },
+): Promise<AttachmentInfo> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${BASE}/uploads`, {
-    method: 'POST',
-    credentials: 'include',
-    body: formData,
-    // Don't set Content-Type — browser sets it with multipart boundary
+  const params = new URLSearchParams();
+  if (target?.conversationId) params.set('conversation_id', target.conversationId);
+  if (target?.serverId) params.set('server_id', target.serverId);
+  if (target?.channel) params.set('channel', target.channel);
+  if (target?.purpose) params.set('purpose', target.purpose);
+  const query = params.size ? `?${params.toString()}` : '';
+  return new Promise<AttachmentInfo>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const abort = () => xhr.abort();
+    xhr.open('POST', `${BASE}/uploads${query}`);
+    xhr.withCredentials = true;
+    xhr.responseType = 'json';
+    xhr.upload.onprogress = (event) => options?.onProgress?.(event.loaded, event.lengthComputable ? event.total : file.size);
+    xhr.onload = () => {
+      options?.signal?.removeEventListener('abort', abort);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(xhr.response as AttachmentInfo);
+      } else {
+        const message = typeof xhr.response === 'string'
+          ? xhr.response
+          : (xhr.response as { error?: string } | null)?.error;
+        reject(new HttpError(xhr.status, message || xhr.statusText || `Upload failed: HTTP ${xhr.status}`));
+      }
+    };
+    xhr.onerror = () => {
+      options?.signal?.removeEventListener('abort', abort);
+      reject(new Error('Upload failed because the network connection was lost'));
+    };
+    xhr.onabort = () => {
+      options?.signal?.removeEventListener('abort', abort);
+      reject(new DOMException('Upload cancelled', 'AbortError'));
+    };
+    if (options?.signal?.aborted) return reject(new DOMException('Upload cancelled', 'AbortError'));
+    options?.signal?.addEventListener('abort', abort, { once: true });
+    xhr.send(formData);
   });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(text || `Upload failed: HTTP ${res.status}`);
-  }
-
-  return res.json();
 }

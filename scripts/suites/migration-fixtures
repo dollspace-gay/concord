@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+manifest="${repository_root}/concord/Cargo.toml"
+fixture_test="${repository_root}/concord/server/tests/migrations_upgrade.rs"
+
+[[ -f "${manifest}" && -f "${fixture_test}" ]] || {
+  echo "migration fixture prerequisites are missing" >&2
+  exit 2
+}
+
+grep -Fq "current_schema_version()" "${fixture_test}" || {
+  echo "migration fixtures are not bound to the authoritative schema target" >&2
+  exit 2
+}
+grep -Fq "alias='at-user'" "${fixture_test}" || {
+  echo "legacy stable-identity continuity coverage is missing" >&2
+  exit 2
+}
+
+cd "${repository_root}/concord"
+cargo test --locked -p concord-server --test migrations_upgrade
+cargo test --locked -p concord-server db::pool::tests --lib
+
+echo "migration fixtures passed: historical files, preflight/integrity, and stable legacy aliases"

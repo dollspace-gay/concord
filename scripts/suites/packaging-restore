@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+manifest="${repository_root}/concord/Cargo.toml"
+
+cd "${repository_root}/concord"
+
+# The release artifacts must contain both the service initializer and the
+# operator recovery surface from the exact committed lockfile.
+cargo build --quiet --release --locked --manifest-path "${manifest}" \
+  --bin concord-server --bin concord_operator
+
+# This journey creates a populated current-schema instance, takes and verifies
+# a coordinated backup, restores it into empty deployment paths, and proves
+# content/media preservation, cursor/session invalidation, job pausing, and
+# checksum failure behavior.
+cargo test --quiet --locked --manifest-path "${manifest}" \
+  --features storage-fault-injection \
+  --test backup_restore -- --nocapture
+
+"${repository_root}/scripts/run-source-install-smoke.sh"
+
+printf '%s\n' \
+  "packaging-restore: PASS (locked source install/update, TLS/static/operator layout, verified DB/media/key manifest, fail-closed interrupted restore/resume, reconciliation boundary)"

@@ -1,0 +1,55 @@
+name: extended hosted qualification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  required-suites:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - application-policy
+          - browser-socket
+          - deterministic-jobs
+          - migration-fixtures
+          - storage-faults
+          - packaging-restore
+          - load-recovery
+          - container-smoke
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: concord/web/package-lock.json
+      - run: npm ci
+        working-directory: concord/web
+      - name: Install browser and IRC qualification dependencies
+        if: matrix.suite == 'browser-socket'
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install --yes irssi jq weechat-headless
+        working-directory: concord/web
+      - run: mkdir -p "concord/web/test-results/${{ matrix.suite }}"
+      - run: ../../scripts/run-required-suite.sh "${{ matrix.suite }}"
+        working-directory: concord/web
+        env:
+          CONCORD_PLAYWRIGHT_OUTPUT_DIR: test-results/${{ matrix.suite }}
+          CONCORD_IRC_QUALIFICATION_REPORT: ${{ github.workspace }}/concord/web/test-results/${{ matrix.suite }}/irc-client-qualification.log
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qualification-${{ matrix.suite }}
+          path: |
+            concord/web/test-results/${{ matrix.suite }}
+            .design/concord-remediation/evidence
+          if-no-files-found: ignore

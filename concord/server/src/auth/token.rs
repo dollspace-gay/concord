@@ -23,11 +23,28 @@ pub fn create_session_token(
 ) -> Result<String, jsonwebtoken::errors::Error> {
     let now = Utc::now();
     let jti = uuid::Uuid::new_v4().to_string();
+    create_session_token_with_id(
+        user_id,
+        secret,
+        now.timestamp(),
+        (now + Duration::hours(expiry_hours)).timestamp(),
+        &jti,
+    )
+}
+
+/// Create a JWT for an issuance already assigned a durable credential ID.
+pub fn create_session_token_with_id(
+    user_id: &str,
+    secret: &str,
+    issued_at: i64,
+    expires_at: i64,
+    credential_id: &str,
+) -> Result<String, jsonwebtoken::errors::Error> {
     let claims = Claims {
         sub: user_id.to_string(),
-        exp: (now + Duration::hours(expiry_hours)).timestamp(),
-        iat: now.timestamp(),
-        jti,
+        exp: expires_at,
+        iat: issued_at,
+        jti: credential_id.to_string(),
     };
 
     encode(

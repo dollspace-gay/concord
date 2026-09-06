@@ -1,0 +1,12 @@
+[WebServer] (node:2841258) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 1 test using 1 worker
+
+(node:2841293) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node-22 --trace-warnings ...` to show where the warning was created)
+
+
+[1/1] tests/browser/replay.spec.ts:1235:1 › logout invalidates a held authentication check and reports revoke failure
+  1 passed (4.0s)

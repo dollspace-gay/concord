@@ -1,0 +1,261 @@
+[WebServer] (node:2485777) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 1 test using 1 worker
+
+(node:2485844) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node-22 --trace-warnings ...` to show where the warning was created)
+
+
+[1/1] tests/authenticated/authenticated.spec.ts:1011:1 › owner manages local emoji and stickers through the browser with policy and revocation
+tests/authenticated/authenticated.spec.ts:1011:1 › owner manages local emoji and stickers through the browser with policy and revocation
+[managed-media:console:debug] [vite] connecting...
+
+[managed-media:ws:received] {"type":"connected"}
+
+[managed-media:console:debug] [vite] connected.
+
+[managed-media:console:info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+
+[managed-media:ws:sent] {"type":"list_servers"}
+
+[managed-media:ws:sent] {"type":"list_direct_conversations"}
+
+[managed-media:ws:sent] {"type":"get_server_limits"}
+
+[managed-media:ws:sent] {"type":"sync","request_id":"66ed0b76-0fa7-44eb-b3ec-d774611ea6e5","protocol_version":2,"subscriptions":[],"limit":100}
+
+[managed-media:ws:received] {"type":"own_presence","requested_status":"online","effective_status":"online","custom_status":null,"status_emoji":null}
+
+[managed-media:ws:received] {"type":"server_list","servers":[{"id":"browser-server","name":"Browser fixture","member_count":3,"role":"owner","my_permissions":32636159}]}
+
+[managed-media:ws:sent] {"type":"list_channels","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"get_unread_counts","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"get_community_settings","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"list_channels","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"get_unread_counts","server_id":"browser-server"}
+
+[managed-media:ws:received] {"type":"direct_conversation_list","conversations":[{"id":"browser-dm","peer_id":"browser-bob","peer_username":"bob","last_message_at":"2026-09-06 09:46:40","unread_count":1}]}
+
+[managed-media:ws:sent] {"type":"sync","request_id":"3f836577-93b7-4457-a1de-cba5666eda00","protocol_version":2,"subscriptions":["browser-dm"],"limit":100}
+
+[managed-media:ws:received] {"type":"server_limits","max_message_length":4000,"max_file_size_mb":10}
+
+[managed-media:ws:received] {"type":"sync_snapshot","request_id":"66ed0b76-0fa7-44eb-b3ec-d774611ea6e5","snapshot":{"protocol_version":2,"operation_generation":"555ca8866e397da01182b366e8c1f04a","cursor":"JHs78yz6OAujNusAICMnIhXn-fa3PEp4AKuQgJE6WbVsZ3jCbG_8G1zAN-oI5eFXv96SMpmO75LXgZ9WoQwpbPkT4luoHqS_eO-BPSXHH3pLKacCE3qhIDVtGAxF7Oa0K7BPQmurTiFNbIXdg_MrvxilkFWniBII1F8Pvrvxwz4htdb4mWAETYLRJmr1CgJPdzGGuYc3OOthUUArGx8NFilchffq5-xv2mmIAjFODu3QB4G8LhP6od2ZHwRU2vfgirMGmFXbU6YrsqfyYBcXdOijg0J2o23UN1JJ78RQlRg_wNjzjaXmUjiMfNaX6K3edk3
+
+[managed-media:ws:received] {"type":"channel_list","server_id":"browser-server","channels":[{"id":"browser-general","conversation_id":"channel:62726F777365722D67656E6572616C","server_id":"browser-server","name":"#general","topic":"","member_count":0,"position":0,"is_private":false,"channel_type":"text","archived":false,"slowmode_seconds":0,"is_nsfw":false}]}
+
+[managed-media:ws:sent] {"type":"list_roles","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"list_categories","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"get_presences","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"get_notification_settings","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"sync","request_id":"386eed22-8af4-4070-9fbc-66218a942188","protocol_version":2,"subscriptions":["browser-dm","channel:62726F777365722D67656E6572616C"],"limit":100}
+
+[managed-media:ws:received] {"type":"unread_counts","server_id":"browser-server","counts":[{"channel_name":"#general","count":3}]}
+
+[managed-media:ws:received] {"type":"server_community","community":{"server_id":"browser-server","is_discoverable":false,"rules_accepted":false}}
+
+[managed-media:ws:received] {"type":"channel_list","server_id":"browser-server","channels":[{"id":"browser-general","conversation_id":"channel:62726F777365722D67656E6572616C","server_id":"browser-server","name":"#general","topic":"","member_count":0,"position":0,"is_private":false,"channel_type":"text","archived":false,"slowmode_seconds":0,"is_nsfw":false}]}
+
+[managed-media:ws:received] {"type":"unread_counts","server_id":"browser-server","counts":[{"channel_name":"#general","count":3}]}
+
+[managed-media:ws:received] {"type":"sync_snapshot","request_id":"3f836577-93b7-4457-a1de-cba5666eda00","snapshot":{"protocol_version":2,"operation_generation":"555ca8866e397da01182b366e8c1f04a","cursor":"uusDP4skql2HXPgnDaaFjthWAoIJYRUHweizJSekn4htAk6hVVrxMtdZMyk-STRbEr33SvdEAcP0r4O91GFJELtq-GTtzf_uCBPCm0pYR9MmgVDsUZrxvtTjy2PkTwqZxA6C_zguCFUl740zIAW61TAm7pnjHiTFNEQK9PJBPjkr0DPe-GKQaQ2wdtyvOV2R7ZbPvZluFbijHgnsePMrkOAp3mOkroKYK3DCF2xbBDB4p2g-2EspuxHDeaF7tKYg4WVroS1Web8CzR2Djz7-8-vDEKeCMPLMeA3CdZca9Um0p1aCBdNJFKhcoTf9PnYrzMZ
+
+[managed-media:ws:received] {"type":"role_list","server_id":"browser-server","version":0,"roles":[{"id":"3e9196f5-354b-479e-9523-98fa94ad2258","server_id":"browser-server","name":"Owner","position":3,"permissions":32636159,"is_default":false},{"id":"b96c3ca6-026e-4ce1-8880-fcf187a7cfc1","server_id":"browser-server","name":"Admin","position":2,"permissions":130175,"is_default":false},{"id":"b231ccaa-f5bc-4d60-b9cf-9188461a0fe3","server_id":"browser-server","name":"Moderator","position":1,"permissions":130097,"is_default":fa
+
+[managed-media:ws:received] {"type":"category_list","server_id":"browser-server","categories":[]}
+
+[managed-media:ws:received] {"type":"presence_list","server_id":"browser-server","presences":[{"user_id":"browser-alice","nickname":"alice","status":"online"},{"user_id":"browser-bob","nickname":"bob","status":"offline"},{"user_id":"browser-helper-bot","nickname":"helper-bot","status":"offline"}]}
+
+[managed-media:ws:received] {"type":"notification_settings","server_id":"browser-server","settings":[]}
+
+[managed-media:ws:received] {"type":"sync_snapshot","request_id":"386eed22-8af4-4070-9fbc-66218a942188","snapshot":{"protocol_version":2,"operation_generation":"555ca8866e397da01182b366e8c1f04a","cursor":"L9D4udjpQbXyf8X9qOhBBuRNTMhmzjUj35lXqmoyZxZaDmeEF_lpDcKaTBe1o_zwT3HMzrbOjQB_M39KVEho_dNJXQXe0_vv949gydJWi2rtPawKKApFIF0MJuYr1GAVmCFf3XZDqI0ujUG3wXpe1c6WG8aNAIEXFrRSPJxMoJo9wlyofZwni-lWoCmQagAf0haCCWO_5xOm4_QHMIdFzP4EOEyZXc9sSPlsfIl6swItz-NZ0OvBfmsWBOZbXiQpIM4lMb1KbgE4ke6MeZjq6N9wwmZ2GzUXlDB8lJacA9UGs1T5oZBiRVRac6tFN8Ia6BE
+
+[managed-media:ws:sent] {"type":"lifecycle_command","request_id":"3a585e29-39b7-4c92-a881-4d55819723bf","command":{"type":"create_server","name":"Media policy target"}}
+
+[managed-media:ws:received] {"type":"server_list","servers":[{"id":"browser-server","name":"Browser fixture","member_count":3,"role":"owner","my_permissions":32636159},{"id":"9ee48583-4068-4048-b923-e60789654bee","name":"Media policy target","member_count":1,"role":"owner","my_permissions":32636159}]}
+
+[managed-media:ws:received] {"type":"lifecycle_command_succeeded","request_id":"3a585e29-39b7-4c92-a881-4d55819723bf"}
+
+[managed-media:ws:sent] {"type":"list_channels","server_id":"browser-server"}
+
+[managed-media:ws:received] {"type":"channel_list","server_id":"browser-server","channels":[{"id":"browser-general","conversation_id":"channel:62726F777365722D67656E6572616C","server_id":"browser-server","name":"#general","topic":"","member_count":0,"position":0,"is_private":false,"channel_type":"text","archived":false,"slowmode_seconds":0,"is_nsfw":false}]}
+
+[managed-media:ws:sent] {"type":"join_channel","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"get_members","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"fetch_history","server_id":"browser-server","channel":"#general","limit":50}
+
+[managed-media:ws:sent] {"type":"list_threads","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"list_forum_tags","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"mark_read","operation_generation":"555ca8866e397da01182b366e8c1f04a","request_id":"2ee6bd95-4861-4186-b6f8-5a39abfc45a9","client_message_id":"2ee6bd95-4861-4186-b6f8-5a39abfc45a9","server_id":"browser-server","channel":"#general","message_id":" historical:界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 "}
+
+[managed-media:ws:sent] {"type":"list_slash_commands","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"list_channels","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"get_unread_counts","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"join_channel","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"get_members","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"fetch_history","server_id":"browser-server","channel":"#general","limit":50}
+
+[managed-media:ws:sent] {"type":"list_threads","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"list_forum_tags","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"list_slash_commands","server_id":"browser-server"}
+
+[managed-media:ws:received] {"type":"join","nickname":"alice","server_id":"browser-server","channel":"#general","user_id":"browser-alice","role_ids":["3e9196f5-354b-479e-9523-98fa94ad2258"]}
+
+[managed-media:ws:received] {"type":"names","server_id":"browser-server","channel":"#general","members":[{"nickname":"alice","user_id":"browser-alice","role_ids":["3e9196f5-354b-479e-9523-98fa94ad2258"]}]}
+
+[managed-media:ws:received] {"type":"names","server_id":"browser-server","channel":"#general","members":[{"nickname":"alice","user_id":"browser-alice","role_ids":["3e9196f5-354b-479e-9523-98fa94ad2258"]}]}
+
+[managed-media:ws:received] {"type":"history","server_id":"browser-server","channel":"#general","messages":[{"id":" historical:界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 ","from":"bob","content":"historical long unicode identifier","timestamp":"2024-01-02T08:04:07.987654321Z"},{"id":"  padded historical message id  ","from":"bob","content":"historical offset timestamp","timestamp":"2024-
+
+[managed-media:ws:received] {"type":"thread_list","server_id":"browser-server","channel":"#general","threads":[]}
+
+[managed-media:ws:received] {"type":"error","code":"INVALID_INPUT","message":"forum tags require a forum channel"}
+
+[managed-media:console:error] Server error [INVALID_INPUT]: forum tags require a forum channel
+
+[managed-media:ws:received] {"type":"command_committed","receipt":{"request_id":"2ee6bd95-4861-4186-b6f8-5a39abfc45a9","client_message_id":"2ee6bd95-4861-4186-b6f8-5a39abfc45a9","message_id":" historical:界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 ","sequence":"3","entity_version":1,"persisted_at":"2026-09-06T09:46:47.297506213+00:00","replayed":false}}
+
+[managed-media:console:error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+[managed-media:ws:received] {"type":"slash_command_list","server_id":"browser-server","commands":[{"id":"browser-command","bot_user_id":"browser-helper-bot","name":"journey","description":"Exercise bot interactions","options":[]}]}
+
+[managed-media:ws:received] {"type":"channel_list","server_id":"browser-server","channels":[{"id":"browser-general","conversation_id":"channel:62726F777365722D67656E6572616C","server_id":"browser-server","name":"#general","topic":"","member_count":1,"position":0,"is_private":false,"channel_type":"text","archived":false,"slowmode_seconds":0,"is_nsfw":false}]}
+
+[managed-media:ws:received] {"type":"unread_counts","server_id":"browser-server","counts":[]}
+
+[managed-media:ws:received] {"type":"join","nickname":"alice","server_id":"browser-server","channel":"#general","user_id":"browser-alice","role_ids":["3e9196f5-354b-479e-9523-98fa94ad2258"]}
+
+[managed-media:ws:received] {"type":"names","server_id":"browser-server","channel":"#general","members":[{"nickname":"alice","user_id":"browser-alice","role_ids":["3e9196f5-354b-479e-9523-98fa94ad2258"]}]}
+
+[managed-media:ws:received] {"type":"names","server_id":"browser-server","channel":"#general","members":[{"nickname":"alice","user_id":"browser-alice","role_ids":["3e9196f5-354b-479e-9523-98fa94ad2258"]}]}
+
+[managed-media:ws:received] {"type":"history","server_id":"browser-server","channel":"#general","messages":[{"id":" historical:界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 ","from":"bob","content":"historical long unicode identifier","timestamp":"2024-01-02T08:04:07.987654321Z"},{"id":"  padded historical message id  ","from":"bob","content":"historical offset timestamp","timestamp":"2024-
+
+[managed-media:ws:received] {"type":"thread_list","server_id":"browser-server","channel":"#general","threads":[]}
+
+[managed-media:ws:received] {"type":"error","code":"INVALID_INPUT","message":"forum tags require a forum channel"}
+
+[managed-media:console:error] Server error [INVALID_INPUT]: forum tags require a forum channel
+
+[managed-media:ws:received] {"type":"slash_command_list","server_id":"browser-server","commands":[{"id":"browser-command","bot_user_id":"browser-helper-bot","name":"journey","description":"Exercise bot interactions","options":[]}]}
+
+[managed-media:ws:sent] {"type":"typing","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"send_message","operation_generation":"555ca8866e397da01182b366e8c1f04a","request_id":"62db81a6-2afa-475e-976a-47160cf925f4","client_message_id":"62db81a6-2afa-475e-976a-47160cf925f4","server_id":"browser-server","channel":"#general","content":"Managed media :journey_wave: [sticker:journey_sticker]","nonce":"62db81a6-2afa-475e-976a-47160cf925f4"}
+
+[managed-media:ws:received] {"type":"message_ack","id":"3f23095c-97c1-4f60-9c77-7afa1e0c319d","server_id":"browser-server","channel":"#general","request_id":"62db81a6-2afa-475e-976a-47160cf925f4","client_message_id":"62db81a6-2afa-475e-976a-47160cf925f4","sequence":"4","persisted_at":"2026-09-06 09:46:47.791","replayed":false,"nonce":"62db81a6-2afa-475e-976a-47160cf925f4"}
+
+[managed-media:ws:received] {"type":"message","id":"3f23095c-97c1-4f60-9c77-7afa1e0c319d","server_id":"browser-server","from":"alice","target":"#general","content":"Managed media :journey_wave: [sticker:journey_sticker]","timestamp":"2026-09-06T09:46:47.791Z"}
+
+[managed-media:console:error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+[managed-media:console:error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+[managed-media:ws:sent] {"type":"list_channels","server_id":"9ee48583-4068-4048-b923-e60789654bee"}
+
+[managed-media:ws:sent] {"type":"get_unread_counts","server_id":"9ee48583-4068-4048-b923-e60789654bee"}
+
+[managed-media:ws:sent] {"type":"get_community_settings","server_id":"9ee48583-4068-4048-b923-e60789654bee"}
+
+[managed-media:ws:sent] {"type":"list_channels","server_id":"9ee48583-4068-4048-b923-e60789654bee"}
+
+[managed-media:ws:sent] {"type":"get_unread_counts","server_id":"9ee48583-4068-4048-b923-e60789654bee"}
+
+[managed-media:ws:received] {"type":"channel_list","server_id":"9ee48583-4068-4048-b923-e60789654bee","channels":[{"id":"5f6441d3-64f3-4899-95e1-fb672c39a76c","conversation_id":"channel:35663634343164332D363466332D343839392D393565312D666236373263333961373663","server_id":"9ee48583-4068-4048-b923-e60789654bee","name":"#general","topic":"","member_count":0,"position":0,"is_private":false,"channel_type":"text","archived":false,"slowmode_seconds":0,"is_nsfw":false}]}
+
+[managed-media:ws:sent] {"type":"list_roles","server_id":"9ee48583-4068-4048-b923-e60789654bee"}
+
+[managed-media:ws:sent] {"type":"list_categories","server_id":"9ee48583-4068-4048-b923-e60789654bee"}
+
+[managed-media:ws:sent] {"type":"get_presences","server_id":"9ee48583-4068-4048-b923-e60789654bee"}
+
+[managed-media:ws:sent] {"type":"get_notification_settings","server_id":"9ee48583-4068-4048-b923-e60789654bee"}
+
+[managed-media:ws:sent] {"type":"sync","request_id":"218a859b-d4b7-4a0d-beb8-5b64fab54d0e","protocol_version":2,"subscriptions":["browser-dm","channel:35663634343164332D363466332D343839392D393565312D666236373263333961373663","channel:62726F777365722D67656E6572616C"],"limit":100}
+
+[managed-media:ws:received] {"type":"unread_counts","server_id":"9ee48583-4068-4048-b923-e60789654bee","counts":[]}
+
+[managed-media:ws:received] {"type":"server_community","community":{"server_id":"9ee48583-4068-4048-b923-e60789654bee","is_discoverable":false,"rules_accepted":false}}
+
+[managed-media:ws:received] {"type":"channel_list","server_id":"9ee48583-4068-4048-b923-e60789654bee","channels":[{"id":"5f6441d3-64f3-4899-95e1-fb672c39a76c","conversation_id":"channel:35663634343164332D363466332D343839392D393565312D666236373263333961373663","server_id":"9ee48583-4068-4048-b923-e60789654bee","name":"#general","topic":"","member_count":0,"position":0,"is_private":false,"channel_type":"text","archived":false,"slowmode_seconds":0,"is_nsfw":false}]}
+
+[managed-media:ws:received] {"type":"unread_counts","server_id":"9ee48583-4068-4048-b923-e60789654bee","counts":[]}
+
+[managed-media:ws:received] {"type":"role_list","server_id":"9ee48583-4068-4048-b923-e60789654bee","version":0,"roles":[{"id":"099e61b2-9926-4421-b614-815efd62ce7d","server_id":"9ee48583-4068-4048-b923-e60789654bee","name":"Owner","position":3,"permissions":32636159,"is_default":false},{"id":"eee80760-6fab-4d54-9a45-70f67bb5c945","server_id":"9ee48583-4068-4048-b923-e60789654bee","name":"Admin","position":2,"permissions":130175,"is_default":false},{"id":"c8c14da2-3532-4456-944f-a0a5ad707b57","server_id":"9ee48583-4068-4048
+
+[managed-media:ws:received] {"type":"category_list","server_id":"9ee48583-4068-4048-b923-e60789654bee","categories":[]}
+
+[managed-media:ws:received] {"type":"presence_list","server_id":"9ee48583-4068-4048-b923-e60789654bee","presences":[{"user_id":"browser-alice","nickname":"alice","status":"online"}]}
+
+[managed-media:ws:received] {"type":"notification_settings","server_id":"9ee48583-4068-4048-b923-e60789654bee","settings":[]}
+
+[managed-media:ws:received] {"type":"sync_snapshot","request_id":"218a859b-d4b7-4a0d-beb8-5b64fab54d0e","snapshot":{"protocol_version":2,"operation_generation":"555ca8866e397da01182b366e8c1f04a","cursor":"TZHS5yRH7TyNdcWbeev2lW5Bfkt3GxPW6ZwwHNG4G_0pyRzZ0o0nlscfHMp07ZKnLp06UPGbWVAqYn07vXwlMlLGWG22WEFQDl3a6A2aKJUOqGSsqM6KLixKEJ_Nt1oSiRfltxuIfVdOfrN1PuSinIKrA0O0TJOAUZdYZOJIHgrcLN-G-BGtjey36qOnRBgsQzSsCeWkJ_99Bd3L1Z4JjTGbSJCree9qaI3QrS2vdBMuEGL2jy-fSLox8Ng4fdP2Yc9JQxrDwkzY9nd-CcTFFi4RULQOG2ixXD8Wyw6Am_lWwD0yfkUS-Tc0CYuiPLc0XdC
+
+[managed-media:ws:sent] {"type":"send_message","operation_generation":"555ca8866e397da01182b366e8c1f04a","request_id":"62db81a6-2afa-475e-976a-47160cf925f4","client_message_id":"62db81a6-2afa-475e-976a-47160cf925f4","server_id":"browser-server","channel":"#general","content":"Managed media :journey_wave: [sticker:journey_sticker]","nonce":"62db81a6-2afa-475e-976a-47160cf925f4"}
+
+[managed-media:ws:received] {"type":"durable_event","event":{"kind":"read_advanced","conversation_id":"channel:62726F777365722D67656E6572616C","entity_type":"read_state","entity_id":"23e3671e3e222558338e610e9b9f6d83388fdcb6493c8c1575585f7bc713b0b1","entity_version":1,"message":null,"reaction":null,"read_state":{"conversation_id":"channel:62726F777365722D67656E6572616C","message_id":" historical:界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界
+
+[managed-media:ws:sent] {"type":"lifecycle_command","request_id":"921d1c6b-88cb-4ff6-97e6-ddb3152b0e41","command":{"type":"delete_server","server_id":"9ee48583-4068-4048-b923-e60789654bee"}}
+
+[managed-media:ws:received] {"type":"message_ack","id":"3f23095c-97c1-4f60-9c77-7afa1e0c319d","server_id":"browser-server","channel":"#general","request_id":"62db81a6-2afa-475e-976a-47160cf925f4","client_message_id":"62db81a6-2afa-475e-976a-47160cf925f4","sequence":"4","persisted_at":"2026-09-06 09:46:47.791","replayed":true,"nonce":"62db81a6-2afa-475e-976a-47160cf925f4"}
+
+[managed-media:ws:received] {"type":"durable_event","event":{"kind":"message_created","conversation_id":"channel:62726F777365722D67656E6572616C","entity_type":"message","entity_id":"3f23095c-97c1-4f60-9c77-7afa1e0c319d","entity_version":1,"message":{"message_id":"3f23095c-97c1-4f60-9c77-7afa1e0c319d","conversation_id":"channel:62726F777365722D67656E6572616C","sequence":"4","entity_version":1,"sender_id":"browser-alice","sender_nick":"alice","content":"Managed media :journey_wave: [sticker:journey_sticker]","content_format"
+
+[managed-media:ws:received] {"type":"server_list","servers":[{"id":"browser-server","name":"Browser fixture","member_count":3,"role":"owner","my_permissions":32636159}]}
+
+[managed-media:ws:sent] {"type":"list_threads","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"list_forum_tags","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"get_unread_counts","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"mark_read","operation_generation":"555ca8866e397da01182b366e8c1f04a","request_id":"82a386d2-0649-48a2-aded-4a01a6eddc33","client_message_id":"82a386d2-0649-48a2-aded-4a01a6eddc33","server_id":"browser-server","channel":"#general","message_id":"3f23095c-97c1-4f60-9c77-7afa1e0c319d"}
+
+[managed-media:ws:sent] {"type":"list_slash_commands","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"get_community_settings","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"list_channels","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"get_unread_counts","server_id":"browser-server"}
+
+[managed-media:ws:sent] {"type":"join_channel","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"get_members","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"fetch_history","server_id":"browser-server","channel":"#general","limit":50}
+
+[managed-media:ws:sent] {"type":"list_threads","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"list_forum_tags","server_id":"browser-server","channel":"#general"}
+
+[managed-media:ws:sent] {"type":"list_slash_commands","server_id":"browser-server"}
+
+[managed-media:ws:received] {"type":"lifecycle_command_succeeded","request_id":"921d1c6b-88cb-4ff6-97e6-ddb3152b0e41"}
+
+[managed-media:console:error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+[managed-media:ws:received] {"type":"thread_list","server_id":"browser-server","channel":"#general","threads":[]}
+
+  1 passed (5.5s)

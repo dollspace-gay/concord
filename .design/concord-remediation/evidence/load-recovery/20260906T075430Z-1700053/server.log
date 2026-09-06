@@ -1,0 +1,60 @@
+2026-09-06T07:54:47.135168Z  INFO concord_server::db::pool: database connected with WAL, synchronous=FULL, foreign_keys=ON database_url="sqlite:/tmp/tmp.AnCxlz1yPW/concord.db?mode=rwc"
+2026-09-06T07:54:47.392760Z  INFO concord_server::engine::chat_engine: bootstrapping default roles for existing server server_id=browser-server
+2026-09-06T07:54:47.397645Z  INFO concord_server::engine::chat_engine: loaded servers from database count=1
+2026-09-06T07:54:47.397966Z  INFO concord_server::engine::chat_engine: loaded channels from database count=1
+2026-09-06T07:54:47.398332Z  INFO concord_server::web::atproto: no persisted AT Protocol signing key found, generating new one
+2026-09-06T07:54:47.405682Z  INFO concord_server: Concord server starting — Web: 127.0.0.1:58451, IRC: 127.0.0.1:46879
+2026-09-06T07:54:47.405779Z  INFO concord_server::irc::listener: IRC listener started on 127.0.0.1:46879 (plaintext)
+2026-09-06T07:54:47.519242Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:53100
+2026-09-06T07:54:47.735619Z  INFO concord_server::engine::chat_engine: session connected session_id=c3b7a09c-308d-4245-9174-bf94841583eb nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T07:54:47.737394Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:53106
+2026-09-06T07:54:47.742352Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T07:54:47.947008Z  INFO concord_server::engine::chat_engine: session connected session_id=a2fde024-db06-4fb5-8240-f37884dc5eb3 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T07:54:47.948062Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:38912
+2026-09-06T07:54:47.952062Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T07:54:48.156145Z  INFO concord_server::engine::chat_engine: session connected session_id=61304574-dd71-41a0-8b54-ee970ec6e175 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T07:54:48.157772Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:38914
+2026-09-06T07:54:48.161503Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T07:54:48.366038Z  INFO concord_server::engine::chat_engine: session connected session_id=b8d5f59d-087c-4621-8ce7-48ab71c55af2 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T07:54:48.374261Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T07:54:51.373373Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:51.574230Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:51.770221Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:51.967381Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:52.169166Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:52.367021Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:52.567998Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:52.774460Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:52.967018Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:53.171544Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:53.367139Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:53.567106Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:53.769759Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:53.967029Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:54.170401Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:54.367171Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:54.567271Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:54.772251Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:54.967024Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:55.171420Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:55.367140Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:55.567057Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:55.775059Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:55.967262Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:56.173895Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:56.367185Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:56.567166Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:56.770939Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:54:56.967146Z  WARN concord_server::irc::connection: IRC command rate limited peer=127.0.0.1:38914
+2026-09-06T07:54:57.172536Z  WARN concord_server::irc::commands: PRIVMSG failed error=message rate limit exceeded target=#browser-fixture/general
+2026-09-06T07:55:27.190301Z  INFO concord_server::engine::chat_engine: session disconnected session_id=b8d5f59d-087c-4621-8ce7-48ab71c55af2 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:55:27.245708Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:38914 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:55:27.246087Z  INFO concord_server::engine::chat_engine: session disconnected session_id=a2fde024-db06-4fb5-8240-f37884dc5eb3 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:55:27.246105Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:53106 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:55:27.246669Z  INFO concord_server::engine::chat_engine: session disconnected session_id=c3b7a09c-308d-4245-9174-bf94841583eb nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:55:27.246696Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:53100 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:55:27.246897Z  INFO concord_server::engine::chat_engine: session disconnected session_id=61304574-dd71-41a0-8b54-ee970ec6e175 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:55:27.246912Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:38912 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:55:27.264013Z  INFO concord_server: shutdown signal received
+2026-09-06T07:55:27.264285Z  INFO concord_server::irc::listener: IRC listener shutting down
+2026-09-06T07:55:27.264461Z  INFO concord_server: Concord server stopped

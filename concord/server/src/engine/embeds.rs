@@ -1,52 +1,4 @@
-use std::net::IpAddr;
-
 use super::events::EmbedInfo;
-
-/// Check if an IP address is in a private/reserved range (SSRF protection).
-fn is_private_ip(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => {
-            v4.is_loopback()          // 127.0.0.0/8
-                || v4.is_private()    // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
-                || v4.is_link_local() // 169.254.0.0/16
-                || v4.is_broadcast()  // 255.255.255.255
-                || v4.is_unspecified() // 0.0.0.0
-                || v4.octets()[0] == 100 && (v4.octets()[1] & 0xC0) == 64 // 100.64.0.0/10 (CGNAT)
-        }
-        IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified(),
-    }
-}
-
-/// Resolve hostname and check that it doesn't point to a private IP (SSRF protection).
-pub(crate) async fn is_safe_url(url: &str) -> bool {
-    let Ok(parsed) = reqwest::Url::parse(url) else {
-        return false;
-    };
-    let Some(host) = parsed.host_str() else {
-        return false;
-    };
-
-    // If it's a direct IP address, check it
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        return !is_private_ip(ip);
-    }
-
-    // Resolve DNS and check all addresses
-    let port = parsed
-        .port()
-        .unwrap_or(if parsed.scheme() == "https" { 443 } else { 80 });
-    let lookup = format!("{host}:{port}");
-    match tokio::net::lookup_host(&lookup).await {
-        Ok(addrs) => {
-            let addrs: Vec<_> = addrs.collect();
-            if addrs.is_empty() {
-                return false;
-            }
-            addrs.iter().all(|addr| !is_private_ip(addr.ip()))
-        }
-        Err(_) => false,
-    }
-}
 
 /// Extract all URLs (http/https) from message content (max 5).
 pub fn extract_urls(content: &str) -> Vec<String> {
@@ -66,23 +18,27 @@ pub fn extract_urls(content: &str) -> Vec<String> {
 
 /// Fetch Open Graph metadata for a URL.
 /// Returns None if the fetch fails or no OG tags are found.
-pub async fn unfurl_url(client: &reqwest::Client, url: &str) -> Option<EmbedInfo> {
-    // SSRF protection: block requests to private/internal IP ranges
-    if !is_safe_url(url).await {
-        return None;
-    }
-
-    let resp = client
-        .get(url)
-        .header("User-Agent", "ConcordBot/1.0 (link preview)")
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await
-        .ok()?;
+pub async fn unfurl_url(
+    client: &crate::egress::ControlledHttpClient,
+    url: &str,
+) -> Option<EmbedInfo> {
+    let parsed = reqwest::Url::parse(url).ok()?;
+    let request = client
+        .request(
+            reqwest::Method::GET,
+            parsed,
+            crate::egress::RedirectPolicy::FollowSafeGet,
+        )
+        .ok()?
+        .header(
+            reqwest::header::USER_AGENT,
+            reqwest::header::HeaderValue::from_static("ConcordBot/1.0 (link preview)"),
+        );
+    let resp = client.send(request).await.ok()?;
 
     // Only parse HTML responses
     let content_type = resp
-        .headers()
+        .headers
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
@@ -90,13 +46,7 @@ pub async fn unfurl_url(client: &reqwest::Client, url: &str) -> Option<EmbedInfo
         return None;
     }
 
-    // Limit body read to 256KB to avoid abuse
-    let body = resp.text().await.ok()?;
-    let body = if body.len() > 256 * 1024 {
-        &body[..256 * 1024]
-    } else {
-        &body
-    };
+    let body = std::str::from_utf8(&resp.body).ok()?;
 
     let title = extract_meta(body, "og:title").or_else(|| extract_html_title(body));
     let description =
@@ -129,7 +79,10 @@ fn extract_meta(html: &str, name: &str) -> Option<String> {
 
     for pattern in &patterns {
         if let Some(pos) = html.find(pattern.as_str()) {
-            let search_end = (pos + 500).min(html.len());
+            let mut search_end = (pos + 500).min(html.len());
+            while !html.is_char_boundary(search_end) {
+                search_end -= 1;
+            }
             let slice = &html[pos..search_end];
 
             if let Some(content) = extract_content_attr(slice) {
@@ -163,11 +116,10 @@ fn extract_content_attr(tag_fragment: &str) -> Option<String> {
 
 /// Extract <title>...</title> as fallback.
 fn extract_html_title(html: &str) -> Option<String> {
-    let lower = html.to_lowercase();
-    let start = lower.find("<title")?.checked_add(6)?;
-    let after_tag = lower[start..].find('>')?;
+    let start = html.find("<title")?.checked_add(6)?;
+    let after_tag = html[start..].find('>')?;
     let content_start = start + after_tag + 1;
-    let end = lower[content_start..].find("</title>")?;
+    let end = html[content_start..].find("</title>")?;
     let title = html[content_start..content_start + end].trim().to_string();
     if title.is_empty() {
         None
@@ -319,6 +271,17 @@ mod tests {
         let html = r#"<meta property="og:title" content="My Page Title">"#;
         let result = extract_meta(html, "og:title");
         assert_eq!(result, Some("My Page Title".into()));
+    }
+
+    #[test]
+    fn unicode_near_scan_boundary_never_panics_or_splits_text() {
+        let padding = "é".repeat(249);
+        let html = format!(r#"<meta property="og:title" {padding} content="safe">"#);
+        let _ = extract_meta(&html, "og:title");
+        assert_eq!(
+            extract_html_title("<title>İstanbul</title>"),
+            Some("İstanbul".into())
+        );
     }
 
     #[test]

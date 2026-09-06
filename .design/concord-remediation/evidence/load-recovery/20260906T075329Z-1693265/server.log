@@ -1,0 +1,36 @@
+2026-09-06T07:53:52.905172Z  INFO concord_server::db::pool: database connected with WAL, synchronous=FULL, foreign_keys=ON database_url="sqlite:/tmp/tmp.hMLadj4InB/concord.db?mode=rwc"
+2026-09-06T07:53:53.154772Z  INFO concord_server::engine::chat_engine: bootstrapping default roles for existing server server_id=browser-server
+2026-09-06T07:53:53.155768Z  INFO concord_server::engine::chat_engine: loaded servers from database count=1
+2026-09-06T07:53:53.155994Z  INFO concord_server::engine::chat_engine: loaded channels from database count=1
+2026-09-06T07:53:53.156177Z  INFO concord_server::web::atproto: no persisted AT Protocol signing key found, generating new one
+2026-09-06T07:53:53.163581Z  INFO concord_server: Concord server starting — Web: 127.0.0.1:37451, IRC: 127.0.0.1:50329
+2026-09-06T07:53:53.163797Z  INFO concord_server::irc::listener: IRC listener started on 127.0.0.1:50329 (plaintext)
+2026-09-06T07:53:53.341204Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:43038
+2026-09-06T07:53:53.341208Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:43050
+2026-09-06T07:53:53.341206Z  WARN concord_server::irc::listener: IRC connection rejected: per-IP limit reached ip=127.0.0.1 count=5
+2026-09-06T07:53:53.341233Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:43058
+2026-09-06T07:53:53.341299Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:43046
+2026-09-06T07:53:53.341319Z  WARN concord_server::irc::listener: IRC connection rejected: per-IP limit reached ip=127.0.0.1 count=5
+2026-09-06T07:53:53.341345Z  WARN concord_server::irc::listener: IRC connection rejected: per-IP limit reached ip=127.0.0.1 count=5
+2026-09-06T07:53:53.341380Z  INFO concord_server::irc::connection: IRC client connected peer=127.0.0.1:43060
+2026-09-06T07:53:53.342789Z  WARN concord_server::irc::connection: IRC token validation error error=credential verifier is busy
+2026-09-06T07:53:53.342817Z  INFO concord_server::irc::connection: IRC client disconnected (unregistered) peer=127.0.0.1:43060
+2026-09-06T07:53:53.557580Z  INFO concord_server::engine::chat_engine: session connected session_id=c8380a32-b0cd-4918-b8e4-80d749b7058a nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T07:53:53.558372Z  INFO concord_server::engine::chat_engine: session connected session_id=b4f8f7a6-219f-4dde-8869-9a4b19918945 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T07:53:53.559361Z  INFO concord_server::engine::chat_engine: session connected session_id=80aa1122-74b0-49a1-9c79-61b1b3a8b2c5 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T07:53:53.562530Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T07:53:53.562658Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T07:53:53.562971Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T07:53:53.575401Z  INFO concord_server::engine::chat_engine: session connected session_id=9e6ae1df-1c70-479e-bbe0-1039e43f1361 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a protocol=Irc
+2026-09-06T07:53:53.579690Z  INFO concord_server::engine::chat_engine: joined channel nickname=u-6fc8716f2b97f9d1dd7b262b3be34a server_id=browser-server channel_name=#general
+2026-09-06T07:53:54.346410Z  INFO concord_server::engine::chat_engine: session disconnected session_id=b4f8f7a6-219f-4dde-8869-9a4b19918945 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:53:54.346475Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:43050 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:53:54.346628Z  INFO concord_server: shutdown signal received
+2026-09-06T07:53:54.346410Z  INFO concord_server::engine::chat_engine: session disconnected session_id=c8380a32-b0cd-4918-b8e4-80d749b7058a nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:53:54.346670Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:43058 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:53:54.346714Z  INFO concord_server::irc::listener: IRC listener shutting down
+2026-09-06T07:53:54.346410Z  INFO concord_server::engine::chat_engine: session disconnected session_id=9e6ae1df-1c70-479e-bbe0-1039e43f1361 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:53:54.346904Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:43038 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:53:54.347060Z  INFO concord_server::engine::chat_engine: session disconnected session_id=80aa1122-74b0-49a1-9c79-61b1b3a8b2c5 nickname=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:53:54.347083Z  INFO concord_server::irc::connection: IRC client disconnected peer=127.0.0.1:43046 nick=u-6fc8716f2b97f9d1dd7b262b3be34a
+2026-09-06T07:53:54.347178Z  INFO concord_server: Concord server stopped

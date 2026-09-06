@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "${repository_root}/concord"
+run_tests="${repository_root}/scripts/run-cargo-tests-nonempty.sh"
+
+"${run_tests}" --locked -p concord-server jobs::tests --lib
+"${run_tests}" --locked -p concord-server media::tests --lib
+"${run_tests}" --locked -p concord-server egress::tests --lib
+"${run_tests}" --locked -p concord-server encrypted_atproto_credentials_round_trip_and_fail_closed --lib
+"${run_tests}" --locked -p concord-server web::webhook_dispatcher::tests --lib
+"${run_tests}" --locked -p concord-server web::atproto_records::tests --lib
+"${run_tests}" --locked -p concord-server web::pds_client::tests --lib
+"${run_tests}" --locked -p concord-server web::atproto::signing_key_tests --lib
+"${run_tests}" --locked -p concord-server engine::profile_sync::tests --lib
+"${run_tests}" --locked -p concord-server --test oauth2_lifecycle
+
+echo "deterministic jobs passed: fenced durable dispatch/restart, bounded retry, webhook grant/retry delivery, AT publication uncertainty/reconciliation, PDS refresh/profile sync, OAuth rotation/reuse, media recovery, controlled egress, encrypted credentials"

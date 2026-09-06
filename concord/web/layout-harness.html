@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8"><link rel="stylesheet" href="/src/index.css"><title>Concord layout harness</title></head>
+  <body>
+    <main id="root" class="h-screen"></main>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { AppLayout } from '/src/components/layout/AppLayout.tsx';
+      import { useChatStore } from '/src/stores/chatStore.ts';
+      import { useUiStore } from '/src/stores/uiStore.ts';
+      window.chatStore = useChatStore;
+      window.uiStore = useUiStore;
+      createRoot(document.getElementById('root')).render(React.createElement(AppLayout));
+    </script>
+  </body>
+</html>

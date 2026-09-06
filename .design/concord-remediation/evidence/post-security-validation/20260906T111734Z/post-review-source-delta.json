@@ -1,0 +1,35 @@
+{
+  "reason": "Sol final corrections: seeder div_ceil, IRC fixture key input, local media image rendering and associated browser regression/restart oracle; Rust server/operator unchanged",
+  "changes": [
+    {
+      "path": "concord/server/src/bin/load_qualification_seed.rs",
+      "before": "d5616f59e20f9a9c3ece0eb5c29b7b4fb0cfe3c6301b790b0b93b8f8ec3c7e0a",
+      "after": "b2724b338ce4ce2c36aa688c3a87f8f2b93143dc2f32052fa4f99c35a0e332c1"
+    },
+    {
+      "path": "concord/web/src/components/ExternalImage.tsx",
+      "before": "0407a09ea73d443430c6ecfd024f30debe45f5d75ec7181dc1160920443ba3b2",
+      "after": "97d09637ab6a38e66aff2b22b330795a056ae8bbf7d37cdd1cbcae5d18669e5b"
+    },
+    {
+      "path": "concord/web/src/utils/externalUrl.ts",
+      "before": "2b745bd140e1ab58b0ef668ace38b9a1bc9b90a03290810ac98e5716a72cdddb",
+      "after": "b18951fa9b3e4332b5116c732d6cb579df3f020c8d9e27c3397a1551cfb8863a"
+    },
+    {
+      "path": "concord/web/tests/authenticated/authenticated.spec.ts",
+      "before": "cc9d4f63ceae69ec6e6391e90b1abc59195c30cd5218eb21cca2f2fd3d1aa43d",
+      "after": "1eff5709af78d3a2b5baa0371af7b09272ef5e8883686802dac8f42f3052425e"
+    },
+    {
+      "path": "concord/web/tests/browser/replay.spec.ts",
+      "before": "b0d7c055a2b8156e078422a7746e66f4de16580b5ddaa471bbf8d2f8651fd5b3",
+      "after": "62d021c96d0fc5cc2cc3cd65a45e431c9db6a99ddc331a68773f0f6b9ec15f38"
+    },
+    {
+      "path": "scripts/run-irc-client-qualification.sh",
+      "before": "2a9541e032d186b43cd7ad1ffc008222ec4dd23aa8d0891711ab44efe1d4c671",
+      "after": "6ea06dcbeb3a35ea7592374ce6c1b6d33746218df12896da2880d817f60aa1d0"
+    }
+  ]
+}

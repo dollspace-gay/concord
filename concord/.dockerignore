@@ -1,6 +1,14 @@
 server/target/
+target/
 web/node_modules/
 web/dist/
+web/test-results/
+web/playwright-report/
+data/
+server/data/
+server/concord.toml
+*.key
+*.pem
 *.db
 *.db-wal
 *.db-shm

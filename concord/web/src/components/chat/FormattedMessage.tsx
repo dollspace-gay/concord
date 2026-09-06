@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useUiStore } from '../../stores/uiStore';
 
@@ -13,6 +13,7 @@ type Token =
   | { type: 'italic'; children: Token[] }
   | { type: 'strikethrough'; children: Token[] }
   | { type: 'code'; value: string }
+  | { type: 'link'; value: string }
   | { type: 'spoiler'; children: Token[] }
   | { type: 'mention'; value: string }
   | { type: 'custom_emoji'; name: string }
@@ -27,6 +28,14 @@ function parseInline(text: string): Token[] {
   let i = 0;
 
   while (i < text.length) {
+    if (text.startsWith('https://', i) || text.startsWith('http://', i)) {
+      const match = text.slice(i).match(/^https?:\/\/[^\s<]+/);
+      if (match) {
+        tokens.push({ type: 'link', value: match[0] });
+        i += match[0].length;
+        continue;
+      }
+    }
     // Inline code: `...`
     if (text[i] === '`') {
       const end = text.indexOf('`', i + 1);
@@ -109,7 +118,10 @@ function parseInline(text: string): Token[] {
 
     // Plain text — collect until next special character
     let j = i + 1;
-    while (j < text.length && !['*', '~', '`', '|', '@', ':', '['].includes(text[j])) {
+    while (j < text.length
+      && !['*', '~', '`', '|', '@', ':', '['].includes(text[j])
+      && !text.startsWith('https://', j)
+      && !text.startsWith('http://', j)) {
       j++;
     }
     tokens.push({ type: 'text', value: text.slice(i, j) });
@@ -138,6 +150,12 @@ function renderTokens(tokens: Token[], keyPrefix = ''): React.ReactNode[] {
             {token.value}
           </code>
         );
+      case 'link':
+        return (
+          <a key={key} href={token.value} target="_blank" rel="noreferrer" className="text-blue-400 underline">
+            {token.value}
+          </a>
+        );
       case 'spoiler':
         return <SpoilerSpan key={key}>{renderTokens(token.children, `${key}-`)}</SpoilerSpan>;
       case 'mention':
@@ -151,12 +169,19 @@ function renderTokens(tokens: Token[], keyPrefix = ''): React.ReactNode[] {
 }
 
 function SpoilerSpan({ children }: { children: React.ReactNode }) {
+  const [revealed, setRevealed] = useState(false);
   return (
-    <span
-      className="cursor-pointer rounded bg-text-muted text-transparent transition-colors hover:bg-transparent hover:text-text-primary"
+    <button
+      type="button"
+      aria-label={revealed ? 'Hide spoiler' : 'Reveal spoiler'}
+      aria-expanded={revealed}
+      onClick={() => setRevealed((current) => !current)}
+      className={`cursor-pointer rounded transition-colors ${revealed
+        ? 'bg-transparent text-text-primary'
+        : 'bg-text-muted text-transparent hover:bg-transparent hover:text-text-primary'}`}
     >
       {children}
-    </span>
+    </button>
   );
 }
 

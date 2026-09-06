@@ -4,51 +4,32 @@ use crate::db::models::{NotificationSettingRow, UpsertNotificationParams};
 
 /// Upsert a notification setting for a user (server-level or channel-level).
 ///
-/// SQLite's UNIQUE constraint does not enforce uniqueness when any column is NULL
-/// (because NULL != NULL). For server-level settings (channel_id = NULL), we use a
-/// DELETE + INSERT pattern to prevent duplicate rows. For channel-level settings,
-/// ON CONFLICT works normally.
+/// The scope-specific partial unique indexes make each update atomic.
 pub async fn upsert_notification_setting(
     pool: &SqlitePool,
     params: &UpsertNotificationParams<'_>,
 ) -> Result<(), sqlx::Error> {
-    if params.channel_id.is_none() {
-        // Server-level setting: DELETE existing row first to avoid duplicates
-        sqlx::query(
-            "DELETE FROM notification_settings \
-             WHERE user_id = ? AND server_id = ? AND channel_id IS NULL",
-        )
-        .bind(params.user_id)
-        .bind(params.server_id)
-        .execute(pool)
-        .await?;
-
-        sqlx::query(
-            "INSERT INTO notification_settings (id, user_id, server_id, channel_id, level, \
+    let conflict = match (params.server_id, params.channel_id) {
+        (None, None) => {
+            "ON CONFLICT(user_id) WHERE server_id IS NULL AND channel_id IS NULL DO UPDATE SET"
+        }
+        (Some(_), None) => {
+            "ON CONFLICT(user_id,server_id) WHERE server_id IS NOT NULL AND channel_id IS NULL DO UPDATE SET"
+        }
+        (Some(_), Some(_)) => {
+            "ON CONFLICT(user_id,channel_id) WHERE server_id IS NOT NULL AND channel_id IS NOT NULL DO UPDATE SET"
+        }
+        (None, Some(_)) => return Err(sqlx::Error::Protocol("invalid notification scope".into())),
+    };
+    let statement = format!(
+        "INSERT INTO notification_settings (id, user_id, server_id, channel_id, level, \
              suppress_everyone, suppress_roles, muted, mute_until, updated_at) \
-             VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, datetime('now'))",
-        )
-        .bind(params.id)
-        .bind(params.user_id)
-        .bind(params.server_id)
-        .bind(params.level)
-        .bind(params.suppress_everyone as i32)
-        .bind(params.suppress_roles as i32)
-        .bind(params.muted as i32)
-        .bind(params.mute_until)
-        .execute(pool)
-        .await?;
-    } else {
-        // Channel-level setting: ON CONFLICT works because channel_id is non-NULL
-        sqlx::query(
-            "INSERT INTO notification_settings (id, user_id, server_id, channel_id, level, \
-             suppress_everyone, suppress_roles, muted, mute_until, updated_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) \
-             ON CONFLICT(user_id, server_id, channel_id) DO UPDATE SET \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) {conflict} \
              level = excluded.level, suppress_everyone = excluded.suppress_everyone, \
              suppress_roles = excluded.suppress_roles, muted = excluded.muted, \
-             mute_until = excluded.mute_until, updated_at = datetime('now')",
-        )
+             mute_until = excluded.mute_until, updated_at = datetime('now')"
+    );
+    sqlx::query(&statement)
         .bind(params.id)
         .bind(params.user_id)
         .bind(params.server_id)
@@ -60,7 +41,6 @@ pub async fn upsert_notification_setting(
         .bind(params.mute_until)
         .execute(pool)
         .await?;
-    }
     Ok(())
 }
 

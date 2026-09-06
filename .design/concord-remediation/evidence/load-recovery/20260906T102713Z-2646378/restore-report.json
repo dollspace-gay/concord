@@ -1,0 +1,12 @@
+{
+  "accepted_messages_verified": true,
+  "action": "restore",
+  "declared_restore_point": "backup_restored=16704ee6-607b-4853-8e8c-0157075dfed8",
+  "duplicate_publications": 0,
+  "external_jobs_paused": true,
+  "foreign_key_violations": 0,
+  "integrity": "ok",
+  "missing_media": 0,
+  "ready": true,
+  "restored_main_messages": 8
+}

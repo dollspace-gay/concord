@@ -1,0 +1,312 @@
+
+> web@0.0.0 test
+> playwright test
+
+[WebServer] (node:2825355) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 50 tests using 1 worker
+
+(node:2825567) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node-22 --trace-warnings ...` to show where the warning was created)
+
+
+[1/50] tests/browser/replay.spec.ts:6:1 › direct conversations recover offline history and route live messages by canonical conversation
+[2/50] tests/browser/replay.spec.ts:83:1 › facade subscribers observe coordinated account and sync entity commits atomically
+[3/50] tests/browser/replay.spec.ts:102:1 › lifecycle commands resolve only from correlated acceptance and never auto-replay
+[4/50] tests/browser/replay.spec.ts:174:1 › rich bot responses render safe embeds and invoke accessible controls
+[WebServer] 6:09:56 AM [vite] http proxy error: /api/channels/%23general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:09:56 AM [vite] http proxy error: /api/servers/server/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[5/50] tests/browser/replay.spec.ts:240:1 › server and profile images remain opt-in before third-party requests
+[6/50] tests/browser/replay.spec.ts:264:1 › slash command autocomplete is keyboard accessible and submits typed arguments
+[WebServer] 6:09:59 AM [vite] http proxy error: /api/channels/%23general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:09:59 AM [vite] http proxy error: /api/servers/server/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[7/50] tests/browser/replay.spec.ts:304:1 › rejected command interactions retain drafts and restore component controls
+[WebServer] 6:09:59 AM [vite] http proxy error: /api/channels/%23general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:09:59 AM [vite] http proxy error: /api/servers/server/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[8/50] tests/browser/replay.spec.ts:353:1 › removed conversations prune protected state and ignore delayed obsolete snapshots
+[9/50] tests/browser/replay.spec.ts:390:1 › a rejected direct send removes its optimistic row and remains retryable with full context
+[10/50] tests/browser/replay.spec.ts:420:1 › mounted multiline composer preserves Shift+Enter and never submits during IME composition
+[WebServer] 6:10:01 AM [vite] http proxy error: /api/channels/general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:01 AM [vite] http proxy error: /api/servers/server-1/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[11/50] tests/browser/replay.spec.ts:449:1 › formatted messages expose safe links and keyboard-operable spoilers
+[12/50] tests/browser/replay.spec.ts:469:1 › image viewer traps dismissal and restores focus to its opener
+[WebServer] 6:10:01 AM [vite] http proxy error: /api/channels/general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:01 AM [vite] http proxy error: /api/servers/server/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[13/50] tests/browser/replay.spec.ts:495:1 › nested dialogs skip hidden controls and Escape closes only the top dialog
+[14/50] tests/browser/replay.spec.ts:515:1 › workspace settings dialogs open and close by keyboard with focus restoration
+[WebServer] 6:10:02 AM [vite] http proxy error: /api/servers/server/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:02 AM [vite] http proxy error: /api/users/me/emoji?target_server_id=server
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:02 AM [vite] http proxy error: /api/settings/atproto-sync
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:02 AM [vite] http proxy error: /api/tokens
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:02 AM [vite] http proxy error: /api/atproto/publications
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[15/50] tests/browser/replay.spec.ts:553:1 › current rules gate preserves a disconnected acceptance and retries after reconnect
+[WebServer] 6:10:02 AM [vite] http proxy error: /api/servers/server/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:02 AM [vite] http proxy error: /api/users/me/emoji?target_server_id=server
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[16/50] tests/browser/replay.spec.ts:607:1 › mobile chat uses the full viewport and provides a conversation back action
+[WebServer] 6:10:03 AM [vite] http proxy error: /api/channels/general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:03 AM [vite] http proxy error: /api/servers/server-1/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:03 AM [vite] http proxy error: /api/users/me/emoji?target_server_id=server-1
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[17/50] tests/browser/replay.spec.ts:631:1 › workspace remains usable without horizontal overflow at tablet and desktop widths
+[WebServer] 6:10:04 AM [vite] http proxy error: /api/channels/general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:04 AM [vite] http proxy error: /api/servers/server/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:04 AM [vite] http proxy error: /api/users/me/emoji?target_server_id=server
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:04 AM [vite] http proxy error: /api/channels/general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:04 AM [vite] http proxy error: /api/servers/server/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:04 AM [vite] http proxy error: /api/users/me/emoji?target_server_id=server
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[18/50] tests/browser/replay.spec.ts:651:1 › quick switcher is keyboard navigable and restores focus after selection
+[WebServer] 6:10:04 AM [vite] http proxy error: /api/channels/%23general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:04 AM [vite] http proxy error: /api/servers/server-1/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:04 AM [vite] http proxy error: /api/users/me/emoji?target_server_id=server-1
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[19/50] tests/browser/replay.spec.ts:686:1 › snapshot and replay rebuild normalized conversation state
+[20/50] tests/browser/replay.spec.ts:757:1 › resync clears protected projections before rebuilding
+[21/50] tests/browser/replay.spec.ts:788:1 › retryable command errors resend the identical correlated command once
+[22/50] tests/browser/replay.spec.ts:832:1 › account change cancels a delayed private-command retry
+[23/50] tests/browser/replay.spec.ts:859:1 › a post-reconnect snapshot replays an unacknowledged command with the same id
+[24/50] tests/browser/replay.spec.ts:882:1 › v2 durable delivery is idempotent across both legacy event orders and stale tombstone updates
+[25/50] tests/browser/replay.spec.ts:945:1 › single and bulk deletes redact replies and evict loaded search pin and bookmark copies
+[26/50] tests/browser/replay.spec.ts:982:1 › a delayed read projection preserves messages with a newer canonical sequence
+[27/50] tests/browser/replay.spec.ts:1030:1 › durable thread state updates known projections and ignores unknown descriptors
+[28/50] tests/browser/replay.spec.ts:1090:1 › real browser socket snapshot and server close clear protected data while preserving its draft
+[29/50] tests/browser/replay.spec.ts:1159:1 › resync clears every protected cache through the shared reset
+[30/50] tests/browser/replay.spec.ts:1203:1 › a protected HTTP response held across resync cannot repopulate private state
+[31/50] tests/browser/replay.spec.ts:1235:1 › logout invalidates a held authentication check and reports revoke failure
+[32/50] tests/browser/replay.spec.ts:1269:1 › server folder saves serialize latest structure and retain failed edits for retry
+[33/50] tests/browser/replay.spec.ts:1311:1 › a held server folder load cannot overwrite a newer local edit or account
+[34/50] tests/browser/replay.spec.ts:1343:1 › held IRC token creation cannot reveal an old account credential after account switch
+[WebServer] 6:10:13 AM [vite] http proxy error: /api/settings/atproto-sync
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:13 AM [vite] http proxy error: /api/users/account-a/profile
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+[WebServer] 6:10:13 AM [vite] http proxy error: /api/atproto/publications
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:13 AM [vite] http proxy error: /api/settings/atproto-sync
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:13 AM [vite] http proxy error: /api/users/account-b/profile
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:13 AM [vite] http proxy error: /api/atproto/publications
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[35/50] tests/browser/replay.spec.ts:1374:1 › authentication bootstrap distinguishes signed out from a dependency failure
+[36/50] tests/browser/replay.spec.ts:1402:1 › an authenticated app keeps its workspace and offers retry when sign-in verification is unavailable
+[WebServer] 6:10:14 AM [vite] http proxy error: /api/server-folders
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[37/50] tests/browser/replay.spec.ts:1427:1 › hidden tabs honor notification settings and claim one desktop alert per message
+[38/50] tests/browser/replay.spec.ts:1509:1 › reconnected role membership enables role alerts until a live removal
+[39/50] tests/browser/replay.spec.ts:1572:1 › late role snapshots cannot resurrect removed assignments or colors
+[40/50] tests/browser/replay.spec.ts:1608:1 › concurrent tabs atomically claim one desktop notification
+[41/50] tests/browser/replay.spec.ts:1657:1 › channel read state advances only after the conversation tab becomes visible
+[WebServer] 6:10:16 AM [vite] http proxy error: /api/servers/server/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+[WebServer] 6:10:16 AM [vite] http proxy error: /api/channels/%23general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:16 AM [vite] http proxy error: /api/users/me/emoji?target_server_id=server
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[42/50] tests/browser/replay.spec.ts:1697:1 › more than one hundred visible conversations synchronize in bounded complete windows
+[43/50] tests/browser/replay.spec.ts:1743:1 › logout isolates drafts by durable account and restores them on return
+[44/50] tests/browser/replay.spec.ts:1768:1 › a failed socket send keeps the account draft and removes the optimistic row
+[45/50] tests/browser/replay.spec.ts:1788:1 › a nonretryable server rejection removes the optimistic row without overwriting newer composition
+[46/50] tests/browser/replay.spec.ts:1813:1 › mounted composer never sends an upload through a different account socket
+[WebServer] 6:10:17 AM [vite] http proxy error: /api/channels/general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:17 AM [vite] http proxy error: /api/servers/server-1/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[47/50] tests/browser/replay.spec.ts:1863:1 › a held voice failure stays with its captured account and conversation
+[WebServer] 6:10:18 AM [vite] http proxy error: /api/channels/general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+[WebServer] 6:10:18 AM [vite] http proxy error: /api/servers/server-1/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[48/50] tests/browser/replay.spec.ts:1917:1 › reply targets remain scoped while navigating between conversations
+[WebServer] 6:10:18 AM [vite] http proxy error: /api/channels/alpha/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:18 AM [vite] http proxy error: /api/servers/server/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:18 AM [vite] http proxy error: /api/channels/beta/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:18 AM [vite] http proxy error: /api/channels/alpha/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[49/50] tests/browser/replay.spec.ts:1942:1 › failed composer upload stays attached and can be retried visibly
+[WebServer] 6:10:19 AM [vite] http proxy error: /api/channels/general/atproto-publication
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[WebServer] 6:10:19 AM [vite] http proxy error: /api/servers/server-1/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+[50/50] tests/browser/replay.spec.ts:1983:1 › search validates input and uses correlated continuation pages with deletion tombstones
+[WebServer] 6:10:19 AM [vite] http proxy error: /api/servers/server-1/emoji
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1135:18)
+[WebServer]     at afterConnectMultiple (node:net:1716:7)
+
+  50 passed (26.2s)

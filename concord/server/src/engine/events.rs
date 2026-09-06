@@ -1,23 +1,66 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
 /// Unique identifier for a message.
-pub type MessageId = Uuid;
-
-/// Unique identifier for a connected session (one per connection, not per user).
-pub type SessionId = Uuid;
+pub use crate::engine::ids::{ConnectionId, MessageId};
+use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 /// Protocol-agnostic event that flows through the chat engine.
 /// Both IRC and WebSocket adapters produce and consume these.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ChatEvent {
+    /// Protocol-v2 synchronization snapshot at an opaque durable cursor.
+    SyncSnapshot {
+        request_id: String,
+        snapshot: crate::engine::replay::SyncSnapshot,
+    },
+
+    /// Protocol-v2 durable replay batch.
+    ReplayBatch {
+        request_id: String,
+        batch: crate::engine::replay::ReplayBatch,
+    },
+
+    /// Current authorized projection of a durable event descriptor.
+    DurableEvent {
+        event: Box<crate::engine::replay::DurableEventProjection>,
+    },
+
+    /// The supplied cursor cannot safely resume and the client must replace cached state.
+    ResyncRequired {
+        request_id: String,
+        reason: crate::engine::replay::ResyncReason,
+    },
+
+    /// Correlated stable command failure for protocol-v2 clients.
+    CommandError {
+        request_id: String,
+        code: String,
+        message: String,
+        retryable: bool,
+    },
+
+    /// Correlated acceptance of a non-durable lifecycle command.
+    ///
+    /// Clients add `request_id` to the command object. Serde deliberately
+    /// ignores that field on older command variants, while the WebSocket
+    /// adapter retains it and emits this result only after the command has
+    /// completed successfully.
+    LifecycleCommandSucceeded { request_id: String },
+
+    /// Durable correlated result for edit/delete/reaction/read commands.
+    CommandCommitted {
+        receipt: crate::engine::messaging::CommandReceipt,
+    },
+
     /// A message sent to a channel or as a DM.
     Message {
         id: MessageId,
         #[serde(skip_serializing_if = "Option::is_none")]
         server_id: Option<String>,
+        /// Canonical conversation identifier, present for direct messages.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        conversation_id: Option<String>,
         from: String,
         target: String,
         content: String,
@@ -52,6 +95,14 @@ pub enum ChatEvent {
         id: MessageId,
         server_id: String,
         channel: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        conversation_id: Option<String>,
+        request_id: String,
+        client_message_id: String,
+        /// Decimal string to preserve the full SQLite integer range in JavaScript.
+        sequence: String,
+        persisted_at: String,
+        replayed: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         nonce: Option<String>,
     },
@@ -90,6 +141,12 @@ pub enum ChatEvent {
         channel: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         avatar_url: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        user_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        server_avatar_url: Option<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        role_ids: Vec<String>,
     },
 
     /// User left a channel.
@@ -168,7 +225,11 @@ pub enum ChatEvent {
     /// List of roles in a server.
     RoleList {
         server_id: String,
+        version: i64,
         roles: Vec<RoleInfo>,
+        /// Present for an authoritative bootstrap; absent for a metadata-only mutation.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        member_roles: Option<Vec<MemberRoleInfo>>,
     },
 
     /// A role was created or updated.
@@ -180,8 +241,16 @@ pub enum ChatEvent {
     /// A member's role assignments changed.
     MemberRoleUpdate {
         server_id: String,
+        version: i64,
         user_id: String,
         role_ids: Vec<String>,
+    },
+
+    /// Authoritative permission rules for one channel.
+    ChannelPermissionOverrideList {
+        server_id: String,
+        channel_id: String,
+        overrides: Vec<ChannelPermissionOverrideInfo>,
     },
 
     /// List of categories in a server.
@@ -220,6 +289,14 @@ pub enum ChatEvent {
         presences: Vec<PresenceInfo>,
     },
 
+    /// The authenticated user's durable preference and current projected state.
+    OwnPresence {
+        requested_status: String,
+        effective_status: String,
+        custom_status: Option<String>,
+        status_emoji: Option<String>,
+    },
+
     /// A user's profile was fetched or updated.
     UserProfile { profile: UserProfileInfo },
 
@@ -228,6 +305,8 @@ pub enum ChatEvent {
         server_id: String,
         user_id: String,
         nickname: Option<String>,
+        display_name: String,
+        server_avatar_url: Option<String>,
     },
 
     /// Notification settings response.
@@ -238,11 +317,17 @@ pub enum ChatEvent {
 
     /// Search results response.
     SearchResults {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        request_id: Option<String>,
         server_id: String,
         query: String,
         results: Vec<SearchResultMessage>,
         total_count: i64,
         offset: i64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        next_continuation: Option<String>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        restarted: bool,
     },
 
     /// Message was pinned in a channel.
@@ -307,6 +392,14 @@ pub enum ChatEvent {
         tag_id: String,
     },
 
+    /// Complete tag selection for a thread.
+    ThreadTagUpdate {
+        server_id: String,
+        thread_id: String,
+        version: i64,
+        tag_ids: Vec<String>,
+    },
+
     /// Bookmarks list response.
     BookmarkList { bookmarks: Vec<BookmarkInfo> },
 
@@ -315,6 +408,11 @@ pub enum ChatEvent {
 
     /// Bookmark removed.
     BookmarkRemove { message_id: String },
+
+    /// Actor-scoped direct conversation navigation state.
+    DirectConversationList {
+        conversations: Vec<DirectConversationInfo>,
+    },
 
     /// A member was kicked from the server.
     MemberKick {
@@ -445,6 +543,12 @@ pub enum ChatEvent {
     /// Channel follow deleted.
     ChannelFollowDelete { follow_id: String },
 
+    /// Result of an explicit announcement publication request.
+    AnnouncementPublished {
+        source_message_id: String,
+        published_count: usize,
+    },
+
     /// Server templates list.
     TemplateList {
         server_id: String,
@@ -461,6 +565,12 @@ pub enum ChatEvent {
     TemplateDelete {
         server_id: String,
         template_id: String,
+    },
+
+    /// A new server created atomically from a versioned template.
+    TemplateInstantiated {
+        template_id: String,
+        server_id: String,
     },
 
     // ── Phase 8: Integrations & Bots ──
@@ -510,11 +620,21 @@ pub enum ChatEvent {
         channel: String,
         response: InteractionResponseData,
     },
+    /// Correlated acceptance of a slash command or message component invocation.
+    InteractionInvoked { request_id: String },
 
     /// Bot tokens list response (sent only to the bot owner).
     BotTokenList {
         bot_user_id: String,
         tokens: Vec<BotTokenInfo>,
+    },
+    /// Bot accounts controlled by the authenticated owner.
+    BotAccountList { bots: Vec<BotAccountInfo> },
+    /// A newly issued secret. The raw token is emitted exactly once.
+    BotCredentialCreated {
+        bot_user_id: String,
+        token: String,
+        credential: BotTokenInfo,
     },
 
     /// OAuth2 app list response.
@@ -568,7 +688,7 @@ pub enum ChatEvent {
 }
 
 /// Info about a replied-to message.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ReplyInfo {
     pub id: String,
     pub from: String,
@@ -576,14 +696,14 @@ pub struct ReplyInfo {
 }
 
 /// Grouped reactions for a message in history.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ReactionGroup {
     pub emoji: String,
     pub count: usize,
     pub user_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ServerInfo {
     pub id: String,
     pub name: String,
@@ -597,9 +717,10 @@ pub struct ServerInfo {
     pub my_permissions: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ChannelInfo {
     pub id: String,
+    pub conversation_id: String,
     pub server_id: String,
     pub name: String,
     pub topic: String,
@@ -612,9 +733,11 @@ pub struct ChannelInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thread_parent_message_id: Option<String>,
     pub archived: bool,
+    pub slowmode_seconds: i32,
+    pub is_nsfw: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MemberInfo {
     pub nickname: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -629,9 +752,18 @@ pub struct MemberInfo {
     pub status_emoji: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_id: Option<String>,
+    #[serde(default)]
+    pub role_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// One member's role assignments in an authoritative role bootstrap.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+pub struct MemberRoleInfo {
+    pub user_id: String,
+    pub role_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct HistoryMessage {
     pub id: MessageId,
     pub from: String,
@@ -647,10 +779,14 @@ pub struct HistoryMessage {
     pub attachments: Option<Vec<AttachmentInfo>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub embeds: Option<Vec<EmbedInfo>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rich_embeds: Option<Vec<RichEmbedInfo>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub components: Option<Vec<MessageComponent>>,
 }
 
 /// Metadata for a file attachment.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AttachmentInfo {
     pub id: String,
     pub filename: String,
@@ -660,7 +796,7 @@ pub struct AttachmentInfo {
 }
 
 /// Open Graph link embed preview metadata.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct EmbedInfo {
     pub url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -673,14 +809,14 @@ pub struct EmbedInfo {
     pub site_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct UnreadCount {
     pub channel_name: String,
     pub count: i64,
 }
 
 /// Role metadata sent to clients.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct RoleInfo {
     pub id: String,
     pub server_id: String,
@@ -694,8 +830,19 @@ pub struct RoleInfo {
     pub is_default: bool,
 }
 
+/// A role- or member-specific permission rule for one channel.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+pub struct ChannelPermissionOverrideInfo {
+    pub id: String,
+    pub channel_id: String,
+    pub target_type: String,
+    pub target_id: String,
+    pub allow_bits: i64,
+    pub deny_bits: i64,
+}
+
 /// Channel category metadata sent to clients.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CategoryInfo {
     pub id: String,
     pub server_id: String,
@@ -704,7 +851,7 @@ pub struct CategoryInfo {
 }
 
 /// Minimal channel position info for reorder events.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ChannelPositionInfo {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -713,7 +860,7 @@ pub struct ChannelPositionInfo {
 }
 
 /// User presence info sent to clients.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PresenceInfo {
     pub user_id: String,
     pub nickname: String,
@@ -727,7 +874,7 @@ pub struct PresenceInfo {
 }
 
 /// Full user profile info.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct UserProfileInfo {
     pub user_id: String,
     pub username: String,
@@ -743,7 +890,7 @@ pub struct UserProfileInfo {
 }
 
 /// Notification setting info.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct NotificationSettingInfo {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -759,20 +906,20 @@ pub struct NotificationSettingInfo {
 }
 
 /// A search result message (same as HistoryMessage but with channel info).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SearchResultMessage {
-    pub id: MessageId,
+    pub id: String,
     pub from: String,
     pub content: String,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: String,
     pub channel_id: String,
     pub channel_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub edited_at: Option<DateTime<Utc>>,
+    pub edited_at: Option<String>,
 }
 
 /// Info about a pinned message.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PinnedMessageInfo {
     pub id: String,
     pub message_id: String,
@@ -786,20 +933,27 @@ pub struct PinnedMessageInfo {
 }
 
 /// Info about a thread.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ThreadInfo {
     pub id: String,
     pub name: String,
     pub channel_type: String, // "public_thread" | "private_thread"
     pub parent_message_id: Option<String>,
+    pub creator_user_id: Option<String>,
     pub archived: bool,
+    #[serde(default)]
+    pub state_version: i64,
+    #[serde(default)]
+    pub tags_version: i64,
+    #[serde(default)]
+    pub tag_ids: Vec<String>,
     pub auto_archive_minutes: i32,
     pub message_count: i64,
     pub created_at: String,
 }
 
 /// Forum tag info.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ForumTagInfo {
     pub id: String,
     pub name: String,
@@ -810,7 +964,7 @@ pub struct ForumTagInfo {
 }
 
 /// Bookmark info.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BookmarkInfo {
     pub id: String,
     pub message_id: String,
@@ -823,11 +977,27 @@ pub struct BookmarkInfo {
     pub created_at: String,
 }
 
+/// Direct conversation navigation entry sent only to a participant.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DirectConversationInfo {
+    pub id: String,
+    pub peer_id: String,
+    pub peer_username: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peer_avatar_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_message_at: Option<String>,
+    pub unread_count: u64,
+}
+
 /// Audit log entry sent to clients.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AuditLogEntry {
     pub id: String,
     pub actor_id: String,
+    pub actor_username_snapshot: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actor_avatar_snapshot: Option<String>,
     pub action_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_type: Option<String>,
@@ -841,7 +1011,7 @@ pub struct AuditLogEntry {
 }
 
 /// Ban info sent to clients.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BanInfo {
     pub id: String,
     pub user_id: String,
@@ -852,7 +1022,7 @@ pub struct BanInfo {
 }
 
 /// AutoMod rule info sent to clients.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AutomodRuleInfo {
     pub id: String,
     pub name: String,
@@ -865,7 +1035,7 @@ pub struct AutomodRuleInfo {
 }
 
 /// Server invite info sent to clients.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct InviteInfo {
     pub id: String,
     pub code: String,
@@ -882,7 +1052,7 @@ pub struct InviteInfo {
 }
 
 /// Scheduled event info sent to clients.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct EventInfo {
     pub id: String,
     pub server_id: String,
@@ -903,14 +1073,14 @@ pub struct EventInfo {
 }
 
 /// RSVP info.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct RsvpInfo {
     pub user_id: String,
     pub status: String,
 }
 
 /// Channel follow info.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ChannelFollowInfo {
     pub id: String,
     pub source_channel_id: String,
@@ -919,7 +1089,7 @@ pub struct ChannelFollowInfo {
 }
 
 /// Server template info.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct TemplateInfo {
     pub id: String,
     pub name: String,
@@ -932,7 +1102,7 @@ pub struct TemplateInfo {
 }
 
 /// Server community/discovery info.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ServerCommunityInfo {
     pub server_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -944,12 +1114,16 @@ pub struct ServerCommunityInfo {
     pub rules_text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<String>,
+    /// Whether the requesting member accepted the server's current rules version.
+    /// Omitted from public discovery results.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rules_accepted: Option<bool>,
 }
 
 // ── Phase 8: Integrations & Bots ──
 
 /// Webhook info sent to clients.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WebhookInfo {
     pub id: String,
     pub server_id: String,
@@ -966,7 +1140,7 @@ pub struct WebhookInfo {
 }
 
 /// Slash command info sent to clients.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SlashCommandInfo {
     pub id: String,
     pub bot_user_id: String,
@@ -976,7 +1150,7 @@ pub struct SlashCommandInfo {
 }
 
 /// A single option/parameter for a slash command.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SlashCommandOption {
     pub name: String,
     pub description: String,
@@ -988,14 +1162,14 @@ pub struct SlashCommandOption {
 }
 
 /// A pre-defined choice for a slash command option.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SlashCommandChoice {
     pub name: String,
     pub value: String,
 }
 
 /// Interaction info sent to bots.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct InteractionInfo {
     pub id: String,
     pub interaction_type: String,
@@ -1008,7 +1182,7 @@ pub struct InteractionInfo {
 }
 
 /// Bot's response to an interaction.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct InteractionResponseData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
@@ -1021,7 +1195,7 @@ pub struct InteractionResponseData {
 }
 
 /// Rich embed format for bot messages.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct RichEmbedInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -1046,7 +1220,7 @@ pub struct RichEmbedInfo {
 }
 
 /// A field in a rich embed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct EmbedField {
     pub name: String,
     pub value: String,
@@ -1055,7 +1229,7 @@ pub struct EmbedField {
 }
 
 /// Footer for a rich embed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct EmbedFooter {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1063,7 +1237,7 @@ pub struct EmbedFooter {
 }
 
 /// Author section for a rich embed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct EmbedAuthor {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1073,7 +1247,7 @@ pub struct EmbedAuthor {
 }
 
 /// A message component (button, select menu, or action row).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MessageComponent {
     ActionRow {
@@ -1109,7 +1283,7 @@ fn default_one() -> i32 {
 }
 
 /// An option in a select menu component.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct SelectOption {
     pub label: String,
     pub value: String,
@@ -1122,7 +1296,7 @@ pub struct SelectOption {
 }
 
 /// Bot token info (without the actual hash).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BotTokenInfo {
     pub id: String,
     pub name: String,
@@ -1132,8 +1306,17 @@ pub struct BotTokenInfo {
     pub last_used: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BotAccountInfo {
+    pub id: String,
+    pub username: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avatar_url: Option<String>,
+    pub installed_server_ids: Vec<String>,
+}
+
 /// OAuth2 application info.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct OAuth2AppInfo {
     pub id: String,
     pub name: String,
@@ -1150,6 +1333,7 @@ pub struct OAuth2AppInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
 
     // ────────────────────────────────────────────────────────────────
     // ChatEvent serialization/deserialization round-trips
@@ -1163,8 +1347,9 @@ mod tests {
     #[test]
     fn test_message_event_roundtrip() {
         let event = ChatEvent::Message {
-            id: Uuid::new_v4(),
+            id: Uuid::new_v4().into(),
             server_id: Some("srv1".into()),
+            conversation_id: None,
             from: "alice".into(),
             target: "#general".into(),
             content: "Hello, world!".into(),
@@ -1209,8 +1394,9 @@ mod tests {
     #[test]
     fn test_message_event_minimal() {
         let event = ChatEvent::Message {
-            id: Uuid::new_v4(),
+            id: Uuid::new_v4().into(),
             server_id: None,
+            conversation_id: None,
             from: "alice".into(),
             target: "bob".into(),
             content: "DM".into(),
@@ -1238,7 +1424,7 @@ mod tests {
     #[test]
     fn test_message_edit_event_roundtrip() {
         let event = ChatEvent::MessageEdit {
-            id: Uuid::new_v4(),
+            id: Uuid::new_v4().into(),
             server_id: "srv1".into(),
             channel: "#general".into(),
             content: "edited content".into(),
@@ -1259,7 +1445,7 @@ mod tests {
     #[test]
     fn test_message_delete_event_roundtrip() {
         let event = ChatEvent::MessageDelete {
-            id: Uuid::new_v4(),
+            id: Uuid::new_v4().into(),
             server_id: "srv1".into(),
             channel: "#general".into(),
         };
@@ -1279,6 +1465,9 @@ mod tests {
             server_id: "srv1".into(),
             channel: "#general".into(),
             avatar_url: Some("https://example.com/avatar.png".into()),
+            user_id: Some("user-alice".into()),
+            server_avatar_url: None,
+            role_ids: vec!["role-member".into()],
         };
         let restored = roundtrip(&event);
         match restored {
@@ -1397,7 +1586,7 @@ mod tests {
     #[test]
     fn test_reaction_add_event_roundtrip() {
         let event = ChatEvent::ReactionAdd {
-            message_id: Uuid::new_v4(),
+            message_id: Uuid::new_v4().into(),
             server_id: "srv1".into(),
             channel: "#general".into(),
             user_id: "user1".into(),
@@ -1704,7 +1893,11 @@ mod tests {
                 name: "#my-thread".into(),
                 channel_type: "public_thread".into(),
                 parent_message_id: Some("msg1".into()),
+                creator_user_id: Some("user1".into()),
                 archived: false,
+                state_version: 1,
+                tags_version: 1,
+                tag_ids: Vec::new(),
                 auto_archive_minutes: 1440,
                 message_count: 0,
                 created_at: "2026-01-01T00:00:00Z".into(),
@@ -1780,6 +1973,7 @@ mod tests {
                 welcome_message: Some("Welcome!".into()),
                 rules_text: None,
                 category: Some("gaming".into()),
+                rules_accepted: None,
             }],
         };
         let restored = roundtrip(&event);
@@ -1800,8 +1994,9 @@ mod tests {
     #[test]
     fn test_event_json_has_type_tag() {
         let event = ChatEvent::Message {
-            id: Uuid::new_v4(),
+            id: Uuid::new_v4().into(),
             server_id: None,
+            conversation_id: None,
             from: "a".into(),
             target: "b".into(),
             content: "c".into(),
@@ -1819,7 +2014,7 @@ mod tests {
         let events: Vec<(ChatEvent, &str)> = vec![
             (
                 ChatEvent::MessageEdit {
-                    id: Uuid::new_v4(),
+                    id: Uuid::new_v4().into(),
                     server_id: "s".into(),
                     channel: "c".into(),
                     content: "x".into(),
@@ -1829,7 +2024,7 @@ mod tests {
             ),
             (
                 ChatEvent::MessageDelete {
-                    id: Uuid::new_v4(),
+                    id: Uuid::new_v4().into(),
                     server_id: "s".into(),
                     channel: "c".into(),
                 },
@@ -1934,6 +2129,7 @@ mod tests {
             "{:?}",
             ChannelInfo {
                 id: "1".into(),
+                conversation_id: "channel:31".into(),
                 server_id: "s".into(),
                 name: "n".into(),
                 topic: "t".into(),
@@ -1944,6 +2140,8 @@ mod tests {
                 channel_type: "text".into(),
                 thread_parent_message_id: None,
                 archived: false,
+                slowmode_seconds: 0,
+                is_nsfw: false,
             }
         );
         let _ = format!(
@@ -1956,6 +2154,7 @@ mod tests {
                 status_emoji: None,
                 user_id: None,
                 server_avatar_url: None,
+                role_ids: Vec::new(),
             }
         );
         let _ = format!(

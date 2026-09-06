@@ -1,5 +1,7 @@
 # Concord
 
+For installation, first-run secret creation, configuration, containers, health, and shutdown behavior, use the canonical [operations guide](docs/operations.md).
+
 An open-source, self-hostable chat platform with native IRC compatibility and a modern web UI.
 
 Any IRC client (HexChat, irssi, WeeChat) connects alongside web users — messages flow seamlessly between protocols.
@@ -22,29 +24,18 @@ Any IRC client (HexChat, irssi, WeeChat) connects alongside web users — messag
 
 ### Prerequisites
 
-- Rust 1.84+ (for the server)
+- Rust 1.96.0 (pinned by `rust-toolchain.toml`)
 - Node.js 22+ (for the web frontend)
 
 ### Build from source
 
-```bash
-# Build the frontend
-cd web
-npm ci
-npm run build
-cp -r dist/* ../server/static/
-cd ..
-
-# Build the server
-cd server
-cargo build --release
-```
+Follow the [source installation layout](docs/operations.md#build-from-source). It builds both locked Rust binaries, installs Cargo's `concord_operator` artifact as `concord-operator`, and places the matching browser bundle where the server resolves `./static`.
 
 ### Run
 
 ```bash
-# From the server directory
-../target/release/concord-server
+cd /opt/concord/share/concord
+/opt/concord/bin/concord-server --config /etc/concord/concord.toml serve
 ```
 
 The server starts on:

@@ -8,6 +8,7 @@ interface VoiceRecorderProps {
 export function VoiceRecorder({ onRecorded, onCancel }: VoiceRecorderProps) {
   const [recording, setRecording] = useState(false);
   const [duration, setDuration] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
@@ -23,6 +24,7 @@ export function VoiceRecorder({ onRecorded, onCancel }: VoiceRecorderProps) {
   }, []);
 
   const startRecording = useCallback(async () => {
+    setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -53,10 +55,11 @@ export function VoiceRecorder({ onRecorded, onCancel }: VoiceRecorderProps) {
         setDuration((d) => d + 1);
       }, 1000);
     } catch (err) {
-      console.error('Failed to start recording:', err);
-      onCancel();
+      setError(err instanceof DOMException && err.name === 'NotAllowedError'
+        ? 'Microphone permission was denied. Allow microphone access and try again.'
+        : 'The microphone could not be started. Check that it is connected and try again.');
     }
-  }, [onRecorded, onCancel, cleanup]);
+  }, [onRecorded, cleanup]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -84,7 +87,7 @@ export function VoiceRecorder({ onRecorded, onCancel }: VoiceRecorderProps) {
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-bg-input px-4 py-3">
+    <div className="flex items-center gap-3 rounded-lg bg-bg-input px-4 py-3" role={error ? 'alert' : undefined}>
       {/* Pulsing red dot */}
       <span className="relative flex h-3 w-3">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
@@ -92,7 +95,7 @@ export function VoiceRecorder({ onRecorded, onCancel }: VoiceRecorderProps) {
       </span>
 
       <span className="text-sm text-text-secondary">
-        {recording ? `Recording ${formatTime(duration)}` : 'Starting...'}
+        {error ?? (recording ? `Recording ${formatTime(duration)}` : 'Starting...')}
       </span>
 
       <div className="flex-1" />
@@ -106,6 +109,8 @@ export function VoiceRecorder({ onRecorded, onCancel }: VoiceRecorderProps) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
+
+      {error && <button onClick={startRecording} className="rounded px-2 py-1 text-sm font-medium text-accent">Try again</button>}
 
       {recording && (
         <button

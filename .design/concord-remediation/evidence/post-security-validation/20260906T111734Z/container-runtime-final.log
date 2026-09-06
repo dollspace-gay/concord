@@ -1,0 +1,15 @@
+[2m2026-09-06T11:43:25.390964Z[0m [32m INFO[0m [2mconcord_server::db::pool[0m[2m:[0m database connected with WAL, synchronous=FULL, foreign_keys=ON [3mdatabase_url[0m[2m=[0m"sqlite:/work/data/concord.db?mode=rwc"
+[2m2026-09-06T11:43:25.480059Z[0m [32m INFO[0m [2mconcord_server::db::pool[0m[2m:[0m database migrations verified [3mversion[0m[2m=[0m32
+[2m2026-09-06T11:43:25.600414Z[0m [32m INFO[0m [2mconcord_server::engine::chat_engine[0m[2m:[0m loaded servers from database [3mcount[0m[2m=[0m0
+[2m2026-09-06T11:43:25.600436Z[0m [32m INFO[0m [2mconcord_server::engine::chat_engine[0m[2m:[0m loaded channels from database [3mcount[0m[2m=[0m0
+[2m2026-09-06T11:43:25.600902Z[0m [32m INFO[0m [2mconcord_server::web::atproto[0m[2m:[0m no persisted AT Protocol signing key found, generating new one
+[2m2026-09-06T11:43:25.636078Z[0m [32m INFO[0m [2mconcord_server[0m[2m:[0m Concord server starting — Web: 0.0.0.0:8080, IRC: 127.0.0.1:6667
+[2m2026-09-06T11:43:25.636274Z[0m [32m INFO[0m [2mconcord_server::irc::listener[0m[2m:[0m IRC listener started on 127.0.0.1:6667 (plaintext)
+[2m2026-09-06T11:43:26.490507Z[0m [32m INFO[0m [2mconcord_server[0m[2m:[0m shutdown signal received
+[2m2026-09-06T11:43:26.490688Z[0m [32m INFO[0m [2mconcord_server::irc::listener[0m[2m:[0m IRC listener shutting down
+[2m2026-09-06T11:43:26.490814Z[0m [32m INFO[0m [2mconcord_server[0m[2m:[0m Concord server stopped
+container_image_id=15f3854a35a5e3a4c08bb86b2125e7765d9c2c8c857270bc7b47c5c484a3008f
+container_source_revision=cff0df246b91461f959d8dbe9154ba50bba2331c source_state=dirty source_input_sha256=ba00241bfea0385e7b6beea50ea621f438c35e9d3fb3005163ebe52ba9c8b0cb
+container_server_sha256=76e4e301ec69c1bf01c98e06adaf34398f786898847e8433180a80db6f3c6fcb
+container_operator_sha256=0e748ce6aaa1a662ce8a950e2947115d778b7444011a1ade0b915d3afa12aec5
+container_operator_migration_status={"findings":[],"source_version":32,"target_version":32}

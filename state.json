@@ -1,6 +1,6 @@
 {
   "next_display_id": 15,
-  "next_comment_id": 40,
+  "next_comment_id": 41,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
@@ -549,10 +549,21 @@
       "priority": "high",
       "created_by": "sooH",
       "created_at": "2026-09-06T17:14:00.164104118Z",
-      "updated_at": "2026-09-06T17:14:03.520610233Z",
+      "updated_at": "2026-09-06T17:15:46.132456161Z",
       "labels": [
         "maintenance"
-      ]
+      ],
+      "comments": {
+        "3789414f-26ee-4406-93a4-0c9f6e66ea81": {
+          "display_id": 40,
+          "author": "sooH",
+          "content": "Preflight: 57 owned handwritten source files exceed 500 lines. Preserve wire/schema/public imports and semantics; organize modules by domain rather than numbered chunks. Include nested AGENTS.md and a soft-budget exception registry. Existing root config untouched. Plan saved in .design/maintainability/plan.md. Path-aware guards, test selectors, and build consumers will move with the code; Cargo feature suites run sequentially.",
+          "created_at": "2026-09-06T17:15:46.129123430Z",
+          "kind": "note",
+          "signed_by": "SHA256:vSvLFVVvxeXZ2zdt51iBf/d9/mqC7DX2RDgTAqewsvA",
+          "signature": "U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgI9W61IujvruBcNoIuYpXT9mJq/xROI741mkuv3/UlMYAAAARY3Jvc3NsaW5rLWNvbW1lbnQAAAAAAAAABnNoYTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABAzp44bQBOSJ7C6jXQwDE9w40G3/v4ck1eESMe9uBD+6413dKQf3OINB5AOCsJKzH6lt8atcmiHBsdNB6gcvxhBA=="
+        }
+      }
     },
     "fb0f7c8f-b44a-4947-a5b6-dd4ea1b43c71": {
       "uuid": "fb0f7c8f-b44a-4947-a5b6-dd4ea1b43c71",
@@ -584,8 +595,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-06T17:14:06.536597767Z",
+    "timestamp": "2026-09-06T17:15:46.132456161Z",
     "agent_id": "sooH",
-    "agent_seq": 78
+    "agent_seq": 79
   }
 }

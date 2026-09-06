@@ -1,6 +1,6 @@
 {
   "next_display_id": 13,
-  "next_comment_id": 9,
+  "next_comment_id": 10,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
@@ -72,11 +72,20 @@
       "priority": "high",
       "created_by": "sooH",
       "created_at": "2026-09-05T23:54:17.412118203Z",
-      "updated_at": "2026-09-06T05:14:59.842829845Z",
+      "updated_at": "2026-09-06T05:36:51.073621848Z",
       "labels": [
         "feature"
       ],
       "comments": {
+        "11dfb54e-3483-4b72-88f5-de6069ac3146": {
+          "display_id": 9,
+          "author": "sooH",
+          "content": "[action] Parent checkpoint:993 Rust tests,28 browser regressions, real channel/forum/moderation/template journeys and interrupted restore2 tests passed. Full feature coding continues. I47 HTTP/bearer admission and I52 resume identity/destination ownership fixes under integration; no final security review.",
+          "created_at": "2026-09-06T05:36:51.068437495Z",
+          "kind": "note",
+          "signed_by": "SHA256:vSvLFVVvxeXZ2zdt51iBf/d9/mqC7DX2RDgTAqewsvA",
+          "signature": "U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgI9W61IujvruBcNoIuYpXT9mJq/xROI741mkuv3/UlMYAAAARY3Jvc3NsaW5rLWNvbW1lbnQAAAAAAAAABnNoYTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABAVSd2v016YS8JjwemzmebvRQagTv0igj4CrzOC+LODLq6rBrDqfNS9S3ZBDDUVVd84EaHsbGzIlY/q35xoIexAg=="
+        },
         "32da7e93-c046-43dd-9353-62a5bdc239b2": {
           "display_id": 8,
           "author": "sooH",
@@ -274,8 +283,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-06T05:14:59.842829845Z",
+    "timestamp": "2026-09-06T05:36:51.073621848Z",
     "agent_id": "sooH",
-    "agent_seq": 33
+    "agent_seq": 34
   }
 }

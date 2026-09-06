@@ -1,11 +1,12 @@
 {
-  "next_display_id": 10,
+  "next_display_id": 11,
   "next_comment_id": 3,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
     "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981": 1,
     "50213085-596b-43a3-857c-a9c07e25c6c4": 9,
+    "64089dce-3725-48d3-a53c-a87603eed71a": 10,
     "822ad84b-9eb1-4bd6-800e-d603bde6468a": 3,
     "99e382c4-348a-45ab-b9f8-7cb30dc3de83": 7,
     "a6aa4117-4a65-44a5-814a-48f3d82a9089": 5,
@@ -100,6 +101,18 @@
         "feature"
       ]
     },
+    "64089dce-3725-48d3-a53c-a87603eed71a": {
+      "uuid": "64089dce-3725-48d3-a53c-a87603eed71a",
+      "display_id": 10,
+      "title": "S6 complete messaging organization moderation and community",
+      "description": "Complete F01-F20, M7-M8 and R16-R19 through actual authorized transactional service and UI journeys; search operators, notifications, threads/forums/tags, hierarchy, invites/rules, events/templates/announcements, audit and fault/restart tests.",
+      "status": "open",
+      "priority": "medium",
+      "parent_uuid": "4d3464bc-f4f5-4c6e-bc1a-c67a9a4e4981",
+      "created_by": "sooH",
+      "created_at": "2026-09-06T00:07:57.588490090Z",
+      "updated_at": "2026-09-06T00:07:57.588490090Z"
+    },
     "822ad84b-9eb1-4bd6-800e-d603bde6468a": {
       "uuid": "822ad84b-9eb1-4bd6-800e-d603bde6468a",
       "display_id": 3,
@@ -178,8 +191,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-06T00:07:54.284813827Z",
+    "timestamp": "2026-09-06T00:07:57.588490090Z",
     "agent_id": "sooH",
-    "agent_seq": 21
+    "agent_seq": 22
   }
 }

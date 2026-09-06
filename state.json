@@ -17,7 +17,12 @@
     "fb0f7c8f-b44a-4947-a5b6-dd4ea1b43c71": 11,
     "fb0f8763-ab3c-4c63-822a-cf9a3a2fde3f": 8
   },
-  "locks": {},
+  "locks": {
+    "14": {
+      "agent_id": "sooH",
+      "claimed_at": "2026-09-06T17:14:06.536597767Z"
+    }
+  },
   "issues": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": {
       "uuid": "0465b617-e9bc-4612-9fc3-dbc76e5c11bd",
@@ -579,8 +584,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-06T17:14:03.520610233Z",
+    "timestamp": "2026-09-06T17:14:06.536597767Z",
     "agent_id": "sooH",
-    "agent_seq": 77
+    "agent_seq": 78
   }
 }

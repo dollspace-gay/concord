@@ -29,7 +29,8 @@ pub async fn upsert_notification_setting(
              suppress_roles = excluded.suppress_roles, muted = excluded.muted, \
              mute_until = excluded.mute_until, updated_at = datetime('now')"
     );
-    sqlx::query(&statement)
+    // Only the literal conflict clause above is interpolated; all values are bound.
+    sqlx::query(sqlx::AssertSqlSafe(statement))
         .bind(params.id)
         .bind(params.user_id)
         .bind(params.server_id)

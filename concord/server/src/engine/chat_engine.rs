@@ -6705,7 +6705,8 @@ impl ChatEngine {
              suppress_roles=excluded.suppress_roles,muted=excluded.muted, \
              mute_until=excluded.mute_until,updated_at=datetime('now')"
         );
-        sqlx::query(&sql)
+        // Only the literal conflict clause above is interpolated; all values are bound.
+        sqlx::query(sqlx::AssertSqlSafe(sql))
             .bind(&id)
             .bind(actor.user_id().as_str())
             .bind(params.server_id)

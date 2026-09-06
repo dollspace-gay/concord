@@ -62,17 +62,19 @@ pub async fn get_attachments_by_ids(
     if ids.is_empty() {
         return Ok(vec![]);
     }
-    let placeholders: Vec<&str> = ids.iter().map(|_| "?").collect();
-    let sql = format!(
+    let mut builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
         "SELECT id, uploader_id, message_id, filename, original_filename, content_type, file_size, created_at, blob_cid, blob_url \
-         FROM attachments WHERE id IN ({})",
-        placeholders.join(", ")
+         FROM attachments WHERE id IN (",
     );
-    let mut query = sqlx::query_as::<_, AttachmentRow>(&sql);
+    let mut separated = builder.separated(", ");
     for id in ids {
-        query = query.bind(id);
+        separated.push_bind(id);
     }
-    query.fetch_all(pool).await
+    builder.push(")");
+    builder
+        .build_query_as::<AttachmentRow>()
+        .fetch_all(pool)
+        .await
 }
 
 /// Get all attachments linked to a specific message.
@@ -97,17 +99,19 @@ pub async fn get_attachments_for_messages(
     if message_ids.is_empty() {
         return Ok(vec![]);
     }
-    let placeholders: Vec<&str> = message_ids.iter().map(|_| "?").collect();
-    let sql = format!(
+    let mut builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
         "SELECT id, uploader_id, message_id, filename, original_filename, content_type, file_size, created_at, blob_cid, blob_url \
-         FROM attachments WHERE message_id IN ({}) ORDER BY created_at",
-        placeholders.join(", ")
+         FROM attachments WHERE message_id IN (",
     );
-    let mut query = sqlx::query_as::<_, AttachmentRow>(&sql);
+    let mut separated = builder.separated(", ");
     for id in message_ids {
-        query = query.bind(id);
+        separated.push_bind(id);
     }
-    query.fetch_all(pool).await
+    builder.push(") ORDER BY created_at");
+    builder
+        .build_query_as::<AttachmentRow>()
+        .fetch_all(pool)
+        .await
 }
 
 /// Parameters for inserting an attachment with a PDS blob reference.

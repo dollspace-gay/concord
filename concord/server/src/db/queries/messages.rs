@@ -152,16 +152,18 @@ pub async fn get_reactions_for_messages(
         return Ok(vec![]);
     }
     // Build a parameterized IN clause
-    let placeholders: Vec<&str> = message_ids.iter().map(|_| "?").collect();
-    let sql = format!(
-        "SELECT message_id, user_id, emoji FROM reactions WHERE message_id IN ({}) ORDER BY created_at",
-        placeholders.join(", ")
+    let mut builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+        "SELECT message_id, user_id, emoji FROM reactions WHERE message_id IN (",
     );
-    let mut query = sqlx::query_as::<_, ReactionRow>(&sql);
+    let mut separated = builder.separated(", ");
     for id in message_ids {
-        query = query.bind(id);
+        separated.push_bind(id);
     }
-    query.fetch_all(pool).await
+    builder.push(") ORDER BY created_at");
+    builder
+        .build_query_as::<ReactionRow>()
+        .fetch_all(pool)
+        .await
 }
 
 /// Upsert a user's read state for a channel.

@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::Utc;
 use dashmap::DashMap;
-use rand::RngCore;
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -669,7 +669,7 @@ impl AuthService {
     ) -> Result<String, AuthError> {
         let prefix = kind.token_prefix().ok_or(AuthError::Invalid)?;
         let mut secret = [0_u8; 32];
-        rand::thread_rng().fill_bytes(&mut secret);
+        rand::rng().fill_bytes(&mut secret);
         let encoded = secret
             .iter()
             .map(|byte| format!("{byte:02x}"))

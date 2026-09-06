@@ -398,9 +398,9 @@ impl CommunityService {
                 .await?;
         }
         let id = Uuid::new_v4().to_string();
-        use rand::Rng;
-        let code: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
+        use rand::RngExt;
+        let code: String = rand::rng()
+            .sample_iter(&rand::distr::Alphanumeric)
             .take(24)
             .map(char::from)
             .collect();

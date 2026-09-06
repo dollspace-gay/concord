@@ -220,7 +220,7 @@ fn blocked_v14_override_has_an_operator_inventory_repair_and_upgrade_journey() {
         sqlx::query("CREATE TABLE schema_version(version INTEGER PRIMARY KEY,applied_at TEXT NOT NULL DEFAULT (datetime('now')))")
             .execute(&mut *connection).await.unwrap();
         for (index, script) in LEGACY_TO_14.iter().enumerate() {
-            sqlx::raw_sql(script)
+            sqlx::raw_sql(*script)
                 .execute(&mut *connection)
                 .await
                 .unwrap();

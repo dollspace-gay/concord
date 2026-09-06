@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
-use rand::RngCore;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::sqlite::SqliteConnectOptions;
@@ -1007,11 +1007,11 @@ async fn create_backup(
                 .await?;
 
         let database = destination.join("database.sqlite");
-        let quoted = database.to_string_lossy().replace('\'', "''");
         sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
             .execute(pool)
             .await?;
-        sqlx::query(&format!("VACUUM INTO '{quoted}'"))
+        sqlx::query("VACUUM INTO ?")
+            .bind(database.to_string_lossy().as_ref())
             .execute(pool)
             .await
             .context("create coordinated SQLite snapshot")?;
@@ -1754,7 +1754,7 @@ fn write_new_key(path: &Path) -> Result<()> {
         std::fs::create_dir_all(parent)?;
     }
     let mut random = [0_u8; 32];
-    rand::thread_rng().fill_bytes(&mut random);
+    rand::rng().fill_bytes(&mut random);
     write_private_new(path, hex::encode(random).as_bytes())
 }
 

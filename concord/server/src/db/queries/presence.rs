@@ -49,17 +49,19 @@ pub async fn get_presences_for_users(
     if user_ids.is_empty() {
         return Ok(vec![]);
     }
-    let placeholders: Vec<&str> = user_ids.iter().map(|_| "?").collect();
-    let sql = format!(
+    let mut builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
         "SELECT user_id, status, requested_status, custom_status, status_emoji, last_seen_at, updated_at \
-         FROM user_presence WHERE user_id IN ({})",
-        placeholders.join(", ")
+         FROM user_presence WHERE user_id IN (",
     );
-    let mut query = sqlx::query_as::<_, UserPresenceRow>(&sql);
+    let mut separated = builder.separated(", ");
     for id in user_ids {
-        query = query.bind(id);
+        separated.push_bind(id);
     }
-    query.fetch_all(pool).await
+    builder.push(")");
+    builder
+        .build_query_as::<UserPresenceRow>()
+        .fetch_all(pool)
+        .await
 }
 
 /// Set user offline and record last_seen.

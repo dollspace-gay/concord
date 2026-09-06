@@ -153,11 +153,16 @@ function useLifecycleFeedback(scope: string) {
   const [success, setSuccess] = useState<string | null>(null);
   const generation = useRef(0);
 
-  useEffect(() => {
-    generation.current += 1;
+  const [previousScope, setPreviousScope] = useState(scope);
+  if (previousScope !== scope) {
+    setPreviousScope(scope);
     setPendingKey(null);
     setError(null);
     setSuccess(null);
+  }
+
+  useEffect(() => {
+    generation.current += 1;
     return () => { generation.current += 1; };
   }, [scope]);
 
@@ -300,29 +305,32 @@ function WebhooksTab({ webhooks, serverId, channels, onCreate, onDelete }: {
 
 function WebhookCard({ webhook, onDelete }: { webhook: WebhookInfo; onDelete: (id: string) => Promise<void> }) {
   const [deliveries, setDeliveries] = useState<WebhookDeliveryStatus[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(webhook.webhook_type === 'outgoing');
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const outgoing = webhook.webhook_type === 'outgoing';
 
-  const refresh = useCallback(async (signal?: AbortSignal) => {
-    if (!outgoing) return;
+  const refresh = useCallback((signal?: AbortSignal) => {
+    if (!outgoing) return Promise.resolve();
     const generation = useChatStore.getState().accountGeneration;
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/webhooks/${encodeURIComponent(webhook.id)}/deliveries?limit=10`, { signal });
-      if (!response.ok) throw new Error('Delivery status is unavailable');
-      const body = await response.json() as { deliveries: WebhookDeliveryStatus[] };
-      if (signal?.aborted || useChatStore.getState().accountGeneration !== generation) return;
-      setDeliveries(body.deliveries);
-      setError(null);
-    } catch (reason) {
-      if (signal?.aborted || useChatStore.getState().accountGeneration !== generation) return;
-      setError(reason instanceof Error ? reason.message : 'Delivery status is unavailable');
-    } finally {
-      if (!signal?.aborted && useChatStore.getState().accountGeneration === generation) setLoading(false);
-    }
+    return fetch(`/api/webhooks/${encodeURIComponent(webhook.id)}/deliveries?limit=10`, { signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Delivery status is unavailable');
+        return await response.json() as { deliveries: WebhookDeliveryStatus[] };
+      })
+      .then((body) => {
+        if (signal?.aborted || useChatStore.getState().accountGeneration !== generation) return;
+        setDeliveries(body.deliveries);
+        setError(null);
+      })
+      .catch((reason: unknown) => {
+        if (signal?.aborted || useChatStore.getState().accountGeneration !== generation) return;
+        setError(reason instanceof Error ? reason.message : 'Delivery status is unavailable');
+      })
+      .finally(() => {
+        if (!signal?.aborted && useChatStore.getState().accountGeneration === generation) setLoading(false);
+      });
   }, [outgoing, webhook.id]);
 
   useEffect(() => {
@@ -431,7 +439,7 @@ function WebhookCard({ webhook, onDelete }: { webhook: WebhookInfo; onDelete: (i
               {delivery.state === 'failed' && <button className="text-blue-400" disabled={loading} onClick={() => void retry(delivery.delivery_id)}>Retry</button>}
             </div>
           ))}
-          <button className="text-blue-400 disabled:opacity-50" disabled={loading} onClick={() => void refresh()}>{loading ? 'Loading…' : 'Refresh status'}</button>
+          <button className="text-blue-400 disabled:opacity-50" disabled={loading} onClick={() => { setLoading(true); void refresh(); }}>{loading ? 'Loading…' : 'Refresh status'}</button>
         </div>
       )}
     </div>

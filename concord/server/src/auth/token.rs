@@ -1,8 +1,7 @@
-use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
-use rand::RngCore;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 /// JWT claims for web session tokens.
@@ -118,15 +117,14 @@ impl JwtBlocklist {
 /// Generate a random IRC access token (64 hex characters).
 pub fn generate_irc_token() -> String {
     let mut bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut bytes);
+    rand::rng().fill_bytes(&mut bytes);
     hex_encode(&bytes)
 }
 
 /// Hash an IRC token with argon2 for storage.
 pub fn hash_irc_token(token: &str) -> Result<String, argon2::password_hash::Error> {
-    let salt = SaltString::generate(&mut rand::thread_rng());
     let argon2 = Argon2::default();
-    let hash = argon2.hash_password(token.as_bytes(), &salt)?;
+    let hash = argon2.hash_password(token.as_bytes())?;
     Ok(hash.to_string())
 }
 
@@ -147,6 +145,14 @@ fn hex_encode(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn verifies_token_hash_from_argon2_0_5() {
+        // Generated with Argon2 0.5.3 defaults and salt b"concord-old-salt".
+        let hash = "$argon2id$v=19$m=19456,t=2,p=1$Y29uY29yZC1vbGQtc2FsdA$/m9tE8ltNaaJImGpvEh57KbQbinm+DfeVRXqPJJ++3Q";
+        assert!(verify_irc_token("legacy-irc-token", hash));
+        assert!(!verify_irc_token("different-token", hash));
+    }
 
     #[test]
     fn test_jwt_roundtrip() {

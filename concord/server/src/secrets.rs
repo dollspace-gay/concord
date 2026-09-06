@@ -4,7 +4,7 @@ use chacha20poly1305::{
     KeyInit, XChaCha20Poly1305, XNonce,
     aead::{Aead, Payload},
 };
-use rand::RngCore;
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
@@ -60,11 +60,11 @@ impl SecretVault {
     }
     pub fn encrypt(&self, context: &str, plaintext: &[u8]) -> Result<String, SecretError> {
         let mut nonce = [0u8; 24];
-        rand::thread_rng().fill_bytes(&mut nonce);
+        rand::rng().fill_bytes(&mut nonce);
         let ciphertext = self
             .cipher
             .encrypt(
-                XNonce::from_slice(&nonce),
+                &XNonce::from(nonce),
                 Payload {
                     msg: plaintext,
                     aad: context.as_bytes(),
@@ -93,7 +93,7 @@ impl SecretVault {
         }
         self.cipher
             .decrypt(
-                XNonce::from_slice(&envelope[..24]),
+                <&XNonce>::try_from(&envelope[..24]).map_err(|_| SecretError::Decrypt)?,
                 Payload {
                     msg: &envelope[24..],
                     aad: context.as_bytes(),
@@ -252,6 +252,27 @@ pub async fn migrate_legacy_atproto_credentials(
 mod tests {
     use super::*;
     use std::io::Write;
+    #[test]
+    fn decrypts_envelope_from_chacha20poly1305_0_10() {
+        // Generated with chacha20poly1305 0.10.1, key [7; 32], nonce [9; 24].
+        let key_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(key_file.path(), hex::encode([7_u8; 32])).unwrap();
+        let vault = SecretVault::load(key_file.path()).unwrap();
+        let envelope =
+            "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJ0heF6x_TVBKGfX5VDBZ1xl6c3P8umTS9dFTqmu9gIX5dcIRADA";
+        assert_eq!(
+            vault
+                .decrypt("oauth:fixture", envelope, vault.key_id())
+                .unwrap(),
+            b"legacy-provider-token"
+        );
+        assert!(
+            vault
+                .decrypt("oauth:other", envelope, vault.key_id())
+                .is_err()
+        );
+    }
+
     #[test]
     fn round_trip_is_randomized_and_context_bound() {
         let mut f = tempfile::NamedTempFile::new().unwrap();

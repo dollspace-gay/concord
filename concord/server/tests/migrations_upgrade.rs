@@ -36,7 +36,7 @@ async fn file_fixture(version: usize) -> (SqlitePool, std::path::PathBuf) {
             .execute(&mut *conn).await.unwrap();
     }
     for (index, script) in LEGACY.iter().take(version).enumerate() {
-        sqlx::raw_sql(script).execute(&mut *conn).await.unwrap();
+        sqlx::raw_sql(*script).execute(&mut *conn).await.unwrap();
         if version >= 1 {
             sqlx::query("INSERT OR IGNORE INTO schema_version(version) VALUES(?)")
                 .bind((index + 1) as i64)

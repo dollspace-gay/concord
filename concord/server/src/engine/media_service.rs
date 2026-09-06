@@ -719,9 +719,17 @@ impl MediaService {
         asset_id: &str,
         purpose: &str,
     ) -> Result<bool, String> {
-        let (table, missing) = match purpose {
-            "emoji" => ("custom_emoji", "emoji"),
-            "sticker" => ("stickers", "sticker"),
+        let (select, delete, missing) = match purpose {
+            "emoji" => (
+                "SELECT image_url FROM custom_emoji WHERE id=? AND server_id=?",
+                "DELETE FROM custom_emoji WHERE id=? AND server_id=?",
+                "emoji",
+            ),
+            "sticker" => (
+                "SELECT image_url FROM stickers WHERE id=? AND server_id=?",
+                "DELETE FROM stickers WHERE id=? AND server_id=?",
+                "sticker",
+            ),
             _ => return Err("INVALID_INPUT: invalid managed media purpose".into()),
         };
         let (_permit, mut transaction) = self.begin_write().await?;
@@ -735,8 +743,7 @@ impl MediaService {
             )
             .await
             .map_err(authorization_error)?;
-        let select = format!("SELECT image_url FROM {table} WHERE id=? AND server_id=?");
-        let url: Option<String> = sqlx::query_scalar(&select)
+        let url: Option<String> = sqlx::query_scalar(select)
             .bind(asset_id)
             .bind(server_id)
             .fetch_optional(&mut *transaction)
@@ -745,8 +752,7 @@ impl MediaService {
         let Some(url) = url else {
             return Ok(false);
         };
-        let delete = format!("DELETE FROM {table} WHERE id=? AND server_id=?");
-        sqlx::query(&delete)
+        sqlx::query(delete)
             .bind(asset_id)
             .bind(server_id)
             .execute(&mut *transaction)

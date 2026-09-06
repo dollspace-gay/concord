@@ -25,7 +25,7 @@ export function isGifPickerAvailable(): boolean {
 export function GifPicker({ onSelect, onClose }: GifPickerProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<TenorGif[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!!TENOR_API_KEY);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -49,18 +49,16 @@ export function GifPicker({ onSelect, onClose }: GifPickerProps) {
     }
   }, []);
 
-  // Load featured GIFs on mount
   useEffect(() => {
-    fetchGifs('');
     inputRef.current?.focus();
-  }, [fetchGifs]);
+  }, []);
 
   // Debounced search
   useEffect(() => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchGifs(query);
-    }, 400);
+    }, query.trim() ? 400 : 0);
     return () => clearTimeout(debounceRef.current);
   }, [query, fetchGifs]);
 

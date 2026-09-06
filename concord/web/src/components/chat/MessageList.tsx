@@ -133,8 +133,10 @@ export function MessageList() {
   return (
     <div className="flex flex-1 flex-col">
       <Virtuoso
+        key={key}
         ref={virtuosoRef}
         data={messages}
+        initialTopMostItemIndex={{ index: 'LAST', align: 'end' }}
         defaultItemHeight={80}
         startReached={handleLoadMore}
         followOutput="smooth"

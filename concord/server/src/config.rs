@@ -5,7 +5,7 @@ use std::io::Write;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
-use rand::RngCore;
+use rand::Rng;
 use serde::Deserialize;
 use sqlx::SqlitePool;
 use url::Url;
@@ -283,13 +283,13 @@ impl ServerConfig {
         create_private_dir(&secret_dir, "auth.jwt_secret_file")?;
 
         let mut random = [0_u8; 32];
-        rand::thread_rng().fill_bytes(&mut random);
+        rand::rng().fill_bytes(&mut random);
         let secret = random
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
         write_new_private_file(&secret_path, secret.as_bytes(), "auth.jwt_secret_file")?;
-        rand::thread_rng().fill_bytes(&mut random);
+        rand::rng().fill_bytes(&mut random);
         let external_key = random
             .iter()
             .map(|byte| format!("{byte:02x}"))

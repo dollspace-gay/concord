@@ -7,7 +7,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum_extra::extract::CookieJar;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use rand::{RngCore, rngs::OsRng};
+use rand::{TryRng, rngs::SysRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::Row;
@@ -77,10 +77,10 @@ fn error(status: StatusCode, code: &'static str) -> Response {
     (status, Json(ErrorBody { error: code })).into_response()
 }
 
-fn secret(prefix: &str) -> String {
+fn secret(prefix: &str) -> Result<String, rand::rngs::SysError> {
     let mut bytes = [0_u8; 32];
-    OsRng.fill_bytes(&mut bytes);
-    format!("{prefix}{}", hex::encode(bytes))
+    SysRng.try_fill_bytes(&mut bytes)?;
+    Ok(format!("{prefix}{}", hex::encode(bytes)))
 }
 
 fn hash(value: &str) -> String {
@@ -185,7 +185,9 @@ pub async fn authorize_get(
             return error(StatusCode::BAD_REQUEST, "invalid_target");
         }
     }
-    let consent = secret("cc_consent_");
+    let Ok(consent) = secret("cc_consent_") else {
+        return error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable");
+    };
     let expires = (chrono::Utc::now() + chrono::Duration::minutes(CODE_MINUTES))
         .format("%Y-%m-%d %H:%M:%S")
         .to_string();
@@ -298,7 +300,9 @@ pub async fn authorize_post(
         )
         .unwrap_or_else(|response| *response);
     }
-    let code = secret("cc_code_");
+    let Ok(code) = secret("cc_code_") else {
+        return error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable");
+    };
     let expires = (chrono::Utc::now() + chrono::Duration::minutes(CODE_MINUTES))
         .format("%Y-%m-%d %H:%M:%S")
         .to_string();
@@ -500,8 +504,12 @@ async fn issue_pair(
 ) -> Response {
     let id = uuid::Uuid::new_v4().to_string();
     let family = family.unwrap_or(&id).to_owned();
-    let access = secret("cc_oauth_access_");
-    let refresh = secret("cc_oauth_refresh_");
+    let Ok(access) = secret("cc_oauth_access_") else {
+        return error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable");
+    };
+    let Ok(refresh) = secret("cc_oauth_refresh_") else {
+        return error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable");
+    };
     let access_expiry = (chrono::Utc::now() + chrono::Duration::minutes(ACCESS_MINUTES))
         .format("%Y-%m-%d %H:%M:%S")
         .to_string();
@@ -614,8 +622,12 @@ async fn rotate_refresh(
         return error(StatusCode::BAD_REQUEST, "invalid_grant");
     }
     let replacement = uuid::Uuid::new_v4().to_string();
-    let access = secret("cc_oauth_access_");
-    let new_refresh = secret("cc_oauth_refresh_");
+    let Ok(access) = secret("cc_oauth_access_") else {
+        return error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable");
+    };
+    let Ok(new_refresh) = secret("cc_oauth_refresh_") else {
+        return error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable");
+    };
     let access_expiry = (chrono::Utc::now() + chrono::Duration::minutes(ACCESS_MINUTES))
         .format("%Y-%m-%d %H:%M:%S")
         .to_string();

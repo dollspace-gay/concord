@@ -1141,11 +1141,12 @@ function EmojiTab({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const emojiEntries = Object.entries(emoji);
 
   const handleUpload = async () => {
-    const file = fileInputRef.current?.files?.[0];
+    const file = selectedFile;
     if (!file || !newName.trim()) return;
 
     // Validate: images only, max 256KB
@@ -1164,6 +1165,7 @@ function EmojiTab({
       const attachment = await uploadFile(file, { serverId, purpose: 'emoji' });
       await createEmoji(serverId, newName.trim(), attachment.url);
       setNewName('');
+      setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
@@ -1187,7 +1189,7 @@ function EmojiTab({
           />
           <button
             onClick={handleUpload}
-            disabled={uploading || !newName.trim() || !fileInputRef.current?.files?.length}
+            disabled={uploading || !newName.trim() || !selectedFile}
             className="rounded bg-bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-bg-accent-hover disabled:opacity-50"
           >
             {uploading ? 'Uploading...' : 'Upload'}
@@ -1195,6 +1197,7 @@ function EmojiTab({
         </div>
         <input
           ref={fileInputRef}
+          onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
           type="file"
           accept="image/*"
           className="text-sm text-text-secondary file:mr-3 file:rounded file:border-0 file:bg-bg-accent file:px-3 file:py-1 file:text-sm file:text-white"
@@ -1247,9 +1250,10 @@ function StickersTab({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleUpload = async () => {
-    const file = fileInputRef.current?.files?.[0];
+    const file = selectedFile;
     if (!file || !newName.trim()) return;
 
     if (!file.type.startsWith('image/')) {
@@ -1268,6 +1272,7 @@ function StickersTab({
       await createSticker(serverId, newName.trim(), attachment.url, newDesc.trim() || undefined);
       setNewName('');
       setNewDesc('');
+      setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
@@ -1291,7 +1296,7 @@ function StickersTab({
           />
           <button
             onClick={handleUpload}
-            disabled={uploading || !newName.trim() || !fileInputRef.current?.files?.length}
+            disabled={uploading || !newName.trim() || !selectedFile}
             className="rounded bg-bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-bg-accent-hover disabled:opacity-50"
           >
             {uploading ? 'Uploading...' : 'Upload'}
@@ -1307,6 +1312,7 @@ function StickersTab({
         />
         <input
           ref={fileInputRef}
+          onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
           type="file"
           accept="image/*"
           className="text-sm text-text-secondary file:mr-3 file:rounded file:border-0 file:bg-bg-accent file:px-3 file:py-1 file:text-sm file:text-white"

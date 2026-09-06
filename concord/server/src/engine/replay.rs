@@ -4,7 +4,7 @@ use base64::Engine;
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};
 use chrono::Utc;
-use rand::RngCore;
+use rand::Rng;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -218,7 +218,7 @@ impl ReplayService {
             pool,
             auth,
             write_admission,
-            cursor_cipher: XChaCha20Poly1305::new(Key::from_slice(&key_bytes)),
+            cursor_cipher: XChaCha20Poly1305::new(&Key::from(key_bytes)),
         }
     }
 
@@ -612,10 +612,10 @@ impl ReplayService {
         };
         let plaintext = serde_json::to_vec(&claims).map_err(|_| ReplayError::InvalidInput)?;
         let mut nonce = [0_u8; 24];
-        rand::thread_rng().fill_bytes(&mut nonce);
+        rand::rng().fill_bytes(&mut nonce);
         let ciphertext = self
             .cursor_cipher
-            .encrypt(XNonce::from_slice(&nonce), plaintext.as_ref())
+            .encrypt(&XNonce::from(nonce), plaintext.as_ref())
             .map_err(|_| ReplayError::InvalidInput)?;
         let mut encoded = nonce.to_vec();
         encoded.extend_from_slice(&ciphertext);
@@ -635,7 +635,11 @@ impl ReplayService {
         let (nonce, ciphertext) = encoded.split_at(24);
         let plaintext = self
             .cursor_cipher
-            .decrypt(XNonce::from_slice(nonce), ciphertext)
+            .decrypt(
+                <&XNonce>::try_from(nonce)
+                    .map_err(|_| ReplayError::ResyncRequired(ResyncReason::InvalidCursor))?,
+                ciphertext,
+            )
             .map_err(|_| ReplayError::ResyncRequired(ResyncReason::InvalidCursor))?;
         let claims: CursorClaims = serde_json::from_slice(&plaintext)
             .map_err(|_| ReplayError::ResyncRequired(ResyncReason::InvalidCursor))?;
@@ -742,7 +746,7 @@ fn subscription_hash(subscriptions: &[ConversationId]) -> String {
         hasher.update((subscription.as_str().len() as u64).to_be_bytes());
         hasher.update(subscription.as_str().as_bytes());
     }
-    format!("{:x}", hasher.finalize())
+    hex::encode(hasher.finalize())
 }
 
 async fn authorize_conversation(

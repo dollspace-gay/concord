@@ -92,16 +92,15 @@ pub async fn bulk_delete_messages(
         return Ok(0);
     }
     // Build parameterized IN clause
-    let placeholders: Vec<&str> = message_ids.iter().map(|_| "?").collect();
-    let sql = format!(
-        "UPDATE messages SET deleted_at = datetime('now') WHERE id IN ({}) AND deleted_at IS NULL",
-        placeholders.join(",")
+    let mut builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+        "UPDATE messages SET deleted_at = datetime('now') WHERE id IN (",
     );
-    let mut query = sqlx::query(&sql);
+    let mut separated = builder.separated(", ");
     for id in message_ids {
-        query = query.bind(id);
+        separated.push_bind(id);
     }
-    let result = query.execute(pool).await?;
+    builder.push(") AND deleted_at IS NULL");
+    let result = builder.build().execute(pool).await?;
     Ok(result.rows_affected())
 }
 

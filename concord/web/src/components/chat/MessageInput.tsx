@@ -75,7 +75,12 @@ export function MessageInput() {
     ? []
     : slashCommands.filter((command) => command.name.toLowerCase().startsWith(slashQuery)).slice(0, 8);
 
-  useEffect(() => setSlashIndex(0), [slashQuery, slashCandidates.length]);
+  const slashSelectionKey = `${compositionKey}:${slashQuery}:${slashCandidates.length}`;
+  const [previousSlashSelectionKey, setPreviousSlashSelectionKey] = useState(slashSelectionKey);
+  if (previousSlashSelectionKey !== slashSelectionKey) {
+    setPreviousSlashSelectionKey(slashSelectionKey);
+    setSlashIndex(0);
+  }
 
   const insertSlashCommand = useCallback((name: string) => {
     setText(`/${name} `);
@@ -103,10 +108,12 @@ export function MessageInput() {
       ].slice(0, 8)
     : [];
 
-  // Reset mention index when candidates change
-  useEffect(() => {
+  const mentionSelectionKey = `${compositionKey}:${mentionQuery}:${mentionCandidates.length}`;
+  const [previousMentionSelectionKey, setPreviousMentionSelectionKey] = useState(mentionSelectionKey);
+  if (previousMentionSelectionKey !== mentionSelectionKey) {
+    setPreviousMentionSelectionKey(mentionSelectionKey);
     setMentionIndex(0);
-  }, [mentionCandidates.length]);
+  }
 
   const insertMention = useCallback((mention: string) => {
     const before = text.slice(0, mentionStart);

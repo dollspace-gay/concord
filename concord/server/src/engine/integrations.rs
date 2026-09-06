@@ -738,7 +738,11 @@ mod tests {
                     "1"
                 }
             );
-            sqlx::query(&trigger).execute(&pool).await.unwrap();
+            // Test trigger identifiers and predicates come only from the fixed literals above.
+            sqlx::query(sqlx::AssertSqlSafe(trigger))
+                .execute(&pool)
+                .await
+                .unwrap();
             assert!(service.create_webhook(&actor, incoming()).await.is_err());
             for query in [
                 "SELECT COUNT(*) FROM users WHERE id LIKE 'webhook:%'",

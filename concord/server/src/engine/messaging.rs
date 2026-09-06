@@ -1860,7 +1860,7 @@ fn validate_operation_ids(request_id: &str, client_message_id: &str) -> Result<(
 fn hash_json(value: &serde_json::Value) -> Result<String, MessagingError> {
     let bytes = serde_json::to_vec(value)
         .map_err(|_| MessagingError::InvalidInput("command cannot be encoded".into()))?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
+    Ok(hex::encode(Sha256::digest(bytes)))
 }
 
 fn domain_tuple_id(domain: &[u8], fields: &[&str]) -> String {
@@ -1871,7 +1871,7 @@ fn domain_tuple_id(domain: &[u8], fields: &[&str]) -> String {
         hasher.update((field.len() as u64).to_be_bytes());
         hasher.update(field.as_bytes());
     }
-    format!("{:x}", hasher.finalize())
+    hex::encode(hasher.finalize())
 }
 
 pub(crate) fn reaction_entity_id(message_id: &str, user_id: &str, emoji: &str) -> String {

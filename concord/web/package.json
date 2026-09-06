@@ -23,31 +23,32 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.1.18",
+    "@tailwindcss/vite": "^4.3.3",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-virtuoso": "^4.18.1",
-    "tailwindcss": "^4.1.18",
-    "zustand": "^5.0.11"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-virtuoso": "^4.18.13",
+    "tailwindcss": "^4.3.3",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@playwright/test": "1.62.0",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
     "@types/ws": "^8.18.1",
-    "@vitejs/plugin-react": "^5.1.1",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "@vitejs/plugin-react": "^6.1.1",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.6",
+    "globals": "^17.12.0",
     "json-schema-to-typescript": "16.0.0",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.48.0",
-    "vite": "^7.3.1",
-    "ws": "8.21.0"
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.69.0",
+    "vite": "^8.2.2",
+    "ws": "8.21.3"
   }
 }

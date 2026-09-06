@@ -330,7 +330,7 @@ pub fn observed_storage_sync_faults() -> u32 {
 }
 
 fn checksum(sql: &str) -> String {
-    format!("{:x}", Sha256::digest(sql.as_bytes()))
+    hex::encode(Sha256::digest(sql.as_bytes()))
 }
 
 async fn object_exists(
@@ -351,9 +351,12 @@ async fn column_exists(
     column: &str,
 ) -> Result<bool, sqlx::Error> {
     let quoted = table.replace('"', "\"\"");
-    let rows = sqlx::query(&format!("PRAGMA table_info(\"{quoted}\")"))
-        .fetch_all(conn)
-        .await?;
+    // The identifier is double-quoted with embedded quotes escaped above.
+    let rows = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "PRAGMA table_info(\"{quoted}\")"
+    )))
+    .fetch_all(conn)
+    .await?;
     Ok(rows
         .iter()
         .any(|row| row.get::<String, _>("name") == column))
@@ -705,7 +708,11 @@ async fn inspect_repairs(
                 "SELECT id,{quoted_column} FROM \"{quoted_table}\" \
                  WHERE {quoted_column} IS NULL OR julianday({quoted_column}) IS NULL"
             );
-            for row in sqlx::query(&query).fetch_all(&mut *conn).await? {
+            // Identifiers come from the fixed table/column list above.
+            for row in sqlx::query(sqlx::AssertSqlSafe(query))
+                .fetch_all(&mut *conn)
+                .await?
+            {
                 findings.push(RepairFinding {
                     code: "malformed_timestamp",
                     object_type: table,
@@ -724,7 +731,11 @@ async fn inspect_repairs(
             }
             let quoted = table.replace('"', "\"\"");
             let query = format!("SELECT id FROM \"{quoted}\" WHERE trim(id)='' OR length(id)>512");
-            for row in sqlx::query(&query).fetch_all(&mut *conn).await? {
+            // Identifiers come from the fixed table/column list above.
+            for row in sqlx::query(sqlx::AssertSqlSafe(query))
+                .fetch_all(&mut *conn)
+                .await?
+            {
                 findings.push(RepairFinding {
                     code: "malformed_identifier",
                     object_type: table,
@@ -1095,9 +1106,12 @@ async fn capture_snapshot(conn: &mut SqliteConnection) -> Result<Vec<(String, i6
     let mut snapshot = Vec::with_capacity(tables.len());
     for table in tables {
         let quoted = table.replace('"', "\"\"");
-        let count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM \"{quoted}\""))
-            .fetch_one(&mut *conn)
-            .await?;
+        // SQLite schema names are double-quoted with embedded quotes escaped above.
+        let count: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT COUNT(*) FROM \"{quoted}\""
+        )))
+        .fetch_one(&mut *conn)
+        .await?;
         snapshot.push((table, count));
     }
     Ok(snapshot)

@@ -1474,7 +1474,7 @@ impl AuthorizationService {
         }
 
         let safe_query = query.map(|query| format!("\"{}\"", query.replace('"', "")));
-        let append_predicate = |builder: &mut QueryBuilder<'_, Sqlite>, include_cursor: bool| {
+        let append_predicate = |builder: &mut QueryBuilder<Sqlite>, include_cursor: bool| {
             builder.push(" FROM messages m ");
             if safe_query.is_some() {
                 builder.push("JOIN messages_fts f ON m.rowid=f.rowid ");

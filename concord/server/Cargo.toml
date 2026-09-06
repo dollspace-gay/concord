@@ -22,78 +22,78 @@ required-features = ["browser-fixtures"]
 
 [dependencies]
 # Async runtime
-tokio = { version = "1.49", features = ["full"] }
-tokio-util = "0.7"
+tokio = { version = "1.53.1", features = ["full"] }
+tokio-util = "0.7.19"
 
 # HTTP / WebSocket framework
-axum = { version = "0.8", features = ["ws", "multipart"] }
-tower = "0.5"
-tower-http = { version = "0.6", features = ["cors", "fs", "limit"] }
+axum = { version = "0.8.9", features = ["ws", "multipart"] }
+tower = "0.5.3"
+tower-http = { version = "0.7.1", features = ["cors", "fs", "limit"] }
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
 schemars = { version = "=1.2.2", features = ["chrono04", "uuid1"] }
 
 # Concurrent data structures
-dashmap = "6.1"
+dashmap = "6.2.1"
 
 # Permission bitfields
-bitflags = "2"
+bitflags = "2.13.1"
 
 # Identifiers
-uuid = { version = "1.20", features = ["v4", "serde"] }
+uuid = { version = "1.26.0", features = ["v4", "serde"] }
 
 # Time
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4.45", features = ["serde"] }
 
 # Async stream utilities (needed for WebSocket split)
-futures-util = "0.3"
+futures-util = "0.3.34"
 
 # Database
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "chrono", "uuid", "macros", "migrate"] }
-libsqlite3-sys = { version = "0.30.1", features = ["bundled"], optional = true }
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "sqlite", "chrono", "uuid", "macros", "migrate"] }
+libsqlite3-sys = { version = "0.37.0", features = ["bundled"], optional = true }
 
 # Authentication
-jsonwebtoken = { version = "11.0", default-features = false, features = ["aws_lc_rs"] }
-argon2 = "0.5"
-rand = "0.8"
-base64 = "0.22"
-reqwest = { version = "0.12", features = ["json", "stream"] }
+jsonwebtoken = { version = "11.0.0", default-features = false, features = ["aws_lc_rs"] }
+argon2 = "0.6.0"
+rand = "0.10.2"
+base64 = "0.23.1"
+reqwest = { version = "0.13.4", features = ["json", "stream", "form", "query"] }
 
 # AT Protocol (Bluesky) OAuth
 atproto-oauth = { version = "0.14.5", default-features = false }
 atproto-identity = { version = "0.14.5", default-features = false }
-urlencoding = "2.1"
-url = "2.5"
-anyhow = "1.0"
-sha2 = "0.10"
-hex = "0.4"
-thiserror = "2"
-chacha20poly1305 = "0.10"
-cap-std = "3.4"
-fs2 = "0.4"
+urlencoding = "2.1.3"
+url = "2.5.8"
+anyhow = "1.0.104"
+sha2 = "0.11.0"
+hex = "0.4.3"
+thiserror = "2.0.20"
+chacha20poly1305 = "0.11.0"
+cap-std = "4.0.3"
+fs2 = "0.4.3"
 
 # HTTP cookie/header utilities
-axum-extra = { version = "0.10", features = ["cookie", "typed-header"] }
+axum-extra = { version = "0.12.6", features = ["cookie", "typed-header"] }
 
 # Configuration
-toml = "0.8"
+toml = "1.1.5"
 
 # CLI
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6.6", features = ["derive"] }
 
 # IRC TLS support
-tokio-rustls = "0.26"
-rustls-pki-types = { version = "1.14", features = ["std"] }
+tokio-rustls = "0.26.5"
+rustls-pki-types = { version = "1.15.1", features = ["std"] }
 
 # Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [dev-dependencies]
-jsonschema = { version = "=0.33.0", default-features = false }
-tempfile = "3"
+jsonschema = { version = "=0.54.0", default-features = false }
+tempfile = "3.27.0"
 
 [build-dependencies]
-cc = "1"
+cc = "1.4.5"

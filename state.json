@@ -1,6 +1,6 @@
 {
   "next_display_id": 13,
-  "next_comment_id": 12,
+  "next_comment_id": 13,
   "display_id_map": {
     "0465b617-e9bc-4612-9fc3-dbc76e5c11bd": 4,
     "22b78555-b3df-4e8c-ad98-0000c10939cc": 2,
@@ -72,11 +72,20 @@
       "priority": "high",
       "created_by": "sooH",
       "created_at": "2026-09-05T23:54:17.412118203Z",
-      "updated_at": "2026-09-06T06:13:31.509439721Z",
+      "updated_at": "2026-09-06T06:52:33.280217822Z",
       "labels": [
         "feature"
       ],
       "comments": {
+        "0f6e38f4-ea87-4162-a5f8-6aeb33a0d59f": {
+          "display_id": 12,
+          "author": "sooH",
+          "content": "[action] Schema28 historical upgrades1–16 and operatorCLI passed; current browser41 and session-authority23 passed; strictClippy r8 passed. Real installed-bot journey passed, stronger profile/bot/dialog rerun awaits compiling OAuth issuer batch. Four browser stores and shared dialogs implemented; I59 peer role hydration/fanout returned. Fullcoding active before security review.",
+          "created_at": "2026-09-06T06:52:33.275253323Z",
+          "kind": "note",
+          "signed_by": "SHA256:vSvLFVVvxeXZ2zdt51iBf/d9/mqC7DX2RDgTAqewsvA",
+          "signature": "U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgI9W61IujvruBcNoIuYpXT9mJq/xROI741mkuv3/UlMYAAAARY3Jvc3NsaW5rLWNvbW1lbnQAAAAAAAAABnNoYTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABAhnRh5sEIza1H4WMc+uT5/gH8399RFia4sfN/6KhPR98/7q9CYjcSnIUHSwiUuvrDYE3pEONl/tNvnba1wdQYCA=="
+        },
         "11dfb54e-3483-4b72-88f5-de6069ac3146": {
           "display_id": 9,
           "author": "sooH",
@@ -301,8 +310,8 @@
   },
   "next_milestone_id": 1,
   "watermark": {
-    "timestamp": "2026-09-06T06:13:31.509439721Z",
+    "timestamp": "2026-09-06T06:52:33.280217822Z",
     "agent_id": "sooH",
-    "agent_seq": 36
+    "agent_seq": 37
   }
 }
